@@ -1,0 +1,15 @@
+[program:family-house-connect-queue]
+; Keep the selected connection's retry_after setting greater than --timeout.
+process_name=%(program_name)s_%(process_num)02d
+directory=/var/www/family-house-connect/current
+command=/usr/bin/php artisan queue:work --sleep=3 --tries=3 --backoff=5 --timeout=60 --max-time=3600 --memory=256 --no-interaction
+user=www-data
+numprocs=2
+autostart=true
+autorestart=true
+stopasgroup=true
+killasgroup=true
+stopwaitsecs=3600
+redirect_stderr=true
+stdout_logfile=/var/log/supervisor/family-house-connect-queue.log
+environment=APP_ENV="production"

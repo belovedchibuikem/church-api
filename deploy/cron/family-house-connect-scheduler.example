@@ -1,0 +1,2 @@
+# Install as /etc/cron.d/family-house-connect-scheduler after replacing the release path if needed.
+* * * * * www-data cd /var/www/family-house-connect/current && /usr/bin/php artisan schedule:run --no-interaction >> storage/logs/scheduler.log 2>&1

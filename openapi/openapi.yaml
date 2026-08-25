@@ -1,0 +1,197 @@
+openapi: 3.1.0
+info:
+  title: Family House Connect API
+  version: 0.2.0
+  description: Authoritative Laravel API consumed by the Family House Connect Next.js and Flutter applications.
+servers:
+  - url: /api/v1
+paths:
+  /:
+    get:
+      operationId: getApiStatus
+      summary: Describe the available API platform
+      tags: [Platform]
+      responses:
+        '200':
+          description: API platform is available.
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusEnvelope'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /health:
+    get:
+      operationId: getHealth
+      summary: Check application liveness
+      tags: [Platform]
+      responses:
+        '200':
+          description: Application process is healthy enough to serve requests.
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthEnvelope'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /health/readiness:
+    get:
+      operationId: getReadiness
+      summary: Check required application dependencies
+      description: Returns only safe component status labels and never exposes connection details.
+      tags: [Platform]
+      responses:
+        '200':
+          description: Required dependencies are ready.
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessEnvelope'
+        '503':
+          description: At least one required dependency is unavailable.
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+components:
+  headers:
+    CorrelationId:
+      description: Request correlation UUID, propagated when the supplied value is valid.
+      schema:
+        type: string
+        format: uuid
+  responses:
+    RateLimited:
+      description: The public API rate limit was exceeded.
+      headers:
+        X-Correlation-ID:
+          $ref: '#/components/headers/CorrelationId'
+        Retry-After:
+          description: Seconds until another request may be attempted.
+          schema:
+            type: integer
+            minimum: 0
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+  schemas:
+    EnvelopeMeta:
+      type: object
+      required: [api_version, timestamp]
+      properties:
+        api_version:
+          type: string
+          const: v1
+        timestamp:
+          type: string
+          format: date-time
+    ApiStatusEnvelope:
+      type: object
+      required: [data, meta, correlation_id]
+      properties:
+        data:
+          type: object
+          required: [name, status, surfaces]
+          properties:
+            name:
+              type: string
+              const: Family House Connect API
+            status:
+              type: string
+              const: available
+            surfaces:
+              type: array
+              prefixItems:
+                - { type: string, const: public }
+                - { type: string, const: user }
+                - { type: string, const: admin }
+              minItems: 3
+              maxItems: 3
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        correlation_id:
+          type: string
+          format: uuid
+    HealthEnvelope:
+      type: object
+      required: [data, meta, correlation_id]
+      properties:
+        data:
+          type: object
+          required: [status, service]
+          properties:
+            status:
+              type: string
+              const: ok
+            service:
+              type: string
+              const: family-house-connect-api
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        correlation_id:
+          type: string
+          format: uuid
+    ReadinessEnvelope:
+      type: object
+      required: [data, meta, correlation_id]
+      properties:
+        data:
+          type: object
+          required: [status, checks]
+          properties:
+            status:
+              type: string
+              const: ready
+            checks:
+              type: object
+              required: [database, cache, queue]
+              properties:
+                database:
+                  type: string
+                  enum: [ok, failed]
+                cache:
+                  type: string
+                  enum: [ok, failed]
+                queue:
+                  type: string
+                  enum: [ok, failed]
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        correlation_id:
+          type: string
+          format: uuid
+    ErrorEnvelope:
+      type: object
+      required: [error, meta, correlation_id]
+      properties:
+        error:
+          type: object
+          required: [code, message, details]
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: object
+              additionalProperties: true
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        correlation_id:
+          type: string
+          format: uuid
