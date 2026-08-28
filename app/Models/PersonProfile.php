@@ -13,6 +13,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'middle_name',
     'family_name',
     'preferred_name',
+    'country',
+    'region',
+    'locality',
 ])]
 class PersonProfile extends Model
 {

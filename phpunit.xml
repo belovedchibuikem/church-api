@@ -34,6 +34,8 @@
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
+        <env name="SESSION_COOKIE" value="family_house_connect_session"/>
+        <env name="CORS_ALLOWED_ORIGINS" value="http://localhost:3000,http://127.0.0.1:3000"/>
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>

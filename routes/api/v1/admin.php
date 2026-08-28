@@ -1,6 +1,463 @@
 <?php
 
-/**
- * Privileged operations are added here only with authentication, MFA,
- * permission, scope, record-policy, and audit enforcement.
- */
+use App\Admin\AdminDashboardModule;
+use App\Http\Controllers\Api\V1\Admin\AccessAdministrationController;
+use App\Http\Controllers\Api\V1\Admin\AccessCatalogController;
+use App\Http\Controllers\Api\V1\Admin\AdminDashboardController;
+use App\Http\Controllers\Api\V1\Admin\AdminProfileController;
+use App\Http\Controllers\Api\V1\Admin\AdvisoryAiOperationsController;
+use App\Http\Controllers\Api\V1\Admin\AuditReviewController;
+use App\Http\Controllers\Api\V1\Admin\ChurchOperationsController;
+use App\Http\Controllers\Api\V1\Admin\CommunicationOperationsController;
+use App\Http\Controllers\Api\V1\Admin\ContentAdministrationController;
+use App\Http\Controllers\Api\V1\Admin\DemoDatasetController;
+use App\Http\Controllers\Api\V1\Admin\DomainCatalogController;
+use App\Http\Controllers\Api\V1\Admin\EventOperationsController;
+use App\Http\Controllers\Api\V1\Admin\FileOperationsController;
+use App\Http\Controllers\Api\V1\Admin\FinanceOperationsController;
+use App\Http\Controllers\Api\V1\Admin\KcaOperationsController;
+use App\Http\Controllers\Api\V1\Admin\MapsProviderController;
+use App\Http\Controllers\Api\V1\Admin\MediaOperationsController;
+use App\Http\Controllers\Api\V1\Admin\MissionOperationsController;
+use App\Http\Controllers\Api\V1\Admin\ObjectStorageController;
+use App\Http\Controllers\Api\V1\Admin\OrganizationController;
+use App\Http\Controllers\Api\V1\Admin\PlatformBrandingController;
+use App\Http\Controllers\Api\V1\Admin\PlatformSettingsController;
+use App\Http\Controllers\Api\V1\Admin\PaymentProviderController;
+use App\Http\Controllers\Api\V1\Admin\CommunicationProviderController;
+use App\Http\Controllers\Api\V1\Admin\KcaGovernanceController;
+use App\Http\Controllers\Api\V1\Admin\PressOperationsController;
+use App\Http\Controllers\Api\V1\Admin\PrivacyOperationsController;
+use App\Http\Controllers\Api\V1\Admin\ReportingOperationsController;
+use App\Http\Controllers\Api\V1\Admin\SafeguardingOperationsController;
+use App\Http\Controllers\Api\V1\Admin\ScopeAssignmentController;
+use App\Http\Controllers\Api\V1\Admin\SearchOperationsController;
+use App\Http\Controllers\Api\V1\Admin\UserAdministrationController;
+use App\Http\Middleware\RequireDashboardPermissionAndScope;
+use App\Http\Middleware\RequirePermissionAndScope;
+use App\Services\Admin\ProtectedDomainRegistry;
+use Illuminate\Support\Facades\Route;
+
+Route::get('/profile', AdminProfileController::class)
+    ->middleware(RequirePermissionAndScope::class.':member.self.manage')
+    ->name('profile.show');
+
+Route::prefix('dashboards')->name('dashboards.')->group(function (): void {
+    Route::get('/{module}', [AdminDashboardController::class, 'show'])
+        ->middleware(RequireDashboardPermissionAndScope::class)
+        ->where('module', implode('|', array_map(
+            fn (AdminDashboardModule $dashboard): string => $dashboard->value,
+            AdminDashboardModule::cases(),
+        )))
+        ->name('show');
+});
+
+Route::controller(UserAdministrationController::class)
+    ->prefix('users')
+    ->name('users.')
+    ->group(function (): void {
+        Route::get('/', 'index')
+            ->middleware(RequirePermissionAndScope::class.':identity.users.view')
+            ->name('index');
+        Route::get('/{user}', 'show')
+            ->whereUlid('user')
+            ->middleware(RequirePermissionAndScope::class.':identity.users.view')
+            ->name('show');
+        Route::post('/{user}/suspension', 'suspend')
+            ->whereUlid('user')
+            ->middleware(RequirePermissionAndScope::class.':identity.users.suspend')
+            ->name('suspend');
+        Route::delete('/{user}/suspension', 'reactivate')
+            ->whereUlid('user')
+            ->middleware(RequirePermissionAndScope::class.':identity.users.reactivate')
+            ->name('reactivate');
+    });
+
+Route::prefix('access')->name('access.')->group(function (): void {
+    Route::get('/roles', [AccessCatalogController::class, 'roles'])
+        ->middleware(RequirePermissionAndScope::class.':identity.roles.view')
+        ->name('roles.index');
+    Route::get('/permissions', [AccessCatalogController::class, 'permissions'])
+        ->middleware(RequirePermissionAndScope::class.':identity.permissions.view')
+        ->name('permissions.index');
+    Route::get('/scope-assignments', ScopeAssignmentController::class)
+        ->middleware(RequirePermissionAndScope::class.':identity.scopes.view')
+        ->name('scope_assignments.index');
+    Route::post('/role-assignments/{roleAssignment}/scopes', [AccessAdministrationController::class, 'assignScope'])
+        ->whereUlid('roleAssignment')
+        ->middleware(RequirePermissionAndScope::class.':identity.scopes.assign')
+        ->name('role_assignments.scopes.store');
+    Route::post('/roles/{role}/permissions', [AccessAdministrationController::class, 'grantPermission'])
+        ->whereUlid('role')
+        ->middleware(RequirePermissionAndScope::class.':identity.permissions.grant')
+        ->name('roles.permissions.store');
+});
+
+Route::post('/users/{user}/role-assignments', [AccessAdministrationController::class, 'assignRole'])
+    ->whereUlid('user')
+    ->middleware(RequirePermissionAndScope::class.':identity.roles.assign')
+    ->name('users.role_assignments.store');
+
+Route::prefix('security')->name('security.')->group(function (): void {
+    Route::get('/audit-events', [AuditReviewController::class, 'auditEvents'])
+        ->middleware(RequirePermissionAndScope::class.':security.audit.view')->name('audit_events.index');
+    Route::get('/access-decisions', [AuditReviewController::class, 'accessDecisions'])
+        ->middleware(RequirePermissionAndScope::class.':security.access_decisions.view')->name('access_decisions.index');
+});
+
+Route::prefix('organization')->name('organization.')->group(function (): void {
+    Route::get('/countries', [OrganizationController::class, 'countries'])
+        ->middleware(RequirePermissionAndScope::class.':organization.countries.view')
+        ->name('countries.index');
+    Route::post('/countries', [OrganizationController::class, 'storeCountry'])
+        ->middleware(RequirePermissionAndScope::class.':organization.countries.manage')
+        ->name('countries.store');
+    Route::get('/countries/{country}/levels', [OrganizationController::class, 'levels'])
+        ->whereUlid('country')
+        ->middleware(RequirePermissionAndScope::class.':organization.countries.view')
+        ->name('countries.levels.index');
+    Route::post('/countries/{country}/levels', [OrganizationController::class, 'storeLevel'])
+        ->whereUlid('country')
+        ->middleware(RequirePermissionAndScope::class.':organization.countries.manage')
+        ->name('countries.levels.store');
+    Route::get('/units', [OrganizationController::class, 'units'])
+        ->middleware(RequirePermissionAndScope::class.':organization.units.view')
+        ->name('units.index');
+    Route::post('/units', [OrganizationController::class, 'storeUnit'])
+        ->middleware(RequirePermissionAndScope::class.':organization.units.manage')
+        ->name('units.store');
+    Route::patch('/units/{unit}/parent', [OrganizationController::class, 'moveUnit'])
+        ->whereUlid('unit')
+        ->middleware(RequirePermissionAndScope::class.':organization.units.manage')
+        ->name('units.parent.update');
+    Route::get('/locations', [OrganizationController::class, 'locations'])
+        ->middleware(RequirePermissionAndScope::class.':organization.locations.view')
+        ->name('locations.index');
+    Route::post('/locations', [OrganizationController::class, 'storeLocation'])
+        ->middleware(RequirePermissionAndScope::class.':organization.locations.manage')
+        ->name('locations.store');
+});
+
+Route::prefix('platform')->name('platform.')->group(function (): void {
+    Route::get('/configurations', [PlatformSettingsController::class, 'configurations'])
+        ->middleware(RequirePermissionAndScope::class.':platform.configuration.view')
+        ->name('configurations.index');
+    Route::put('/configurations', [PlatformSettingsController::class, 'upsertConfiguration'])
+        ->middleware(RequirePermissionAndScope::class.':platform.configuration.manage')
+        ->name('configurations.upsert');
+    Route::get('/feature-flags', [PlatformSettingsController::class, 'featureFlags'])
+        ->middleware(RequirePermissionAndScope::class.':platform.feature_flags.view')
+        ->name('feature_flags.index');
+    Route::put('/feature-flags', [PlatformSettingsController::class, 'upsertFeatureFlag'])
+        ->middleware(RequirePermissionAndScope::class.':platform.feature_flags.manage')
+        ->name('feature_flags.upsert');
+    Route::post('/feature-flags/{featureFlag}/enabled', [PlatformSettingsController::class, 'enableFeatureFlag'])
+        ->whereUlid('featureFlag')
+        ->middleware(RequirePermissionAndScope::class.':platform.feature_flags.manage')
+        ->name('feature_flags.enable');
+    Route::delete('/feature-flags/{featureFlag}/enabled', [PlatformSettingsController::class, 'disableFeatureFlag'])
+        ->whereUlid('featureFlag')
+        ->middleware(RequirePermissionAndScope::class.':platform.feature_flags.manage')
+        ->name('feature_flags.disable');
+
+    Route::prefix('storage/object-storage')
+        ->name('storage.object_storage.')
+        ->group(function (): void {
+            Route::get('/', [ObjectStorageController::class, 'show'])
+                ->middleware(RequirePermissionAndScope::class.':platform.storage.view')
+                ->name('show');
+            Route::put('/', [ObjectStorageController::class, 'configure'])
+                ->middleware([
+                    RequirePermissionAndScope::class.':platform.storage.manage',
+                    'throttle:admin-storage',
+                ])
+                ->name('configure');
+            Route::post('/validation', [ObjectStorageController::class, 'validateConnection'])
+                ->middleware([
+                    RequirePermissionAndScope::class.':platform.storage.manage',
+                    'throttle:admin-storage',
+                ])
+                ->name('validate');
+            Route::post('/activation', [ObjectStorageController::class, 'activate'])
+                ->middleware([
+                    RequirePermissionAndScope::class.':platform.storage.manage',
+                    'throttle:admin-storage',
+                ])
+                ->name('activate');
+            Route::delete('/activation', [ObjectStorageController::class, 'deactivate'])
+                ->middleware([
+                    RequirePermissionAndScope::class.':platform.storage.manage',
+                    'throttle:admin-storage',
+                ])
+                ->name('deactivate');
+        });
+
+    Route::prefix('branding')
+        ->name('branding.')
+        ->group(function (): void {
+            Route::get('/', [PlatformBrandingController::class, 'show'])
+                ->middleware(RequirePermissionAndScope::class.':platform.configuration.view')
+                ->name('show');
+            Route::put('/', [PlatformBrandingController::class, 'update'])
+                ->middleware(RequirePermissionAndScope::class.':platform.configuration.manage')
+                ->name('update');
+            Route::post('/logo', [PlatformBrandingController::class, 'uploadLogo'])
+                ->middleware(RequirePermissionAndScope::class.':platform.configuration.manage')
+                ->name('logo.store');
+            Route::delete('/logo', [PlatformBrandingController::class, 'destroyLogo'])
+                ->middleware(RequirePermissionAndScope::class.':platform.configuration.manage')
+                ->name('logo.destroy');
+            Route::post('/favicon', [PlatformBrandingController::class, 'uploadFavicon'])
+                ->middleware(RequirePermissionAndScope::class.':platform.configuration.manage')
+                ->name('favicon.store');
+            Route::delete('/favicon', [PlatformBrandingController::class, 'destroyFavicon'])
+                ->middleware(RequirePermissionAndScope::class.':platform.configuration.manage')
+                ->name('favicon.destroy');
+        });
+
+    Route::prefix('maps')
+        ->name('maps.')
+        ->group(function (): void {
+            Route::get('/', [MapsProviderController::class, 'show'])
+                ->middleware(RequirePermissionAndScope::class.':platform.maps.view')
+                ->name('show');
+            Route::put('/', [MapsProviderController::class, 'configure'])
+                ->middleware([
+                    RequirePermissionAndScope::class.':platform.maps.manage',
+                    'throttle:admin-storage',
+                ])
+                ->name('configure');
+            Route::post('/activation', [MapsProviderController::class, 'activate'])
+                ->middleware([
+                    RequirePermissionAndScope::class.':platform.maps.manage',
+                    'throttle:admin-storage',
+                ])
+                ->name('activate');
+            Route::delete('/activation', [MapsProviderController::class, 'deactivate'])
+                ->middleware([
+                    RequirePermissionAndScope::class.':platform.maps.manage',
+                    'throttle:admin-storage',
+                ])
+                ->name('deactivate');
+        });
+
+    Route::prefix('payments')
+        ->name('payments.')
+        ->group(function (): void {
+            Route::get('/', [PaymentProviderController::class, 'show'])
+                ->middleware(RequirePermissionAndScope::class.':platform.payments.view')
+                ->name('show');
+            Route::put('/', [PaymentProviderController::class, 'configure'])
+                ->middleware([
+                    RequirePermissionAndScope::class.':platform.payments.manage',
+                    'throttle:admin-storage',
+                ])
+                ->name('configure');
+            Route::post('/activation', [PaymentProviderController::class, 'activate'])
+                ->middleware([
+                    RequirePermissionAndScope::class.':platform.payments.manage',
+                    'throttle:admin-storage',
+                ])
+                ->name('activate');
+            Route::delete('/activation', [PaymentProviderController::class, 'deactivate'])
+                ->middleware([
+                    RequirePermissionAndScope::class.':platform.payments.manage',
+                    'throttle:admin-storage',
+                ])
+                ->name('deactivate');
+        });
+
+    Route::prefix('communications')
+        ->name('communications.')
+        ->group(function (): void {
+            Route::get('/', [CommunicationProviderController::class, 'show'])
+                ->middleware(RequirePermissionAndScope::class.':platform.communications.view')
+                ->name('show');
+            Route::put('/', [CommunicationProviderController::class, 'configure'])
+                ->middleware([
+                    RequirePermissionAndScope::class.':platform.communications.manage',
+                    'throttle:admin-storage',
+                ])
+                ->name('configure');
+            Route::post('/activation', [CommunicationProviderController::class, 'activate'])
+                ->middleware([
+                    RequirePermissionAndScope::class.':platform.communications.manage',
+                    'throttle:admin-storage',
+                ])
+                ->name('activate');
+            Route::delete('/activation', [CommunicationProviderController::class, 'deactivate'])
+                ->middleware([
+                    RequirePermissionAndScope::class.':platform.communications.manage',
+                    'throttle:admin-storage',
+                ])
+                ->name('deactivate');
+        });
+
+     Route::post('/files', [FileOperationsController::class, 'store'])
+        ->middleware(RequirePermissionAndScope::class.':platform.files.manage')
+        ->name('files.store');
+    Route::get('/files/{file}/content', [FileOperationsController::class, 'stream'])
+        ->whereUlid('file')
+        ->middleware(RequirePermissionAndScope::class.':platform.files.view')
+        ->name('files.content');
+    Route::post('/files/{file}/approval', [FileOperationsController::class, 'approve'])
+        ->whereUlid('file')
+        ->middleware(RequirePermissionAndScope::class.':platform.files.approve')
+        ->name('files.approve');
+
+    Route::get('/media', [MediaOperationsController::class, 'index'])
+        ->middleware(RequirePermissionAndScope::class.':platform.files.manage')
+        ->name('media.index');
+    Route::post('/media', [MediaOperationsController::class, 'store'])
+        ->middleware(RequirePermissionAndScope::class.':platform.files.manage')
+        ->name('media.store');
+    Route::post('/media/uploads', [MediaOperationsController::class, 'upload'])
+        ->middleware(RequirePermissionAndScope::class.':platform.files.manage')
+        ->name('media.uploads.store');
+    Route::delete('/media/{media}', [MediaOperationsController::class, 'destroy'])
+        ->whereUlid('media')
+        ->middleware(RequirePermissionAndScope::class.':platform.files.manage')
+        ->name('media.destroy');
+
+    Route::get('/demo', [DemoDatasetController::class, 'show'])
+        ->middleware(RequirePermissionAndScope::class.':platform.configuration.view')
+        ->name('demo.show');
+    Route::post('/demo/wipe', [DemoDatasetController::class, 'wipe'])
+        ->middleware(RequirePermissionAndScope::class.':platform.configuration.manage')
+        ->name('demo.wipe');
+    Route::post('/search/queries', [SearchOperationsController::class, 'query'])
+        ->middleware(RequirePermissionAndScope::class.':platform.search.query')
+        ->name('search.queries.store');
+    Route::post('/advisory/requests', [AdvisoryAiOperationsController::class, 'advise'])
+        ->middleware(RequirePermissionAndScope::class.':platform.advisory.request')
+        ->name('advisory.requests.store');
+});
+
+Route::prefix('church')->name('church.')->controller(ChurchOperationsController::class)->group(function (): void {
+    Route::get('/churches', 'churches')->middleware(RequirePermissionAndScope::class.':church.churches.view')->name('churches.index');
+    Route::post('/churches', 'storeChurch')->middleware(RequirePermissionAndScope::class.':church.churches.manage')->name('churches.store');
+    Route::get('/home-churches', 'homeChurches')->middleware(RequirePermissionAndScope::class.':church.home_churches.view')->name('home_churches.index');
+    Route::get('/home-church-applications', 'applications')->middleware(RequirePermissionAndScope::class.':church.home_church_applications.review')->name('home_church_applications.index');
+    Route::post('/home-church-applications', 'storeApplication')->middleware(RequirePermissionAndScope::class.':church.home_church_applications.manage')->name('home_church_applications.store');
+    Route::post('/home-church-applications/{application}/transitions', 'transitionApplication')->whereUlid('application')->middleware(RequirePermissionAndScope::class.':church.home_church_applications.review')->name('home_church_applications.transitions.store');
+    Route::post('/memberships', 'startMembership')->middleware(RequirePermissionAndScope::class.':church.memberships.manage')->name('memberships.store');
+    Route::post('/memberships/{membership}/end', 'endMembership')->whereUlid('membership')->middleware(RequirePermissionAndScope::class.':church.memberships.manage')->name('memberships.end');
+    Route::get('/first-timers', 'firstTimers')->middleware(RequirePermissionAndScope::class.':church.first_timers.view')->name('first_timers.index');
+    Route::post('/first-timers', 'registerFirstTimer')->middleware(RequirePermissionAndScope::class.':church.first_timers.manage')->name('first_timers.store');
+    Route::get('/follow-up-tasks', 'followUpTasks')->middleware(RequirePermissionAndScope::class.':church.follow_up.view')->name('follow_up_tasks.index');
+    Route::post('/follow-up-tasks/{task}/completion', 'completeFollowUpTask')->whereUlid('task')->middleware(RequirePermissionAndScope::class.':church.follow_up.complete')->name('follow_up_tasks.complete');
+    Route::get('/prayer-requests', 'prayerRequests')->middleware(RequirePermissionAndScope::class.':church.follow_up.view')->name('prayer_requests.index');
+    Route::post('/prayer-requests/{prayer}/assignments', 'assignPrayerRequest')->whereUlid('prayer')->middleware(RequirePermissionAndScope::class.':church.follow_up.complete')->name('prayer_requests.assignments.store');
+    Route::post('/prayer-requests/{prayer}/transitions', 'transitionPrayerRequest')->whereUlid('prayer')->middleware(RequirePermissionAndScope::class.':church.follow_up.complete')->name('prayer_requests.transitions.store');
+    Route::get('/pastoral-needs', 'pastoralNeeds')->middleware(RequirePermissionAndScope::class.':church.follow_up.view')->name('pastoral_needs.index');
+    Route::post('/pastoral-needs/{need}/transitions', 'transitionPastoralNeed')->whereUlid('need')->middleware(RequirePermissionAndScope::class.':church.follow_up.complete')->name('pastoral_needs.transitions.store');
+});
+
+Route::prefix('mission')->name('mission.')->controller(MissionOperationsController::class)->group(function (): void {
+    Route::get('/crusades', 'crusades')->middleware(RequirePermissionAndScope::class.':mission.crusades.view')->name('crusades.index');
+    Route::get('/souls', 'souls')->middleware(RequirePermissionAndScope::class.':mission.souls.view')->name('souls.index');
+    Route::get('/invitations', 'invitations')->middleware(RequirePermissionAndScope::class.':mission.invitations.manage')->name('invitations.index');
+    Route::post('/invitations', 'storeInvitation')->middleware(RequirePermissionAndScope::class.':mission.invitations.manage')->name('invitations.store');
+    Route::post('/crusades/{crusade}/souls', 'captureSoul')->whereUlid('crusade')->middleware(RequirePermissionAndScope::class.':mission.souls.capture')->name('souls.store');
+    Route::post('/souls/{soul}/mentor-assignment', 'assignMentor')->whereUlid('soul')->middleware(RequirePermissionAndScope::class.':mission.mentors.assign')->name('souls.mentor_assignment.store');
+    Route::post('/souls/{soul}/follow-ups', 'recordFollowUp')->whereUlid('soul')->middleware(RequirePermissionAndScope::class.':mission.follow_up.record')->name('souls.follow_ups.store');
+    Route::post('/souls/{soul}/follow-up-completion', 'completeFollowUp')->whereUlid('soul')->middleware(RequirePermissionAndScope::class.':mission.follow_up.complete')->name('souls.follow_up_completion.store');
+    Route::post('/invitations/{invitation}/transitions', 'transitionInvitation')->whereUlid('invitation')->middleware(RequirePermissionAndScope::class.':mission.invitations.transition')->name('invitations.transitions.store');
+});
+
+Route::prefix('kca')->name('kca.')->controller(KcaOperationsController::class)->group(function (): void {
+    Route::post('/years', 'storeYear')->middleware(RequirePermissionAndScope::class.':kca.years.manage')->name('years.store');
+    Route::post('/years/{year}/cohorts', 'storeCohort')->whereUlid('year')->middleware(RequirePermissionAndScope::class.':kca.cohorts.manage')->name('years.cohorts.store');
+    Route::post('/modules', 'storeModule')->middleware(RequirePermissionAndScope::class.':kca.modules.manage')->name('modules.store');
+    Route::post('/modules/{module}/lessons', 'storeLesson')->whereUlid('module')->middleware(RequirePermissionAndScope::class.':kca.lessons.manage')->name('modules.lessons.store');
+    Route::post('/enrollments/{enrollment}/attendance', 'recordAttendance')->whereUlid('enrollment')->middleware(RequirePermissionAndScope::class.':kca.attendance.record')->name('enrollments.attendance.store');
+    Route::post('/applications/{application}/transitions', 'transitionApplication')->whereUlid('application')->middleware(RequirePermissionAndScope::class.':kca.applications.transition')->name('applications.transitions.store');
+    Route::post('/applications/{application}/enrollments', 'enroll')->whereUlid('application')->middleware(RequirePermissionAndScope::class.':kca.enrollments.manage')->name('applications.enrollments.store');
+    Route::post('/assignments/{assignment}/transitions', 'transitionAssignment')->whereUlid('assignment')->middleware(RequirePermissionAndScope::class.':kca.assignments.transition')->name('assignments.transitions.store');
+    Route::post('/assignments/{assignment}/evidence', 'submitEvidence')->whereUlid('assignment')->middleware(RequirePermissionAndScope::class.':kca.evidence.submit')->name('assignments.evidence.store');
+    Route::post('/evidence/{evidence}/reviews', 'reviewEvidence')->whereUlid('evidence')->middleware(RequirePermissionAndScope::class.':kca.evidence.review')->name('evidence.reviews.store');
+    Route::post('/enrollments/{enrollment}/certificates', 'issueCertificate')->whereUlid('enrollment')->middleware(RequirePermissionAndScope::class.':kca.certificates.issue')->name('enrollments.certificates.store');
+    Route::post('/certificates/{certificate}/revocation', 'revokeCertificate')->whereUlid('certificate')->middleware(RequirePermissionAndScope::class.':kca.certificates.revoke')->name('certificates.revocation.store');
+    Route::get('/governance', [KcaGovernanceController::class, 'show'])->middleware(RequirePermissionAndScope::class.':kca.governance.view')->name('governance.show');
+    Route::put('/governance', [KcaGovernanceController::class, 'configure'])->middleware(RequirePermissionAndScope::class.':kca.governance.manage')->name('governance.update');
+});
+
+Route::prefix('press')->name('press.')->controller(PressOperationsController::class)->group(function (): void {
+    Route::post('/publications', 'storePublication')->middleware(RequirePermissionAndScope::class.':press.publications.manage')->name('publications.store');
+    Route::post('/publications/{publication}/transitions', 'transitionPublication')->whereUlid('publication')->middleware(RequirePermissionAndScope::class.':press.publications.transition')->name('publications.transitions.store');
+    Route::post('/publications/{publication}/isbn', 'assignIsbn')->whereUlid('publication')->middleware(RequirePermissionAndScope::class.':press.publications.assign_isbn')->name('publications.isbn.store');
+    Route::post('/publications/{publication}/contributors', 'addContributor')->whereUlid('publication')->middleware(RequirePermissionAndScope::class.':press.publications.manage')->name('publications.contributors.store');
+    Route::post('/publications/{publication}/translations', 'storeTranslation')->whereUlid('publication')->middleware(RequirePermissionAndScope::class.':press.translations.manage')->name('publications.translations.store');
+    Route::post('/translations/{translation}/transitions', 'transitionTranslation')->whereUlid('translation')->middleware(RequirePermissionAndScope::class.':press.translations.transition')->name('translations.transitions.store');
+});
+
+Route::prefix('events')->name('events.')->controller(EventOperationsController::class)->group(function (): void {
+    Route::post('/', 'store')->middleware(RequirePermissionAndScope::class.':events.events.manage')->name('store');
+    Route::post('/{event}/registrations', 'register')->whereUlid('event')->middleware(RequirePermissionAndScope::class.':events.registrations.manage')->name('registrations.store');
+    Route::post('/registrations/{registration}/attendance', 'recordAttendance')->whereUlid('registration')->middleware(RequirePermissionAndScope::class.':events.attendance.record')->name('registrations.attendance.store');
+    Route::post('/registrations/{registration}/feedback', 'recordFeedback')->whereUlid('registration')->middleware(RequirePermissionAndScope::class.':events.feedback.record')->name('registrations.feedback.store');
+});
+
+Route::prefix('finance')->name('finance.')->controller(FinanceOperationsController::class)->group(function (): void {
+    Route::post('/payment-intents', 'createIntent')->middleware(RequirePermissionAndScope::class.':finance.payment_intents.create')->name('payment_intents.store');
+    Route::post('/payment-transactions/{transaction}/refunds', 'requestRefund')->whereUlid('transaction')->middleware(RequirePermissionAndScope::class.':finance.payment_refunds.request')->name('payment_transactions.refunds.store');
+});
+
+Route::prefix('communications')->name('communications.')->controller(CommunicationOperationsController::class)->group(function (): void {
+    Route::post('/templates', 'storeTemplate')->middleware(RequirePermissionAndScope::class.':communications.templates.manage')->name('templates.store');
+    Route::post('/audiences', 'storeAudience')->middleware(RequirePermissionAndScope::class.':communications.audiences.manage')->name('audiences.store');
+    Route::post('/broadcasts', 'prepareBroadcast')->middleware(RequirePermissionAndScope::class.':communications.broadcasts.prepare')->name('broadcasts.store');
+    Route::post('/broadcasts/{broadcast}/resolve', 'resolveBroadcast')->whereUlid('broadcast')->middleware(RequirePermissionAndScope::class.':communications.broadcasts.resolve')->name('broadcasts.resolve');
+    Route::post('/recipients/{recipient}/deliveries', 'attemptDelivery')->whereUlid('recipient')->middleware(RequirePermissionAndScope::class.':communications.deliveries.attempt')->name('recipients.deliveries.store');
+    Route::post('/recipients/{recipient}/notifications', 'createNotification')->whereUlid('recipient')->middleware(RequirePermissionAndScope::class.':communications.notifications.create')->name('recipients.notifications.store');
+});
+
+Route::prefix('reporting')->name('reporting.')->controller(ReportingOperationsController::class)->group(function (): void {
+    Route::post('/alert-rules', 'storeRule')->middleware(RequirePermissionAndScope::class.':reporting.alert_rules.manage')->name('alert_rules.store');
+    Route::post('/alert-rules/{alertRule}/enabled', 'setEnabled')->whereUlid('alertRule')->middleware(RequirePermissionAndScope::class.':reporting.alert_rules.manage')->name('alert_rules.enabled');
+    Route::post('/alert-rules/{alertRule}/evaluations', 'evaluate')->whereUlid('alertRule')->middleware(RequirePermissionAndScope::class.':reporting.alert_rules.evaluate')->name('alert_rules.evaluations.store');
+    Route::post('/alert-occurrences/{occurrence}/acknowledgement', 'acknowledge')->whereUlid('occurrence')->middleware(RequirePermissionAndScope::class.':reporting.alert_occurrences.acknowledge')->name('alert_occurrences.acknowledge');
+    Route::post('/alert-occurrences/{occurrence}/resolution', 'resolve')->whereUlid('occurrence')->middleware(RequirePermissionAndScope::class.':reporting.alert_occurrences.resolve')->name('alert_occurrences.resolve');
+});
+
+Route::prefix('privacy')->name('privacy.')->controller(PrivacyOperationsController::class)->group(function (): void {
+    Route::post('/data-subject-requests', 'submit')->middleware(RequirePermissionAndScope::class.':privacy.data_subject_requests.submit')->name('data_subject_requests.store');
+    Route::post('/data-subject-requests/{dataSubjectRequest}/exports/begin', 'beginExport')->whereUlid('dataSubjectRequest')->middleware(RequirePermissionAndScope::class.':privacy.data_exports.begin')->name('data_subject_requests.exports.begin');
+    Route::post('/data-subject-requests/{dataSubjectRequest}/exports/complete', 'completeExport')->whereUlid('dataSubjectRequest')->middleware(RequirePermissionAndScope::class.':privacy.data_exports.complete')->name('data_subject_requests.exports.complete');
+    Route::post('/data-subject-requests/{dataSubjectRequest}/exports/expire', 'expireExport')->whereUlid('dataSubjectRequest')->middleware(RequirePermissionAndScope::class.':privacy.data_exports.expire')->name('data_subject_requests.exports.expire');
+});
+
+Route::prefix('safeguarding')->name('safeguarding.')->controller(SafeguardingOperationsController::class)->group(function (): void {
+    Route::post('/incidents', 'reportIncident')->middleware(RequirePermissionAndScope::class.':safeguarding.incidents.report')->name('incidents.store');
+    Route::post('/guardian-relationships', 'registerGuardian')->middleware(RequirePermissionAndScope::class.':safeguarding.guardians.register')->name('guardian_relationships.store');
+});
+
+Route::prefix('catalog')->name('catalog.')->group(function (): void {
+    foreach ((new ProtectedDomainRegistry)->definitions() as $catalog => $definition) {
+        Route::get($definition['path'], [DomainCatalogController::class, 'index'])
+            ->defaults('catalog', $catalog)
+            ->middleware(RequirePermissionAndScope::class.':'.$definition['permission'])
+            ->name(str_replace('.', '_', $catalog));
+    }
+});
+
+/*
+| Content CMS is gated with platform.configuration.manage (no dedicated
+| content.content.manage permission seed yet). Replace when content permissions land.
+*/
+Route::prefix('content')->name('content.')->group(function (): void {
+    Route::get('/pages', [ContentAdministrationController::class, 'index'])
+        ->middleware(RequirePermissionAndScope::class.':platform.configuration.manage')
+        ->name('pages.index');
+    Route::post('/pages', [ContentAdministrationController::class, 'store'])
+        ->middleware(RequirePermissionAndScope::class.':platform.configuration.manage')
+        ->name('pages.store');
+    Route::put('/pages/{page}', [ContentAdministrationController::class, 'update'])
+        ->whereUlid('page')
+        ->middleware(RequirePermissionAndScope::class.':platform.configuration.manage')
+        ->name('pages.update');
+    Route::post('/pages/{page}/items', [ContentAdministrationController::class, 'storeItem'])
+        ->whereUlid('page')
+        ->middleware(RequirePermissionAndScope::class.':platform.configuration.manage')
+        ->name('pages.items.store');
+});

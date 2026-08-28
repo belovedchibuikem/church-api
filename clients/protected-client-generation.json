@@ -1,0 +1,1197 @@
+{
+    "contract": "openapi/protected-v1.openapi.json",
+    "operations": {
+        "listAdminPermissions": {
+            "method": "GET",
+            "path": "/api/v1/admin/access/permissions"
+        },
+        "listAdminRoles": {
+            "method": "GET",
+            "path": "/api/v1/admin/access/roles"
+        },
+        "listAdminScopeAssignments": {
+            "method": "GET",
+            "path": "/api/v1/admin/access/scope-assignments"
+        },
+        "listAdminAuditEvents": {
+            "method": "GET",
+            "path": "/api/v1/admin/security/audit-events"
+        },
+        "listAdminAccessDecisions": {
+            "method": "GET",
+            "path": "/api/v1/admin/security/access-decisions"
+        },
+        "listAdminCountries": {
+            "method": "GET",
+            "path": "/api/v1/admin/organization/countries"
+        },
+        "createAdminCountry": {
+            "method": "POST",
+            "path": "/api/v1/admin/organization/countries"
+        },
+        "listAdminAdministrativeLevels": {
+            "method": "GET",
+            "path": "/api/v1/admin/organization/countries/{country}/levels"
+        },
+        "createAdminAdministrativeLevel": {
+            "method": "POST",
+            "path": "/api/v1/admin/organization/countries/{country}/levels"
+        },
+        "listAdminLocations": {
+            "method": "GET",
+            "path": "/api/v1/admin/organization/locations"
+        },
+        "createAdminLocation": {
+            "method": "POST",
+            "path": "/api/v1/admin/organization/locations"
+        },
+        "listAdminAdministrativeUnits": {
+            "method": "GET",
+            "path": "/api/v1/admin/organization/units"
+        },
+        "createAdminAdministrativeUnit": {
+            "method": "POST",
+            "path": "/api/v1/admin/organization/units"
+        },
+        "moveAdminAdministrativeUnit": {
+            "method": "PATCH",
+            "path": "/api/v1/admin/organization/units/{unit}/parent"
+        },
+        "listAdminPlatformConfigurations": {
+            "method": "GET",
+            "path": "/api/v1/admin/platform/configurations"
+        },
+        "upsertAdminPlatformConfiguration": {
+            "method": "PUT",
+            "path": "/api/v1/admin/platform/configurations"
+        },
+        "listAdminFeatureFlags": {
+            "method": "GET",
+            "path": "/api/v1/admin/platform/feature-flags"
+        },
+        "upsertAdminFeatureFlag": {
+            "method": "PUT",
+            "path": "/api/v1/admin/platform/feature-flags"
+        },
+        "enableAdminFeatureFlag": {
+            "method": "POST",
+            "path": "/api/v1/admin/platform/feature-flags/{featureFlag}/enabled"
+        },
+        "disableAdminFeatureFlag": {
+            "method": "DELETE",
+            "path": "/api/v1/admin/platform/feature-flags/{featureFlag}/enabled"
+        },
+        "getAdminObjectStorage": {
+            "method": "GET",
+            "path": "/api/v1/admin/platform/storage/object-storage"
+        },
+        "configureAdminObjectStorage": {
+            "method": "PUT",
+            "path": "/api/v1/admin/platform/storage/object-storage"
+        },
+        "activateAdminObjectStorage": {
+            "method": "POST",
+            "path": "/api/v1/admin/platform/storage/object-storage/activation"
+        },
+        "deactivateAdminObjectStorage": {
+            "method": "DELETE",
+            "path": "/api/v1/admin/platform/storage/object-storage/activation"
+        },
+        "validateAdminObjectStorage": {
+            "method": "POST",
+            "path": "/api/v1/admin/platform/storage/object-storage/validation"
+        },
+        "getAdminMapsProvider": {
+            "method": "GET",
+            "path": "/api/v1/admin/platform/maps"
+        },
+        "configureAdminMapsProvider": {
+            "method": "PUT",
+            "path": "/api/v1/admin/platform/maps"
+        },
+        "activateAdminMapsProvider": {
+            "method": "POST",
+            "path": "/api/v1/admin/platform/maps/activation"
+        },
+        "deactivateAdminMapsProvider": {
+            "method": "DELETE",
+            "path": "/api/v1/admin/platform/maps/activation"
+        },
+        "listAdminContentPages": {
+            "method": "GET",
+            "path": "/api/v1/admin/content/pages"
+        },
+        "createAdminContentPage": {
+            "method": "POST",
+            "path": "/api/v1/admin/content/pages"
+        },
+        "updateAdminContentPage": {
+            "method": "PUT",
+            "path": "/api/v1/admin/content/pages/{page}"
+        },
+        "createAdminContentPageItem": {
+            "method": "POST",
+            "path": "/api/v1/admin/content/pages/{page}/items"
+        },
+        "listAdminChurches": {
+            "method": "GET",
+            "path": "/api/v1/admin/church/churches"
+        },
+        "createAdminChurch": {
+            "method": "POST",
+            "path": "/api/v1/admin/church/churches"
+        },
+        "listAdminHomeChurches": {
+            "method": "GET",
+            "path": "/api/v1/admin/church/home-churches"
+        },
+        "listAdminHomeChurchApplications": {
+            "method": "GET",
+            "path": "/api/v1/admin/church/home-church-applications"
+        },
+        "createAdminHomeChurchApplication": {
+            "method": "POST",
+            "path": "/api/v1/admin/church/home-church-applications"
+        },
+        "transitionAdminHomeChurchApplication": {
+            "method": "POST",
+            "path": "/api/v1/admin/church/home-church-applications/{application}/transitions"
+        },
+        "listAdminFirstTimers": {
+            "method": "GET",
+            "path": "/api/v1/admin/church/first-timers"
+        },
+        "createAdminFirstTimer": {
+            "method": "POST",
+            "path": "/api/v1/admin/church/first-timers"
+        },
+        "listAdminChurchFollowUpTasks": {
+            "method": "GET",
+            "path": "/api/v1/admin/church/follow-up-tasks"
+        },
+        "completeAdminChurchFollowUpTask": {
+            "method": "POST",
+            "path": "/api/v1/admin/church/follow-up-tasks/{task}/completion"
+        },
+        "startAdminChurchMembership": {
+            "method": "POST",
+            "path": "/api/v1/admin/church/memberships"
+        },
+        "endAdminChurchMembership": {
+            "method": "POST",
+            "path": "/api/v1/admin/church/memberships/{membership}/end"
+        },
+        "listAdminMissionCrusades": {
+            "method": "GET",
+            "path": "/api/v1/admin/mission/crusades"
+        },
+        "listAdminMissionSouls": {
+            "method": "GET",
+            "path": "/api/v1/admin/mission/souls"
+        },
+        "captureAdminMissionSoul": {
+            "method": "POST",
+            "path": "/api/v1/admin/mission/crusades/{crusade}/souls"
+        },
+        "assignAdminMissionSoulMentor": {
+            "method": "POST",
+            "path": "/api/v1/admin/mission/souls/{soul}/mentor-assignment"
+        },
+        "recordAdminMissionSoulFollowUp": {
+            "method": "POST",
+            "path": "/api/v1/admin/mission/souls/{soul}/follow-ups"
+        },
+        "completeAdminMissionSoulFollowUp": {
+            "method": "POST",
+            "path": "/api/v1/admin/mission/souls/{soul}/follow-up-completion"
+        },
+        "transitionAdminMissionInvitation": {
+            "method": "POST",
+            "path": "/api/v1/admin/mission/invitations/{invitation}/transitions"
+        },
+        "listAdminMissionInvitations": {
+            "method": "GET",
+            "path": "/api/v1/admin/mission/invitations"
+        },
+        "createAdminMissionInvitation": {
+            "method": "POST",
+            "path": "/api/v1/admin/mission/invitations"
+        },
+        "listAdminCatalogKcaApplications": {
+            "method": "GET",
+            "path": "/api/v1/admin/catalog/kca/applications"
+        },
+        "listAdminCatalogKcaEnrollments": {
+            "method": "GET",
+            "path": "/api/v1/admin/catalog/kca/enrollments"
+        },
+        "listAdminCatalogKcaEvidenceSubmissions": {
+            "method": "GET",
+            "path": "/api/v1/admin/catalog/kca/evidence-submissions"
+        },
+        "listAdminCatalogKcaAssessmentResults": {
+            "method": "GET",
+            "path": "/api/v1/admin/catalog/kca/assessment-results"
+        },
+        "listAdminCatalogKcaCertificates": {
+            "method": "GET",
+            "path": "/api/v1/admin/catalog/kca/certificates"
+        },
+        "listAdminCatalogPressPublications": {
+            "method": "GET",
+            "path": "/api/v1/admin/catalog/press/publications"
+        },
+        "listAdminCatalogPressTranslations": {
+            "method": "GET",
+            "path": "/api/v1/admin/catalog/press/translations"
+        },
+        "listAdminCatalogEvents": {
+            "method": "GET",
+            "path": "/api/v1/admin/catalog/events/events"
+        },
+        "listAdminCatalogEventRegistrations": {
+            "method": "GET",
+            "path": "/api/v1/admin/catalog/events/registrations"
+        },
+        "listAdminCatalogPaymentIntents": {
+            "method": "GET",
+            "path": "/api/v1/admin/catalog/finance/payment-intents"
+        },
+        "listAdminCatalogPaymentTransactions": {
+            "method": "GET",
+            "path": "/api/v1/admin/catalog/finance/payment-transactions"
+        },
+        "listAdminCatalogPaymentReconciliations": {
+            "method": "GET",
+            "path": "/api/v1/admin/catalog/finance/payment-reconciliations"
+        },
+        "listAdminCatalogPaymentReceipts": {
+            "method": "GET",
+            "path": "/api/v1/admin/catalog/finance/payment-receipts"
+        },
+        "listAdminCatalogPaymentRefunds": {
+            "method": "GET",
+            "path": "/api/v1/admin/catalog/finance/payment-refunds"
+        },
+        "listAdminCatalogPaymentDisputes": {
+            "method": "GET",
+            "path": "/api/v1/admin/catalog/finance/payment-disputes"
+        },
+        "listAdminCatalogCommunicationTemplates": {
+            "method": "GET",
+            "path": "/api/v1/admin/catalog/communications/templates"
+        },
+        "listAdminCatalogCommunicationAudiences": {
+            "method": "GET",
+            "path": "/api/v1/admin/catalog/communications/audiences"
+        },
+        "listAdminCatalogCommunicationBroadcasts": {
+            "method": "GET",
+            "path": "/api/v1/admin/catalog/communications/broadcasts"
+        },
+        "listAdminCatalogCommunicationDeliveries": {
+            "method": "GET",
+            "path": "/api/v1/admin/catalog/communications/delivery-attempts"
+        },
+        "listAdminCatalogCommunicationNotifications": {
+            "method": "GET",
+            "path": "/api/v1/admin/catalog/communications/notifications"
+        },
+        "listAdminCatalogAlertRules": {
+            "method": "GET",
+            "path": "/api/v1/admin/catalog/reporting/alert-rules"
+        },
+        "listAdminCatalogAlertOccurrences": {
+            "method": "GET",
+            "path": "/api/v1/admin/catalog/reporting/alert-occurrences"
+        },
+        "listAdminCatalogDataSubjectRequests": {
+            "method": "GET",
+            "path": "/api/v1/admin/catalog/privacy/data-subject-requests"
+        },
+        "listAdminCatalogFileAssets": {
+            "method": "GET",
+            "path": "/api/v1/admin/catalog/platform/files"
+        },
+        "listAdminUsers": {
+            "method": "GET",
+            "path": "/api/v1/admin/users"
+        },
+        "getAdminUser": {
+            "method": "GET",
+            "path": "/api/v1/admin/users/{user}"
+        },
+        "suspendAdminUser": {
+            "method": "POST",
+            "path": "/api/v1/admin/users/{user}/suspension"
+        },
+        "reactivateAdminUser": {
+            "method": "DELETE",
+            "path": "/api/v1/admin/users/{user}/suspension"
+        },
+        "getBrowserCsrfCookie": {
+            "method": "GET",
+            "path": "/api/v1/auth/csrf-cookie"
+        },
+        "sendEmailVerification": {
+            "method": "POST",
+            "path": "/api/v1/auth/email/verification-notification"
+        },
+        "verifyEmail": {
+            "method": "GET",
+            "path": "/api/v1/auth/email/verify/{id}/{hash}"
+        },
+        "browserLogin": {
+            "method": "POST",
+            "path": "/api/v1/auth/login"
+        },
+        "browserLogout": {
+            "method": "POST",
+            "path": "/api/v1/auth/logout"
+        },
+        "browserMfaChallenge": {
+            "method": "POST",
+            "path": "/api/v1/auth/mfa/challenge"
+        },
+        "browserMfaConfirm": {
+            "method": "POST",
+            "path": "/api/v1/auth/mfa/totp/confirm"
+        },
+        "browserMfaSetup": {
+            "method": "POST",
+            "path": "/api/v1/auth/mfa/totp/setup"
+        },
+        "requestPasswordReset": {
+            "method": "POST",
+            "path": "/api/v1/auth/password/forgot"
+        },
+        "resetPassword": {
+            "method": "POST",
+            "path": "/api/v1/auth/password/reset"
+        },
+        "registerBrowserUser": {
+            "method": "POST",
+            "path": "/api/v1/auth/register"
+        },
+        "mobileLogin": {
+            "method": "POST",
+            "path": "/api/v1/mobile/auth/login"
+        },
+        "mobileLogout": {
+            "method": "POST",
+            "path": "/api/v1/mobile/auth/logout"
+        },
+        "mobileMfaChallenge": {
+            "method": "POST",
+            "path": "/api/v1/mobile/auth/mfa/challenge"
+        },
+        "mobileMfaConfirm": {
+            "method": "POST",
+            "path": "/api/v1/mobile/auth/mfa/totp/confirm"
+        },
+        "mobileMfaSetup": {
+            "method": "POST",
+            "path": "/api/v1/mobile/auth/mfa/totp/setup"
+        },
+        "mobileRefresh": {
+            "method": "POST",
+            "path": "/api/v1/mobile/auth/refresh"
+        },
+        "listUserConsents": {
+            "method": "GET",
+            "path": "/api/v1/user/consents"
+        },
+        "grantUserConsent": {
+            "method": "POST",
+            "path": "/api/v1/user/consents"
+        },
+        "withdrawUserConsent": {
+            "method": "DELETE",
+            "path": "/api/v1/user/consents/{consent}"
+        },
+        "getCurrentUser": {
+            "method": "GET",
+            "path": "/api/v1/user/me"
+        },
+        "getUserCapabilities": {
+            "method": "GET",
+            "path": "/api/v1/user/capabilities"
+        },
+        "checkUserAuthorization": {
+            "method": "POST",
+            "path": "/api/v1/user/authorization/check"
+        },
+        "updateUserPreferences": {
+            "method": "PUT",
+            "path": "/api/v1/user/preferences"
+        },
+        "listUserDevices": {
+            "method": "GET",
+            "path": "/api/v1/user/security/devices"
+        },
+        "revokeUserDevice": {
+            "method": "DELETE",
+            "path": "/api/v1/user/security/devices/{device}"
+        },
+        "listUserSessions": {
+            "method": "GET",
+            "path": "/api/v1/user/security/sessions"
+        },
+        "revokeUserSession": {
+            "method": "DELETE",
+            "path": "/api/v1/user/security/sessions/{securitySession}"
+        },
+        "getUserDashboard": {
+            "method": "GET",
+            "path": "/api/v1/user/dashboard"
+        },
+        "getUserKcaDashboard": {
+            "method": "GET",
+            "path": "/api/v1/user/kca/dashboard"
+        },
+        "listUserKcaModules": {
+            "method": "GET",
+            "path": "/api/v1/user/kca/modules"
+        },
+        "getUserKcaModule": {
+            "method": "GET",
+            "path": "/api/v1/user/kca/modules/{module}"
+        },
+        "listUserKcaAssignments": {
+            "method": "GET",
+            "path": "/api/v1/user/kca/assignments"
+        },
+        "getUserKcaMentor": {
+            "method": "GET",
+            "path": "/api/v1/user/kca/mentor"
+        },
+        "listUserKcaAttendance": {
+            "method": "GET",
+            "path": "/api/v1/user/kca/attendance"
+        },
+        "listUserNotifications": {
+            "method": "GET",
+            "path": "/api/v1/user/notifications"
+        },
+        "markUserNotificationRead": {
+            "method": "POST",
+            "path": "/api/v1/user/notifications/{notification}/read"
+        },
+        "listUserPaymentIntents": {
+            "method": "GET",
+            "path": "/api/v1/user/payments/intents"
+        },
+        "listUserPaymentTransactions": {
+            "method": "GET",
+            "path": "/api/v1/user/payments/transactions"
+        },
+        "getUserPaymentReceipt": {
+            "method": "GET",
+            "path": "/api/v1/user/payments/receipts/{receipt}"
+        },
+        "createUserGivingPaymentIntent": {
+            "method": "POST",
+            "path": "/api/v1/user/payments/giving-intents"
+        },
+        "completeUserGivingPaymentIntent": {
+            "method": "POST",
+            "path": "/api/v1/user/payments/giving-intents/{intent}/complete"
+        },
+        "listUserPrayerRequests": {
+            "method": "GET",
+            "path": "/api/v1/user/prayers"
+        },
+        "createUserPrayerRequest": {
+            "method": "POST",
+            "path": "/api/v1/user/prayers"
+        },
+        "listUserPastoralNeeds": {
+            "method": "GET",
+            "path": "/api/v1/user/needs"
+        },
+        "createUserPastoralNeed": {
+            "method": "POST",
+            "path": "/api/v1/user/needs"
+        },
+        "listUserMessageConversations": {
+            "method": "GET",
+            "path": "/api/v1/user/messages/conversations"
+        },
+        "createUserMessageConversation": {
+            "method": "POST",
+            "path": "/api/v1/user/messages/conversations"
+        },
+        "listUserConversationMessages": {
+            "method": "GET",
+            "path": "/api/v1/user/messages/conversations/{conversation}/messages"
+        },
+        "createUserConversationMessage": {
+            "method": "POST",
+            "path": "/api/v1/user/messages/conversations/{conversation}/messages"
+        },
+        "getUserSyncCheckpoint": {
+            "method": "GET",
+            "path": "/api/v1/user/sync/checkpoint"
+        },
+        "updateUserSyncCheckpoint": {
+            "method": "PUT",
+            "path": "/api/v1/user/sync/checkpoint"
+        },
+        "listUserSyncChanges": {
+            "method": "GET",
+            "path": "/api/v1/user/sync/changes"
+        },
+        "registerUserEventRegistration": {
+            "method": "POST",
+            "path": "/api/v1/user/events/{event}/registrations"
+        },
+        "recordUserEventFeedback": {
+            "method": "POST",
+            "path": "/api/v1/user/events/feedback"
+        },
+        "submitUserDataSubjectRequest": {
+            "method": "POST",
+            "path": "/api/v1/user/privacy/data-subject-requests"
+        },
+        "storeUserFileAsset": {
+            "method": "POST",
+            "path": "/api/v1/user/files"
+        },
+        "listUserFileAssets": {
+            "method": "GET",
+            "path": "/api/v1/user/files"
+        },
+        "streamUserFileAsset": {
+            "method": "GET",
+            "path": "/api/v1/user/files/{file}"
+        },
+        "getUserEventRegistration": {
+            "method": "GET",
+            "path": "/api/v1/user/events/registrations/{registration}"
+        },
+        "startUserChurchMembership": {
+            "method": "POST",
+            "path": "/api/v1/user/churches/{church}/memberships"
+        },
+        "listUserMemberships": {
+            "method": "GET",
+            "path": "/api/v1/user/memberships"
+        },
+        "getUserHomeChurch": {
+            "method": "GET",
+            "path": "/api/v1/user/home-churches/{homeChurch}"
+        },
+        "submitUserHomeChurchReport": {
+            "method": "POST",
+            "path": "/api/v1/user/home-churches/{homeChurch}/reports"
+        },
+        "assignAdminUserRole": {
+            "method": "POST",
+            "path": "/api/v1/admin/users/{user}/role-assignments"
+        },
+        "assignAdminRoleAssignmentScope": {
+            "method": "POST",
+            "path": "/api/v1/admin/access/role-assignments/{roleAssignment}/scopes"
+        },
+        "grantAdminRolePermission": {
+            "method": "POST",
+            "path": "/api/v1/admin/access/roles/{role}/permissions"
+        },
+        "storeAdminFileAsset": {
+            "method": "POST",
+            "path": "/api/v1/admin/platform/files"
+        },
+        "approveAdminFileAsset": {
+            "method": "POST",
+            "path": "/api/v1/admin/platform/files/{file}/approval"
+        },
+        "streamAdminFileAssetContent": {
+            "method": "GET",
+            "path": "/api/v1/admin/platform/files/{file}/content"
+        },
+        "queryAdminSearch": {
+            "method": "POST",
+            "path": "/api/v1/admin/platform/search/queries"
+        },
+        "requestAdminAdvisory": {
+            "method": "POST",
+            "path": "/api/v1/admin/platform/advisory/requests"
+        },
+        "transitionAdminKcaApplication": {
+            "method": "POST",
+            "path": "/api/v1/admin/kca/applications/{application}/transitions"
+        },
+        "enrollAdminKcaStudent": {
+            "method": "POST",
+            "path": "/api/v1/admin/kca/applications/{application}/enrollments"
+        },
+        "transitionAdminKcaAssignment": {
+            "method": "POST",
+            "path": "/api/v1/admin/kca/assignments/{assignment}/transitions"
+        },
+        "submitAdminKcaEvidence": {
+            "method": "POST",
+            "path": "/api/v1/admin/kca/assignments/{assignment}/evidence"
+        },
+        "reviewAdminKcaEvidence": {
+            "method": "POST",
+            "path": "/api/v1/admin/kca/evidence/{evidence}/reviews"
+        },
+        "issueAdminKcaCertificate": {
+            "method": "POST",
+            "path": "/api/v1/admin/kca/enrollments/{enrollment}/certificates"
+        },
+        "createAdminKcaYear": {
+            "method": "POST",
+            "path": "/api/v1/admin/kca/years"
+        },
+        "createAdminKcaCohort": {
+            "method": "POST",
+            "path": "/api/v1/admin/kca/years/{year}/cohorts"
+        },
+        "createAdminKcaModule": {
+            "method": "POST",
+            "path": "/api/v1/admin/kca/modules"
+        },
+        "createAdminKcaLesson": {
+            "method": "POST",
+            "path": "/api/v1/admin/kca/modules/{module}/lessons"
+        },
+        "recordAdminKcaAttendance": {
+            "method": "POST",
+            "path": "/api/v1/admin/kca/enrollments/{enrollment}/attendance"
+        },
+        "createAdminPressPublication": {
+            "method": "POST",
+            "path": "/api/v1/admin/press/publications"
+        },
+        "transitionAdminPressPublication": {
+            "method": "POST",
+            "path": "/api/v1/admin/press/publications/{publication}/transitions"
+        },
+        "assignAdminPressPublicationIsbn": {
+            "method": "POST",
+            "path": "/api/v1/admin/press/publications/{publication}/isbn"
+        },
+        "addAdminPressPublicationContributor": {
+            "method": "POST",
+            "path": "/api/v1/admin/press/publications/{publication}/contributors"
+        },
+        "createAdminPressTranslation": {
+            "method": "POST",
+            "path": "/api/v1/admin/press/publications/{publication}/translations"
+        },
+        "transitionAdminPressTranslation": {
+            "method": "POST",
+            "path": "/api/v1/admin/press/translations/{translation}/transitions"
+        },
+        "createAdminMinistryEvent": {
+            "method": "POST",
+            "path": "/api/v1/admin/events"
+        },
+        "registerAdminEventRegistration": {
+            "method": "POST",
+            "path": "/api/v1/admin/events/{event}/registrations"
+        },
+        "recordAdminEventAttendance": {
+            "method": "POST",
+            "path": "/api/v1/admin/events/registrations/{registration}/attendance"
+        },
+        "recordAdminEventFeedback": {
+            "method": "POST",
+            "path": "/api/v1/admin/events/registrations/{registration}/feedback"
+        },
+        "createAdminPaymentIntent": {
+            "method": "POST",
+            "path": "/api/v1/admin/finance/payment-intents"
+        },
+        "requestAdminPaymentRefund": {
+            "method": "POST",
+            "path": "/api/v1/admin/finance/payment-transactions/{transaction}/refunds"
+        },
+        "createAdminCommunicationTemplate": {
+            "method": "POST",
+            "path": "/api/v1/admin/communications/templates"
+        },
+        "createAdminCommunicationAudience": {
+            "method": "POST",
+            "path": "/api/v1/admin/communications/audiences"
+        },
+        "prepareAdminCommunicationBroadcast": {
+            "method": "POST",
+            "path": "/api/v1/admin/communications/broadcasts"
+        },
+        "resolveAdminCommunicationBroadcast": {
+            "method": "POST",
+            "path": "/api/v1/admin/communications/broadcasts/{broadcast}/resolve"
+        },
+        "attemptAdminCommunicationDelivery": {
+            "method": "POST",
+            "path": "/api/v1/admin/communications/recipients/{recipient}/deliveries"
+        },
+        "createAdminCommunicationNotification": {
+            "method": "POST",
+            "path": "/api/v1/admin/communications/recipients/{recipient}/notifications"
+        },
+        "createAdminAlertRule": {
+            "method": "POST",
+            "path": "/api/v1/admin/reporting/alert-rules"
+        },
+        "setAdminAlertRuleEnabled": {
+            "method": "POST",
+            "path": "/api/v1/admin/reporting/alert-rules/{alertRule}/enabled"
+        },
+        "evaluateAdminAlertRule": {
+            "method": "POST",
+            "path": "/api/v1/admin/reporting/alert-rules/{alertRule}/evaluations"
+        },
+        "acknowledgeAdminAlertOccurrence": {
+            "method": "POST",
+            "path": "/api/v1/admin/reporting/alert-occurrences/{occurrence}/acknowledgement"
+        },
+        "resolveAdminAlertOccurrence": {
+            "method": "POST",
+            "path": "/api/v1/admin/reporting/alert-occurrences/{occurrence}/resolution"
+        },
+        "submitAdminDataSubjectRequest": {
+            "method": "POST",
+            "path": "/api/v1/admin/privacy/data-subject-requests"
+        },
+        "beginAdminDataExport": {
+            "method": "POST",
+            "path": "/api/v1/admin/privacy/data-subject-requests/{dataSubjectRequest}/exports/begin"
+        },
+        "completeAdminDataExport": {
+            "method": "POST",
+            "path": "/api/v1/admin/privacy/data-subject-requests/{dataSubjectRequest}/exports/complete"
+        },
+        "expireAdminDataExport": {
+            "method": "POST",
+            "path": "/api/v1/admin/privacy/data-subject-requests/{dataSubjectRequest}/exports/expire"
+        },
+        "reportAdminSafeguardingIncident": {
+            "method": "POST",
+            "path": "/api/v1/admin/safeguarding/incidents"
+        },
+        "registerAdminGuardianRelationship": {
+            "method": "POST",
+            "path": "/api/v1/admin/safeguarding/guardian-relationships"
+        }
+    },
+    "operationSchemas": {
+        "listAdminCountries": {
+            "response": "AdminCountryList"
+        },
+        "createAdminCountry": {
+            "request": "CreateAdminCountryInput",
+            "response": "AdminCountry"
+        },
+        "listAdminAdministrativeLevels": {
+            "response": "AdminAdministrativeLevelList"
+        },
+        "createAdminAdministrativeLevel": {
+            "request": "CreateAdminAdministrativeLevelInput",
+            "response": "AdminAdministrativeLevel"
+        },
+        "listAdminLocations": {
+            "response": "AdminLocationList"
+        },
+        "createAdminLocation": {
+            "request": "CreateAdminLocationInput",
+            "response": "AdminLocation"
+        },
+        "listAdminAdministrativeUnits": {
+            "response": "AdminAdministrativeUnitList"
+        },
+        "createAdminAdministrativeUnit": {
+            "request": "CreateAdminAdministrativeUnitInput",
+            "response": "AdminAdministrativeUnit"
+        },
+        "moveAdminAdministrativeUnit": {
+            "request": "MoveAdminAdministrativeUnitInput",
+            "response": "AdminAdministrativeUnit"
+        },
+        "listAdminPlatformConfigurations": {
+            "response": "AdminPlatformConfigurationList"
+        },
+        "upsertAdminPlatformConfiguration": {
+            "request": "UpsertAdminPlatformConfigurationInput",
+            "response": "AdminPlatformConfiguration"
+        },
+        "listAdminFeatureFlags": {
+            "response": "AdminFeatureFlagList"
+        },
+        "upsertAdminFeatureFlag": {
+            "request": "UpsertAdminFeatureFlagInput",
+            "response": "AdminFeatureFlag"
+        },
+        "enableAdminFeatureFlag": {
+            "response": "AdminFeatureFlag"
+        },
+        "disableAdminFeatureFlag": {
+            "response": "AdminFeatureFlag"
+        },
+        "getAdminObjectStorage": {
+            "response": "AdminObjectStorageStatus"
+        },
+        "configureAdminObjectStorage": {
+            "request": "ConfigureAdminObjectStorageInput",
+            "response": "AdminObjectStorageStatus"
+        },
+        "activateAdminObjectStorage": {
+            "response": "AdminObjectStorageStatus"
+        },
+        "deactivateAdminObjectStorage": {
+            "response": "AdminObjectStorageDeactivation"
+        },
+        "validateAdminObjectStorage": {
+            "response": "AdminObjectStorageStatus"
+        },
+        "getAdminMapsProvider": {
+            "response": "AdminMapsProviderStatus"
+        },
+        "configureAdminMapsProvider": {
+            "request": "ConfigureAdminMapsProviderInput",
+            "response": "AdminMapsProviderStatus"
+        },
+        "activateAdminMapsProvider": {
+            "response": "AdminMapsProviderStatus"
+        },
+        "deactivateAdminMapsProvider": {
+            "response": "AdminMapsProviderDeactivation"
+        },
+        "getUserCapabilities": {
+            "response": "UserCapabilities"
+        },
+        "checkUserAuthorization": {
+            "request": "CheckUserAuthorizationInput",
+            "response": "UserAuthorizationDecision"
+        },
+        "queryAdminSearch": {
+            "request": "QueryAdminSearchInput",
+            "response": "AdminSearchResults"
+        },
+        "requestAdminAdvisory": {
+            "request": "RequestAdminAdvisoryInput",
+            "response": "AdminAdvisoryResponse"
+        },
+        "approveAdminFileAsset": {
+            "response": "ProtectedDomainRecord"
+        },
+        "storeAdminFileAsset": {
+            "request": "StoreAdminFileAssetInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "createAdminChurch": {
+            "request": "CreateAdminChurchInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "createAdminHomeChurchApplication": {
+            "request": "CreateAdminHomeChurchApplicationInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "transitionAdminHomeChurchApplication": {
+            "request": "TransitionWithReasonInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "createAdminFirstTimer": {
+            "request": "CreateAdminFirstTimerInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "completeAdminChurchFollowUpTask": {
+            "request": "ReasonCodeInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "startAdminChurchMembership": {
+            "request": "StartAdminChurchMembershipInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "endAdminChurchMembership": {
+            "request": "ReasonCodeInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "captureAdminMissionSoul": {
+            "request": "CaptureAdminMissionSoulInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "assignAdminMissionSoulMentor": {
+            "request": "AssignAdminMissionSoulMentorInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "recordAdminMissionSoulFollowUp": {
+            "request": "RecordAdminMissionSoulFollowUpInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "completeAdminMissionSoulFollowUp": {
+            "request": "ReasonCodeInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "listAdminMissionInvitations": {
+            "response": "ProtectedDomainRecordList"
+        },
+        "createAdminMissionInvitation": {
+            "request": "CreateAdminMissionInvitationInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "transitionAdminMissionInvitation": {
+            "request": "TransitionWithReasonInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "transitionAdminKcaApplication": {
+            "request": "TransitionWithReasonInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "enrollAdminKcaStudent": {
+            "request": "EnrollAdminKcaStudentInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "transitionAdminKcaAssignment": {
+            "request": "TransitionStatusInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "submitAdminKcaEvidence": {
+            "request": "SubmitAdminKcaEvidenceInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "reviewAdminKcaEvidence": {
+            "request": "ReviewAdminKcaEvidenceInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "issueAdminKcaCertificate": {
+            "request": "IssueAdminKcaCertificateInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "createAdminKcaYear": {
+            "request": "CreateAdminKcaYearInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "createAdminKcaCohort": {
+            "request": "CreateAdminKcaCohortInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "createAdminKcaModule": {
+            "request": "CreateAdminKcaModuleInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "createAdminKcaLesson": {
+            "request": "CreateAdminKcaLessonInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "recordAdminKcaAttendance": {
+            "request": "RecordAdminKcaAttendanceInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "createAdminPressPublication": {
+            "request": "CreateAdminPressPublicationInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "transitionAdminPressPublication": {
+            "request": "TransitionWithReasonInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "assignAdminPressPublicationIsbn": {
+            "request": "AssignAdminPressPublicationIsbnInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "addAdminPressPublicationContributor": {
+            "request": "AddAdminPressPublicationContributorInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "createAdminPressTranslation": {
+            "request": "CreateAdminPressTranslationInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "transitionAdminPressTranslation": {
+            "request": "TransitionWithReasonInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "createAdminMinistryEvent": {
+            "request": "CreateAdminMinistryEventInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "registerAdminEventRegistration": {
+            "request": "RegisterAdminEventRegistrationInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "recordAdminEventAttendance": {
+            "request": "RecordAdminEventAttendanceInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "recordAdminEventFeedback": {
+            "request": "RecordAdminEventFeedbackInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "createAdminPaymentIntent": {
+            "request": "CreateAdminPaymentIntentInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "requestAdminPaymentRefund": {
+            "request": "RequestAdminPaymentRefundInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "createAdminCommunicationTemplate": {
+            "request": "CreateAdminCommunicationTemplateInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "createAdminCommunicationAudience": {
+            "request": "CreateAdminCommunicationAudienceInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "prepareAdminCommunicationBroadcast": {
+            "request": "PrepareAdminCommunicationBroadcastInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "attemptAdminCommunicationDelivery": {
+            "request": "IdempotencyKeyInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "createAdminCommunicationNotification": {
+            "response": "ProtectedDomainRecord"
+        },
+        "createAdminAlertRule": {
+            "request": "CreateAdminAlertRuleInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "setAdminAlertRuleEnabled": {
+            "request": "SetAdminAlertRuleEnabledInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "evaluateAdminAlertRule": {
+            "request": "EvaluateAdminAlertRuleInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "acknowledgeAdminAlertOccurrence": {
+            "response": "ProtectedDomainRecord"
+        },
+        "resolveAdminAlertOccurrence": {
+            "request": "ReasonCodeInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "submitAdminDataSubjectRequest": {
+            "request": "SubmitAdminDataSubjectRequestInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "beginAdminDataExport": {
+            "request": "BeginAdminDataExportInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "completeAdminDataExport": {
+            "request": "CompleteAdminDataExportInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "expireAdminDataExport": {
+            "response": "ProtectedDomainRecord"
+        },
+        "reportAdminSafeguardingIncident": {
+            "request": "ReportAdminSafeguardingIncidentInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "registerAdminGuardianRelationship": {
+            "request": "RegisterAdminGuardianRelationshipInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "assignAdminUserRole": {
+            "request": "AssignAdminUserRoleInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "assignAdminRoleAssignmentScope": {
+            "request": "AssignAdminRoleAssignmentScopeInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "grantAdminRolePermission": {
+            "request": "GrantAdminRolePermissionInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "suspendAdminUser": {
+            "request": "SuspendAdminUserInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "createAdminContentPage": {
+            "request": "CreateAdminContentPageInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "updateAdminContentPage": {
+            "request": "UpdateAdminContentPageInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "createAdminContentPageItem": {
+            "request": "CreateAdminContentPageItemInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "grantUserConsent": {
+            "request": "GrantUserConsentInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "updateUserPreferences": {
+            "request": "UpdateUserPreferencesInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "createUserGivingPaymentIntent": {
+            "request": "CreateUserGivingPaymentIntentInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "completeUserGivingPaymentIntent": {
+            "response": "ProtectedDomainRecord"
+        },
+        "createUserPrayerRequest": {
+            "request": "CreateUserPrayerRequestInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "createUserPastoralNeed": {
+            "request": "CreateUserPastoralNeedInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "createUserMessageConversation": {
+            "request": "CreateUserMessageConversationInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "createUserConversationMessage": {
+            "request": "CreateUserConversationMessageInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "updateUserSyncCheckpoint": {
+            "request": "UpdateUserSyncCheckpointInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "registerUserEventRegistration": {
+            "request": "RegisterUserEventRegistrationInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "recordUserEventFeedback": {
+            "request": "RecordUserEventFeedbackInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "submitUserDataSubjectRequest": {
+            "request": "SubmitUserDataSubjectRequestInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "storeUserFileAsset": {
+            "request": "StoreUserFileAssetInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "listUserFileAssets": {
+            "response": "ProtectedDomainRecordList"
+        },
+        "getUserEventRegistration": {
+            "response": "ProtectedDomainRecord"
+        },
+        "startUserChurchMembership": {
+            "request": "StartUserChurchMembershipInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "listUserMemberships": {
+            "response": "ProtectedDomainRecordList"
+        },
+        "getUserHomeChurch": {
+            "response": "ProtectedDomainRecord"
+        },
+        "submitUserHomeChurchReport": {
+            "request": "SubmitUserHomeChurchReportInput",
+            "response": "UserHomeChurchReportSubmission"
+        }
+    },
+    "outputs": {
+        "typescript": "clients/typescript/src/protected-api.ts",
+        "dart": "clients/dart/lib/protected_api.dart"
+    }
+}

@@ -2,6 +2,7 @@
 
 namespace App\Storage;
 
+use App\Exceptions\UnsafeObjectStorageEndpointException;
 use App\Models\ObjectStorageConfiguration;
 use App\Storage\Contracts\ObjectStorageConnectionValidator;
 use App\Storage\Data\ObjectStorageValidationResult;
@@ -49,6 +50,8 @@ class S3ObjectStorageConnectionValidator implements ObjectStorageConnectionValid
             }
 
             return ObjectStorageValidationResult::succeeded();
+        } catch (UnsafeObjectStorageEndpointException) {
+            return ObjectStorageValidationResult::failed('unsafe_endpoint');
         } catch (Throwable) {
             return ObjectStorageValidationResult::failed('connection_failed');
         } finally {

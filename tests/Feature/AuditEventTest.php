@@ -7,7 +7,7 @@ use App\Models\AuditEvent;
 use App\Models\User;
 use App\Support\Audit\AuditEventData;
 use App\Support\Audit\RecordAuditEventAction;
-use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -15,7 +15,7 @@ use Tests\TestCase;
 
 class AuditEventTest extends TestCase
 {
-    use LazilyRefreshDatabase;
+    use DatabaseTransactions;
 
     public function test_records_an_append_only_audit_event_with_request_context(): void
     {

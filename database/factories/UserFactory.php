@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Identity\UserAccountStatus;
 use App\Models\Person;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -47,5 +48,15 @@ class UserFactory extends Factory
     public function withPerson(): static
     {
         return $this->for(Person::factory()->withProfile(), 'person');
+    }
+
+    public function suspended(string $reason = 'policy.violation'): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'account_status' => UserAccountStatus::Suspended->value,
+            'suspension_reason' => $reason,
+            'suspended_at' => now(),
+            'reactivated_at' => null,
+        ]);
     }
 }

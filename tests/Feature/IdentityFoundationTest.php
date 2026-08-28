@@ -7,14 +7,14 @@ use App\Models\AuditEvent;
 use App\Models\Person;
 use App\Models\User;
 use App\Support\Identity\LinkUserToPersonAction;
-use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class IdentityFoundationTest extends TestCase
 {
-    use LazilyRefreshDatabase;
+    use DatabaseTransactions;
 
     public function test_links_a_user_to_one_canonical_person_and_records_the_change(): void
     {

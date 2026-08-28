@@ -1,0 +1,7 @@
+name: family_house_connect_public_api
+description: Transport-neutral generated client and Flutter integration helpers for the public Family House Connect API.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: '>=3.7.0 <4.0.0'

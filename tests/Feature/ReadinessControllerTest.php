@@ -4,12 +4,12 @@ namespace Tests\Feature;
 
 use App\Support\Health\ReadinessChecker;
 use App\Support\Health\ReadinessResult;
-use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Tests\TestCase;
 
 class ReadinessControllerTest extends TestCase
 {
-    use LazilyRefreshDatabase;
+    use DatabaseTransactions;
 
     public function test_returns_200_when_required_dependencies_are_ready(): void
     {

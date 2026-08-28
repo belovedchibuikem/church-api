@@ -1,6 +1,11 @@
 <?php
 
 use App\Http\Middleware\AssignCorrelationId;
+use App\Http\Middleware\AuthenticateMobileAccessToken;
+use App\Http\Middleware\EnsureActiveAccount;
+use App\Http\Middleware\EnsureActiveBrowserSecuritySession;
+use App\Http\Middleware\EnsureRecentMfa;
+use App\Http\Middleware\EnsureVerifiedEmail;
 use App\Support\Api\ApiExceptionRenderer;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -17,6 +22,13 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->append(AssignCorrelationId::class);
+        $middleware->alias([
+            'auth.mobile' => AuthenticateMobileAccessToken::class,
+            'active.account' => EnsureActiveAccount::class,
+            'active.browser.session' => EnsureActiveBrowserSecuritySession::class,
+            'mfa.recent' => EnsureRecentMfa::class,
+            'verified.email' => EnsureVerifiedEmail::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

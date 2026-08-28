@@ -1,25 +1,25 @@
 # Family House Connect Backend Delivery Plan
 
-Updated: 2026-08-25
+Updated: 2026-08-26
 
 ## Current state
 
-Phase 0 discovery is complete and Phase 1 foundation is operationally implemented pending hosted/production infrastructure verification. Laravel 13.27.0 boots on PHP 8.3, versioned API routing is registered, and the public/user/admin route surfaces are separated. Liveness, dependency readiness, normalized error envelopes, correlation identifiers, configurable public throttling, privacy-safe structured JSON logging, queue retention schedules, worker/scheduler deployment templates, and a MySQL/Redis CI gate are implemented. MySQL 8.4 is the active local runtime database with InnoDB tables, and a local isolated backup/restore drill has passed. Local file storage remains the default, while an encrypted, validation-gated S3-compatible storage core is ready for a future secured administration surface. Phase 2A has started with the canonical Person/Profile root, one-to-one User linkage, opaque ULIDs, and an append-only audit writer.
+Phase 0 discovery and the transport-neutral foundations through reporting, safeguarding, privacy, and client generation are implemented in varying depth. Laravel 13.27.0 boots on PHP 8.3, the public/user/admin route surfaces are separated, and 14 public plus 70 identity/User/Admin operations are registered with strict requests, minimized resources, throttling, shared envelopes, dual browser/mobile authentication, recent MFA, and scoped authorization. Admin now includes organization/platform/storage, Church/Home Church, Mission, and immutable audit/access-decision review operations. Governance-dependent behavior generally fails closed. Hosted/production infrastructure remains unverified.
 
 ## Delivery sequence
 
 1. **Foundation — implementation complete; environment verification pending:** structured logging, Redis-ready cache/queue configuration, supervised workers, protected scheduler maintenance, MySQL/Redis CI, monitoring/backup runbooks, and a successful local MySQL restore drill are present. The hosted CI run and production Redis/MySQL/backup/observability environments remain OD-012 gates.
-2. **Identity and access — foundation in progress; transport pending decision:** canonical Person/Profile and User linkage plus audit recording are implemented. Browser/mobile authentication, verification, MFA, sessions/devices, permissions, scopes, and consent remain gated by OD-001 through OD-005.
-3. **Geography and organization:** configurable hierarchy, locations, scope containment, churches, and Home Churches.
-4. **Shared platform services:** audit, media/files, search, notifications, configuration, and feature flags.
-5. **Church and pastoral care.**
-6. **Mission.**
-7. **KCA.**
-8. **Press.**
-9. **Events and finance.**
-10. **Communications.**
-11. **Reporting, analytics, and advisory AI.**
-12. **Safeguarding, privacy, and production hardening.**
-13. **Generated TypeScript/Dart clients and cross-client E2E integration.**
+2. **Identity and access — protected foundation implemented:** browser registration/session/verification/recovery, rotating device-bound mobile credentials, TOTP/recovery MFA, suspension, sessions/devices, consent/preferences, explicit permission bundles, global/geography/exact/own-record scopes, recorded access decisions, 9 User routes, and 7 Admin routes are implemented. Delegation/separation-of-duties and domain-specific record policies remain OD-006+ work.
+3. **Geography, Church, and Home Church — protected operational slice implemented:** geography plus 9 Church/Home Church Admin operations use explicit permissions, recent MFA, BOLA-safe country/unit/church containment, strict resources, audit, tests, OpenAPI, and clients.
+4. **Shared platform services — configuration/flag/storage Admin API implemented; delivery/governance pending:** audited typed encrypted configuration and feature flags have scoped protected Admin management APIs with confidential-value redaction. Optional S3 now has global-only, recently MFA-verified, permissioned, rate-limited configure/inspect/validate/activate/deactivate APIs with write-only encrypted credentials, SSRF controls, and local fallback. Audit/access decisions, private file assets, null-provider search, communications persistence, alert rules, and export-artifact lifecycle exist below HTTP. File scanning/delivery, concrete search indexing, deletion execution, and provider bindings remain gated.
+5. **Church and pastoral care — partial foundation:** Church/Home Church and first-timer follow-up are implemented; broader attendance, groups, prayer, counselling, testimonies, needs, and pastoral workflows remain.
+6. **Mission — protected soul-follow-up slice implemented:** 6 scoped Admin operations expose crusade/soul listing, soul capture, mentor assignment and idempotent follow-up/completion; partners/stories/support remain.
+7. **KCA — lifecycle foundation plus public verification implemented:** learning/certification foundations and HMAC certificate verification exist. OD-008 thresholds, fees, signer/revocation authority, and protected APIs remain.
+8. **Press — workflow foundation plus public catalogue implemented:** publication/translation workflows and minimized published catalogue/detail APIs exist; assets, distribution/sales integrations, and authorities remain.
+9. **Events and finance — public event slice plus finance foundation:** published upcoming event catalogue/detail, free-event workflows, and payment/reconciliation/refund/dispute actions exist. Payment governance and webhook verification deny by default pending OD-009.
+10. **Communications — foundation implemented:** templates, server-side audiences, consent/guardian-aware recipient snapshots, broadcasts, delivery attempts, and in-app notifications exist. Guardian policy and outbound providers fail closed; no protected routes are registered.
+11. **Reporting, analytics, search, and advisory AI — foundation implemented:** canonical metric definitions, alert lifecycle, classification-filtering search boundary, and human-decision-only advisory AI boundary exist. Concrete dashboard queries, providers, visibility policies, and APIs remain.
+12. **Safeguarding and privacy — foundation implemented; governance pending:** child/guardian and restricted-incident records plus data-subject requests/export artifacts exist with encryption and default-deny policies. OD-006/OD-007 decisions, deletion execution, restricted-read APIs, and production hardening remain.
+13. **Clients and integration — public and protected generation implemented:** deterministic TypeScript/Dart clients cover all 14 public and 94 identity/User/Admin operations and pass compile/analyze checks. Organization/platform/storage keep operation-specific schemas; remaining-domain catalog reads are registered; mutation specialization and adjacent-app integration remain.
 
 Each phase must deliver domain rules, authorization, API contracts, audit behavior, tests, and traceability. A later phase must not be marked complete because routes or mock responses exist.

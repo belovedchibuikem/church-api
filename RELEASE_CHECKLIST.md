@@ -7,24 +7,35 @@ Current release status: **not production ready**.
 - [x] Public status/health contracts and correlation IDs are tested.
 - [x] Dependency readiness, normalized API errors, and configurable public throttling are tested and documented.
 - [x] Initial OpenAPI and implementation control documents exist.
-- [x] Local MySQL 8.4 connectivity and migrations are verified with InnoDB tables.
+- [x] Local MySQL 8.4 connectivity and the previously integrated migration baseline are verified with InnoDB tables.
 - [x] Optional S3-compatible adapter and encrypted activation-gated storage core are implemented.
 - [x] Canonical Person/Profile schema, conflict-safe User linkage, and append-only audit writer are implemented and tested.
 - [x] Privacy-safe structured JSON logging and correlation context are tested.
 - [x] Queue worker/scheduler templates and protected retention schedules are implemented and tested.
 - [x] MySQL 8.4 plus Redis CI services and dependency/test/format gates are defined.
 - [x] A local isolated MySQL backup/restore drill passed and operational runbooks exist.
+- [x] Account suspension, consent/preferences, devices, session records, MFA verifier storage, permission/role/scope assignments, and access decisions are implemented and tested below the transport layer.
+- [x] Generic country/administrative hierarchy, reusable locations, and country/unit containment are implemented and tested.
+- [x] Typed confidential configuration, feature flags, and private quarantined file-asset persistence are implemented and tested below the transport layer.
+- [x] Church/Home Church, Mission, KCA, and Press lifecycle foundations are implemented below HTTP with canonical identity, audit, and invalid-transition coverage.
+- [x] Free-event and provider-neutral finance foundations exist; unsafe payment governance/webhook defaults deny.
+- [x] Communications persistence, server-side audiences, consent/scope/guardian hooks, and disabled-provider delivery are implemented below HTTP.
+- [x] Safeguarding/guardian and privacy-request foundations encrypt restricted data and default deny unresolved access/execution.
+- [x] Canonical metric definitions, provider-neutral search/advisory AI boundaries, and alert-rule/occurrence foundations exist below HTTP.
+- [x] Public-only OpenAPI 3.1 and deterministic TypeScript/Dart clients cover all 14 registered public operations; both generated clients pass compile/analyze checks.
 - [ ] Production environment validation and secret injection complete.
 - [ ] Production MySQL migration, connectivity, backup, and restore verified.
 - [ ] Live S3-compatible connection, least-privilege credentials, encryption, lifecycle, and restore behavior verified if object storage is enabled.
 - [ ] Redis cache, queue, retry, failure, and monitoring verified.
 - [x] Scheduler task registration and single-run/overlap controls verified locally.
 - [ ] Hosted CI, supervised workers, scheduler heartbeat, Redis, monitoring, and restore drills verified in the production-like environment.
-- [ ] Authentication, MFA, session/device revocation, and suspension verified.
-- [ ] Permission, scope, record-policy, and restricted-data negative tests pass.
-- [ ] Audit/access-decision storage and privileged transition coverage pass.
-- [ ] Secure file/media, webhook, payment, privacy, and safeguarding controls pass.
-- [ ] OpenAPI is complete and TypeScript/Dart clients build.
+- [x] Registration/login/verification/recovery, browser/mobile credential transport, MFA challenges, and session APIs verified locally after OD-001 through OD-003.
+- [ ] Registered permission bundles and hierarchy/own-record containment pass; domain record policies and restricted-data negative tests remain pending OD-006.
+- [ ] Production database privilege enforcement and protected privileged-transition integration pass; authorized minimized audit/access-decision reads are implemented and locally tested.
+- [x] The complete migration set is applied to both default local and authoritative test MySQL databases, and the final integrated suite passes: 333 tests, 2,020 assertions.
+- [ ] Secure file/media, webhook, payment, privacy, safeguarding, communications, alert, search, and AI policy controls pass.
+- [x] Protected OpenAPI matches all 70 currently registered identity/User/Admin operations and generated TypeScript/Dart clients build; generic protected payload schemas still require specialization as recorded in `KNOWN_GAPS.md`.
+- [ ] Generated public clients are consumed and built by the adjacent Next.js and Flutter applications.
 - [ ] Next.js and Flutter critical E2E journeys pass against real APIs.
 - [ ] Dependency, static analysis, security, performance, and observability gates pass.
 - [ ] No critical security/authorization finding or undocumented production placeholder remains.

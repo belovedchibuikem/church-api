@@ -1,0 +1,62 @@
+<?php
+
+namespace App\Models;
+
+use Database\Factories\MobileRefreshTokenFactory;
+use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
+#[Fillable([
+    'user_id',
+    'security_session_id',
+    'device_id',
+    'family_id',
+    'token_hash',
+    'expires_at',
+])]
+#[Hidden(['token_hash'])]
+class MobileRefreshToken extends Model
+{
+    /** @use HasFactory<MobileRefreshTokenFactory> */
+    use HasFactory, HasUlids;
+
+    /** @return array<int, string> */
+    public function uniqueIds(): array
+    {
+        return ['public_id'];
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    public function securitySession(): BelongsTo
+    {
+        return $this->belongsTo(SecuritySession::class);
+    }
+
+    public function device(): BelongsTo
+    {
+        return $this->belongsTo(Device::class);
+    }
+
+    public function replacedBy(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'replaced_by_id');
+    }
+
+    /** @return array<string, string> */
+    protected function casts(): array
+    {
+        return [
+            'expires_at' => 'immutable_datetime',
+            'used_at' => 'immutable_datetime',
+            'revoked_at' => 'immutable_datetime',
+        ];
+    }
+}

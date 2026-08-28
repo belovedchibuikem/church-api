@@ -1,0 +1,93 @@
+{
+    "contract": "openapi/public-v1.openapi.json",
+    "operations": {
+        "getApiStatus": {
+            "method": "GET",
+            "path": "/api/v1"
+        },
+        "getHealth": {
+            "method": "GET",
+            "path": "/api/v1/health"
+        },
+        "getReadiness": {
+            "method": "GET",
+            "path": "/api/v1/health/readiness"
+        },
+        "listChurches": {
+            "method": "GET",
+            "path": "/api/v1/churches"
+        },
+        "getChurch": {
+            "method": "GET",
+            "path": "/api/v1/churches/{church}"
+        },
+        "submitHomeChurchApplication": {
+            "method": "POST",
+            "path": "/api/v1/home-church-applications"
+        },
+        "listPressPublications": {
+            "method": "GET",
+            "path": "/api/v1/press/publications"
+        },
+        "getPressPublication": {
+            "method": "GET",
+            "path": "/api/v1/press/publications/{publicId}"
+        },
+        "downloadPressPublication": {
+            "method": "GET",
+            "path": "/api/v1/press/publications/{publicId}/download"
+        },
+        "listEvents": {
+            "method": "GET",
+            "path": "/api/v1/events"
+        },
+        "getEvent": {
+            "method": "GET",
+            "path": "/api/v1/events/{event}"
+        },
+        "verifyKcaCertificate": {
+            "method": "GET",
+            "path": "/api/v1/kca/certificates/verify"
+        },
+        "listMissionLocations": {
+            "method": "GET",
+            "path": "/api/v1/mission/locations"
+        },
+        "listMissionCrusades": {
+            "method": "GET",
+            "path": "/api/v1/mission/crusades"
+        },
+        "getMissionCrusade": {
+            "method": "GET",
+            "path": "/api/v1/mission/crusades/{crusade}"
+        },
+        "getMapsConfiguration": {
+            "method": "GET",
+            "path": "/api/v1/maps/configuration"
+        },
+        "listMapsPlaces": {
+            "method": "GET",
+            "path": "/api/v1/maps/places"
+        },
+        "reconcilePublicPaymentWebhook": {
+            "method": "POST",
+            "path": "/api/v1/finance/webhooks/reconcile"
+        },
+        "recordPublicPaymentDisputeWebhook": {
+            "method": "POST",
+            "path": "/api/v1/finance/webhooks/disputes"
+        },
+        "listContentPages": {
+            "method": "GET",
+            "path": "/api/v1/content/pages"
+        },
+        "getContentPage": {
+            "method": "GET",
+            "path": "/api/v1/content/pages/{slug}"
+        }
+    },
+    "outputs": {
+        "typescript": "clients/typescript/src/public-api.ts",
+        "dart": "clients/dart/lib/public_api.dart"
+    }
+}

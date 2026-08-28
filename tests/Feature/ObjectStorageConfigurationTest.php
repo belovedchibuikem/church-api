@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Exceptions\ObjectStorageConnectionValidationException;
+use App\Exceptions\ObjectStorageLocationInUseException;
+use App\Models\FileAsset;
 use App\Models\ObjectStorageConfiguration;
 use App\Storage\Actions\ActivateLocalStorageAction;
 use App\Storage\Actions\ActivateObjectStorageAction;
@@ -14,16 +16,17 @@ use App\Storage\Data\ObjectStorageValidationResult;
 use App\Storage\Data\S3ConnectionData;
 use App\Storage\ObjectStorageValidationStatus;
 use App\Storage\S3FilesystemConfigurationFactory;
+use App\Storage\StorageProvider;
 use Illuminate\Filesystem\AwsS3V3Adapter;
 use Illuminate\Filesystem\FilesystemManager;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class ObjectStorageConfigurationTest extends TestCase
 {
-    use RefreshDatabase;
+    use DatabaseTransactions;
 
     public function test_credentials_are_encrypted_at_rest_and_hidden_from_serialization(): void
     {
@@ -109,6 +112,66 @@ class ObjectStorageConfigurationTest extends TestCase
         $this->assertTrue($configured->is_active);
         $this->assertSame($configuration->configuration_revision, $configured->configuration_revision);
         $this->assertSame(ObjectStorageValidationStatus::Succeeded, $configured->last_validation_status);
+    }
+
+    public function test_credential_rotation_preserves_the_storage_location_revision(): void
+    {
+        $configuration = ObjectStorageConfiguration::factory()->active()->create();
+
+        $configured = $this->app->make(ConfigureS3ObjectStorageAction::class)->handle(
+            new S3ConnectionData(
+                accessKeyId: 'rotated-access-key',
+                secretAccessKey: 'rotated-secret-key',
+                region: $configuration->region,
+                bucket: $configuration->bucket,
+                endpoint: $configuration->endpoint,
+                url: $configuration->url,
+                rootPrefix: $configuration->root_prefix,
+                usePathStyleEndpoint: $configuration->use_path_style_endpoint,
+            ),
+        );
+
+        $this->assertSame($configuration->configuration_revision, $configured->configuration_revision);
+        $this->assertSame('rotated-access-key', $configured->access_key_id);
+        $this->assertSame('rotated-secret-key', $configured->secret_access_key);
+        $this->assertFalse($configured->is_active);
+        $this->assertNull($configured->validated_at);
+    }
+
+    public function test_rejects_changing_a_storage_location_referenced_by_file_assets(): void
+    {
+        $configuration = ObjectStorageConfiguration::factory()->active()->create();
+        FileAsset::factory()->create([
+            'storage_provider' => StorageProvider::S3,
+            'disk_name' => 'object-storage',
+            'storage_configuration_revision' => $configuration->configuration_revision,
+        ]);
+        $wasRejected = false;
+
+        try {
+            $this->app->make(ConfigureS3ObjectStorageAction::class)->handle(
+                new S3ConnectionData(
+                    accessKeyId: $configuration->access_key_id,
+                    secretAccessKey: $configuration->secret_access_key,
+                    region: $configuration->region,
+                    bucket: 'replacement-bucket',
+                    endpoint: $configuration->endpoint,
+                    url: $configuration->url,
+                    rootPrefix: $configuration->root_prefix,
+                    usePathStyleEndpoint: $configuration->use_path_style_endpoint,
+                ),
+            );
+            $this->fail('Expected the referenced storage location change to be rejected.');
+        } catch (ObjectStorageLocationInUseException) {
+            $wasRejected = true;
+        }
+
+        $this->assertTrue($wasRejected);
+        $this->assertSame($configuration->bucket, $configuration->fresh()->bucket);
+        $this->assertSame(
+            $configuration->configuration_revision,
+            $configuration->fresh()->configuration_revision,
+        );
     }
 
     public function test_failed_validation_keeps_local_storage_active_and_records_only_a_stable_code(): void

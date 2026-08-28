@@ -4,16 +4,20 @@ namespace App\Storage\Actions;
 
 use App\Exceptions\ObjectStorageConnectionValidationException;
 use App\Models\ObjectStorageConfiguration;
+use App\Models\User;
 use App\Storage\Contracts\ObjectStorageConnectionValidator;
+use App\Support\Audit\AuditEventData;
+use App\Support\Audit\RecordAuditEventAction;
 use Illuminate\Support\Facades\DB;
 
 class ActivateObjectStorageAction
 {
     public function __construct(
         private ObjectStorageConnectionValidator $validator,
+        private RecordAuditEventAction $recordAuditEvent,
     ) {}
 
-    public function handle(ObjectStorageConfiguration $configuration): ObjectStorageConfiguration
+    public function handle(ObjectStorageConfiguration $configuration, ?User $actor = null): ObjectStorageConfiguration
     {
         $configuration->refresh();
         $revision = $configuration->configuration_revision;
@@ -25,6 +29,7 @@ class ActivateObjectStorageAction
             $revision,
             $result,
             $attemptedAt,
+            $actor,
         ): ObjectStorageConfiguration {
             $lockedConfiguration = ObjectStorageConfiguration::query()
                 ->lockForUpdate()
@@ -42,6 +47,21 @@ class ActivateObjectStorageAction
                 'is_active' => $result->isSuccessful(),
                 'activated_at' => $result->isSuccessful() ? $attemptedAt : null,
             ])->save();
+
+            $this->recordAuditEvent->handle(new AuditEventData(
+                action: $result->isSuccessful()
+                    ? 'platform.object_storage.activated'
+                    : 'platform.object_storage.activation_failed',
+                actor: $actor,
+                targetType: 'object_storage_configuration',
+                targetId: 's3',
+                scopeType: 'global',
+                scopeId: 'platform',
+                metadata: [
+                    'configuration_revision' => $lockedConfiguration->configuration_revision,
+                    'failure_code' => $result->failureCode,
+                ],
+            ));
 
             return $lockedConfiguration;
         }, attempts: 3);

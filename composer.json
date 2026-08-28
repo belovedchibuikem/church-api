@@ -50,6 +50,23 @@
             "@php artisan config:clear --ansi @no_additional_args",
             "@php artisan test"
         ],
+        "openapi:validate": [
+            "@php scripts/validate-public-openapi.php",
+            "@php scripts/generate-protected-api.php --check"
+        ],
+        "clients:generate": [
+            "@php scripts/generate-public-api-clients.php",
+            "@php scripts/generate-protected-api.php"
+        ],
+        "clients:check": [
+            "@openapi:validate",
+            "@php scripts/generate-public-api-clients.php --check",
+            "@php scripts/generate-protected-api.php --check"
+        ],
+        "clients:integration-check": [
+            "@clients:check",
+            "@php scripts/verify-public-client-integrations.php"
+        ],
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
             "@php artisan package:discover --ansi"

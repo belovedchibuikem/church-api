@@ -1,0 +1,2816 @@
+{
+    "openapi": "3.1.0",
+    "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
+    "info": {
+        "title": "Family House Connect Public API",
+        "version": "1.1.0",
+        "description": "Authoritative contract for registered unauthenticated, public-safe API operations."
+    },
+    "servers": [
+        {
+            "url": "/",
+            "description": "Current deployment"
+        }
+    ],
+    "tags": [
+        {
+            "name": "Platform"
+        },
+        {
+            "name": "Church"
+        },
+        {
+            "name": "Press"
+        },
+        {
+            "name": "Events"
+        },
+        {
+            "name": "KCA"
+        },
+        {
+            "name": "Mission"
+        },
+        {
+            "name": "Content"
+        }
+    ],
+    "security": [],
+    "paths": {
+        "/api/v1": {
+            "get": {
+                "operationId": "getApiStatus",
+                "summary": "Get API status",
+                "tags": [
+                    "Platform"
+                ],
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/CorrelationId"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "$ref": "#/components/responses/ApiStatusSuccess"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/RateLimited"
+                    },
+                    "500": {
+                        "$ref": "#/components/responses/InternalError"
+                    }
+                }
+            }
+        },
+        "/api/v1/health": {
+            "get": {
+                "operationId": "getHealth",
+                "summary": "Get liveness status",
+                "tags": [
+                    "Platform"
+                ],
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/CorrelationId"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "$ref": "#/components/responses/HealthSuccess"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/RateLimited"
+                    },
+                    "500": {
+                        "$ref": "#/components/responses/InternalError"
+                    }
+                }
+            }
+        },
+        "/api/v1/health/readiness": {
+            "get": {
+                "operationId": "getReadiness",
+                "summary": "Get dependency readiness",
+                "tags": [
+                    "Platform"
+                ],
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/CorrelationId"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "$ref": "#/components/responses/ReadinessSuccess"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/RateLimited"
+                    },
+                    "500": {
+                        "$ref": "#/components/responses/InternalError"
+                    },
+                    "503": {
+                        "$ref": "#/components/responses/ServiceNotReady"
+                    }
+                }
+            }
+        },
+        "/api/v1/churches": {
+            "get": {
+                "operationId": "listChurches",
+                "summary": "List published churches",
+                "tags": [
+                    "Church"
+                ],
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/CorrelationId"
+                    },
+                    {
+                        "$ref": "#/components/parameters/ChurchNameFilter"
+                    },
+                    {
+                        "$ref": "#/components/parameters/ChurchCountryFilter"
+                    },
+                    {
+                        "$ref": "#/components/parameters/ChurchUnitFilter"
+                    },
+                    {
+                        "$ref": "#/components/parameters/ChurchSort"
+                    },
+                    {
+                        "$ref": "#/components/parameters/Page"
+                    },
+                    {
+                        "$ref": "#/components/parameters/PerPage"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "$ref": "#/components/responses/ChurchListSuccess"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/RateLimited"
+                    },
+                    "500": {
+                        "$ref": "#/components/responses/InternalError"
+                    }
+                }
+            }
+        },
+        "/api/v1/churches/{church}": {
+            "get": {
+                "operationId": "getChurch",
+                "summary": "Get a published church",
+                "tags": [
+                    "Church"
+                ],
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/CorrelationId"
+                    },
+                    {
+                        "$ref": "#/components/parameters/ChurchId"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "$ref": "#/components/responses/ChurchSuccess"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFound"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/RateLimited"
+                    },
+                    "500": {
+                        "$ref": "#/components/responses/InternalError"
+                    }
+                }
+            }
+        },
+        "/api/v1/home-church-applications": {
+            "post": {
+                "operationId": "submitHomeChurchApplication",
+                "summary": "Submit a Start-a-Home-Church application",
+                "tags": [
+                    "Church"
+                ],
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/CorrelationId"
+                    },
+                    {
+                        "$ref": "#/components/parameters/IdempotencyKey"
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/HomeChurchApplicationInput"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "$ref": "#/components/responses/HomeChurchApplicationSuccess"
+                    },
+                    "201": {
+                        "$ref": "#/components/responses/HomeChurchApplicationCreated"
+                    },
+                    "409": {
+                        "$ref": "#/components/responses/Conflict"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/RateLimited"
+                    },
+                    "500": {
+                        "$ref": "#/components/responses/InternalError"
+                    }
+                }
+            }
+        },
+        "/api/v1/press/publications": {
+            "get": {
+                "operationId": "listPressPublications",
+                "summary": "List public Press publications",
+                "tags": [
+                    "Press"
+                ],
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/CorrelationId"
+                    },
+                    {
+                        "$ref": "#/components/parameters/PressLanguageFilter"
+                    },
+                    {
+                        "$ref": "#/components/parameters/PressCategoryFilter"
+                    },
+                    {
+                        "$ref": "#/components/parameters/PressFormatFilter"
+                    },
+                    {
+                        "$ref": "#/components/parameters/PressSort"
+                    },
+                    {
+                        "$ref": "#/components/parameters/Page"
+                    },
+                    {
+                        "$ref": "#/components/parameters/PerPage"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "$ref": "#/components/responses/PressListSuccess"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/RateLimited"
+                    },
+                    "500": {
+                        "$ref": "#/components/responses/InternalError"
+                    }
+                }
+            }
+        },
+        "/api/v1/press/publications/{publicId}": {
+            "get": {
+                "operationId": "getPressPublication",
+                "summary": "Get a public Press publication",
+                "tags": [
+                    "Press"
+                ],
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/CorrelationId"
+                    },
+                    {
+                        "$ref": "#/components/parameters/PressPublicationId"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "$ref": "#/components/responses/PressSuccess"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFound"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/RateLimited"
+                    },
+                    "500": {
+                        "$ref": "#/components/responses/InternalError"
+                    }
+                }
+            }
+        },
+        "/api/v1/press/publications/{publicId}/download": {
+            "get": {
+                "operationId": "downloadPressPublication",
+                "summary": "Download a public Press publication file",
+                "tags": [
+                    "Press"
+                ],
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/CorrelationId"
+                    },
+                    {
+                        "$ref": "#/components/parameters/PressPublicationId"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "$ref": "#/components/responses/PressDownloadSuccess"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFound"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/RateLimited"
+                    },
+                    "500": {
+                        "$ref": "#/components/responses/InternalError"
+                    }
+                }
+            }
+        },
+        "/api/v1/events": {
+            "get": {
+                "operationId": "listEvents",
+                "summary": "List published upcoming events",
+                "tags": [
+                    "Events"
+                ],
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/CorrelationId"
+                    },
+                    {
+                        "$ref": "#/components/parameters/EventCategory"
+                    },
+                    {
+                        "$ref": "#/components/parameters/StartsFrom"
+                    },
+                    {
+                        "$ref": "#/components/parameters/StartsUntil"
+                    },
+                    {
+                        "$ref": "#/components/parameters/EventSort"
+                    },
+                    {
+                        "$ref": "#/components/parameters/Page"
+                    },
+                    {
+                        "$ref": "#/components/parameters/PerPage"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "$ref": "#/components/responses/EventListSuccess"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/RateLimited"
+                    },
+                    "500": {
+                        "$ref": "#/components/responses/InternalError"
+                    }
+                }
+            }
+        },
+        "/api/v1/events/{event}": {
+            "get": {
+                "operationId": "getEvent",
+                "summary": "Get a published upcoming event",
+                "tags": [
+                    "Events"
+                ],
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/CorrelationId"
+                    },
+                    {
+                        "$ref": "#/components/parameters/EventId"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "$ref": "#/components/responses/EventSuccess"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFound"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/RateLimited"
+                    },
+                    "500": {
+                        "$ref": "#/components/responses/InternalError"
+                    }
+                }
+            }
+        },
+        "/api/v1/kca/certificates/verify": {
+            "get": {
+                "operationId": "verifyKcaCertificate",
+                "summary": "Verify an issued KCA certificate",
+                "tags": [
+                    "KCA"
+                ],
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/CorrelationId"
+                    },
+                    {
+                        "$ref": "#/components/parameters/CertificateCode"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "$ref": "#/components/responses/CertificateVerificationSuccess"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFound"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/RateLimited"
+                    },
+                    "500": {
+                        "$ref": "#/components/responses/InternalError"
+                    }
+                }
+            }
+        },
+        "/api/v1/mission/locations": {
+            "get": {
+                "operationId": "listMissionLocations",
+                "summary": "List locations with mission activity",
+                "tags": [
+                    "Mission"
+                ],
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/CorrelationId"
+                    },
+                    {
+                        "$ref": "#/components/parameters/Country"
+                    },
+                    {
+                        "$ref": "#/components/parameters/Search"
+                    },
+                    {
+                        "$ref": "#/components/parameters/MissionStatus"
+                    },
+                    {
+                        "$ref": "#/components/parameters/Page"
+                    },
+                    {
+                        "$ref": "#/components/parameters/PerPage"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "$ref": "#/components/responses/MissionLocationListSuccess"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/RateLimited"
+                    },
+                    "500": {
+                        "$ref": "#/components/responses/InternalError"
+                    }
+                }
+            }
+        },
+        "/api/v1/mission/crusades": {
+            "get": {
+                "operationId": "listMissionCrusades",
+                "summary": "List public mission crusades",
+                "tags": [
+                    "Mission"
+                ],
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/CorrelationId"
+                    },
+                    {
+                        "$ref": "#/components/parameters/Country"
+                    },
+                    {
+                        "$ref": "#/components/parameters/Search"
+                    },
+                    {
+                        "$ref": "#/components/parameters/StartsFrom"
+                    },
+                    {
+                        "$ref": "#/components/parameters/StartsUntil"
+                    },
+                    {
+                        "$ref": "#/components/parameters/MissionStatus"
+                    },
+                    {
+                        "$ref": "#/components/parameters/MissionSort"
+                    },
+                    {
+                        "$ref": "#/components/parameters/Page"
+                    },
+                    {
+                        "$ref": "#/components/parameters/PerPage"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "$ref": "#/components/responses/MissionCrusadeListSuccess"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/RateLimited"
+                    },
+                    "500": {
+                        "$ref": "#/components/responses/InternalError"
+                    }
+                }
+            }
+        },
+        "/api/v1/mission/crusades/{crusade}": {
+            "get": {
+                "operationId": "getMissionCrusade",
+                "summary": "Get a public mission crusade",
+                "tags": [
+                    "Mission"
+                ],
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/CorrelationId"
+                    },
+                    {
+                        "$ref": "#/components/parameters/CrusadeId"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "$ref": "#/components/responses/MissionCrusadeSuccess"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFound"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/RateLimited"
+                    },
+                    "500": {
+                        "$ref": "#/components/responses/InternalError"
+                    }
+                }
+            }
+        },
+        "/api/v1/maps/configuration": {
+            "get": {
+                "operationId": "getMapsConfiguration",
+                "summary": "Get the active client maps provider configuration",
+                "tags": [
+                    "Maps"
+                ],
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/CorrelationId"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "$ref": "#/components/responses/MapsConfigurationSuccess"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/RateLimited"
+                    },
+                    "500": {
+                        "$ref": "#/components/responses/InternalError"
+                    }
+                }
+            }
+        },
+        "/api/v1/maps/places": {
+            "get": {
+                "operationId": "listMapsPlaces",
+                "summary": "List map places with coordinates",
+                "tags": [
+                    "Maps"
+                ],
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/CorrelationId"
+                    },
+                    {
+                        "$ref": "#/components/parameters/MapsPlaceType"
+                    },
+                    {
+                        "$ref": "#/components/parameters/NearLatitude"
+                    },
+                    {
+                        "$ref": "#/components/parameters/NearLongitude"
+                    },
+                    {
+                        "$ref": "#/components/parameters/RadiusKm"
+                    },
+                    {
+                        "$ref": "#/components/parameters/MapsLimit"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "$ref": "#/components/responses/MapsPlacesSuccess"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/RateLimited"
+                    },
+                    "500": {
+                        "$ref": "#/components/responses/InternalError"
+                    }
+                }
+            }
+        },
+        "/api/v1/finance/webhooks/reconcile": {
+            "post": {
+                "operationId": "reconcilePublicPaymentWebhook",
+                "summary": "Reconcile a verified payment provider webhook",
+                "tags": [
+                    "Finance"
+                ],
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/CorrelationId"
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Webhook reconciled"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/RateLimited"
+                    },
+                    "500": {
+                        "$ref": "#/components/responses/InternalError"
+                    }
+                }
+            }
+        },
+        "/api/v1/finance/webhooks/disputes": {
+            "post": {
+                "operationId": "recordPublicPaymentDisputeWebhook",
+                "summary": "Record a verified payment dispute webhook",
+                "tags": [
+                    "Finance"
+                ],
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/CorrelationId"
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Dispute recorded"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/RateLimited"
+                    },
+                    "500": {
+                        "$ref": "#/components/responses/InternalError"
+                    }
+                }
+            }
+        },
+        "/api/v1/content/pages": {
+            "get": {
+                "operationId": "listContentPages",
+                "summary": "List published content pages",
+                "tags": [
+                    "Content"
+                ],
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/CorrelationId"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "$ref": "#/components/responses/ContentPageListSuccess"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/RateLimited"
+                    },
+                    "500": {
+                        "$ref": "#/components/responses/InternalError"
+                    }
+                }
+            }
+        },
+        "/api/v1/content/pages/{slug}": {
+            "get": {
+                "operationId": "getContentPage",
+                "summary": "Get a published content page by slug",
+                "tags": [
+                    "Content"
+                ],
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/CorrelationId"
+                    },
+                    {
+                        "name": "slug",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "$ref": "#/components/responses/ContentPageSuccess"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFound"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/RateLimited"
+                    },
+                    "500": {
+                        "$ref": "#/components/responses/InternalError"
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "parameters": {
+            "CorrelationId": {
+                "name": "X-Correlation-ID",
+                "in": "header",
+                "required": false,
+                "schema": {
+                    "$ref": "#/components/schemas/CorrelationId"
+                }
+            },
+            "IdempotencyKey": {
+                "name": "Idempotency-Key",
+                "in": "header",
+                "required": true,
+                "schema": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 191
+                }
+            },
+            "Page": {
+                "name": "page",
+                "in": "query",
+                "schema": {
+                    "type": "integer",
+                    "minimum": 1
+                }
+            },
+            "PerPage": {
+                "name": "per_page",
+                "in": "query",
+                "schema": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 50
+                }
+            },
+            "ChurchId": {
+                "name": "church",
+                "in": "path",
+                "required": true,
+                "schema": {
+                    "$ref": "#/components/schemas/Ulid"
+                }
+            },
+            "PressPublicationId": {
+                "name": "publicId",
+                "in": "path",
+                "required": true,
+                "schema": {
+                    "$ref": "#/components/schemas/Ulid"
+                }
+            },
+            "EventId": {
+                "name": "event",
+                "in": "path",
+                "required": true,
+                "schema": {
+                    "$ref": "#/components/schemas/Ulid"
+                }
+            },
+            "CrusadeId": {
+                "name": "crusade",
+                "in": "path",
+                "required": true,
+                "schema": {
+                    "$ref": "#/components/schemas/Ulid"
+                }
+            },
+            "ChurchNameFilter": {
+                "name": "filter[name]",
+                "in": "query",
+                "schema": {
+                    "type": "string",
+                    "maxLength": 100
+                }
+            },
+            "ChurchCountryFilter": {
+                "name": "filter[country]",
+                "in": "query",
+                "schema": {
+                    "$ref": "#/components/schemas/CountryCode"
+                }
+            },
+            "ChurchUnitFilter": {
+                "name": "filter[administrative_unit]",
+                "in": "query",
+                "schema": {
+                    "$ref": "#/components/schemas/Ulid"
+                }
+            },
+            "ChurchSort": {
+                "name": "sort",
+                "in": "query",
+                "schema": {
+                    "type": "string",
+                    "enum": [
+                        "name",
+                        "-name",
+                        "published_at",
+                        "-published_at"
+                    ]
+                }
+            },
+            "PressLanguageFilter": {
+                "name": "filter[language]",
+                "in": "query",
+                "schema": {
+                    "type": "string",
+                    "maxLength": 35
+                }
+            },
+            "PressCategoryFilter": {
+                "name": "filter[category]",
+                "in": "query",
+                "schema": {
+                    "type": "string",
+                    "maxLength": 100
+                }
+            },
+            "PressFormatFilter": {
+                "name": "filter[format]",
+                "in": "query",
+                "schema": {
+                    "type": "string",
+                    "enum": [
+                        "print",
+                        "ebook",
+                        "audio",
+                        "bundle"
+                    ]
+                }
+            },
+            "PressSort": {
+                "name": "sort",
+                "in": "query",
+                "schema": {
+                    "type": "string",
+                    "enum": [
+                        "publication_date",
+                        "-publication_date",
+                        "title",
+                        "-title"
+                    ]
+                }
+            },
+            "EventCategory": {
+                "name": "category",
+                "in": "query",
+                "schema": {
+                    "type": "string",
+                    "maxLength": 100
+                }
+            },
+            "EventSort": {
+                "name": "sort",
+                "in": "query",
+                "schema": {
+                    "type": "string",
+                    "enum": [
+                        "starts_at",
+                        "-starts_at",
+                        "name",
+                        "-name"
+                    ]
+                }
+            },
+            "StartsFrom": {
+                "name": "starts_from",
+                "in": "query",
+                "schema": {
+                    "type": "string",
+                    "format": "date"
+                }
+            },
+            "StartsUntil": {
+                "name": "starts_until",
+                "in": "query",
+                "schema": {
+                    "type": "string",
+                    "format": "date"
+                }
+            },
+            "CertificateCode": {
+                "name": "code",
+                "in": "query",
+                "required": true,
+                "schema": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255
+                }
+            },
+            "Country": {
+                "name": "country",
+                "in": "query",
+                "schema": {
+                    "$ref": "#/components/schemas/CountryCode"
+                }
+            },
+            "Search": {
+                "name": "q",
+                "in": "query",
+                "schema": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 100
+                }
+            },
+            "MissionStatus": {
+                "name": "status",
+                "in": "query",
+                "schema": {
+                    "type": "string",
+                    "enum": [
+                        "upcoming",
+                        "past",
+                        "all"
+                    ]
+                }
+            },
+            "MissionSort": {
+                "name": "sort",
+                "in": "query",
+                "schema": {
+                    "type": "string",
+                    "enum": [
+                        "starts_at",
+                        "-starts_at",
+                        "name",
+                        "-name"
+                    ]
+                }
+            },
+            "MapsPlaceType": {
+                "name": "type",
+                "in": "query",
+                "schema": {
+                    "type": "string",
+                    "enum": [
+                        "church",
+                        "home_church",
+                        "all"
+                    ]
+                }
+            },
+            "NearLatitude": {
+                "name": "near_lat",
+                "in": "query",
+                "schema": {
+                    "type": "number",
+                    "minimum": -90,
+                    "maximum": 90
+                }
+            },
+            "NearLongitude": {
+                "name": "near_lng",
+                "in": "query",
+                "schema": {
+                    "type": "number",
+                    "minimum": -180,
+                    "maximum": 180
+                }
+            },
+            "RadiusKm": {
+                "name": "radius_km",
+                "in": "query",
+                "schema": {
+                    "type": "number",
+                    "minimum": 0.1,
+                    "maximum": 500
+                }
+            },
+            "MapsLimit": {
+                "name": "limit",
+                "in": "query",
+                "schema": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 200
+                }
+            }
+        },
+        "headers": {
+            "CorrelationId": {
+                "required": true,
+                "schema": {
+                    "$ref": "#/components/schemas/CorrelationId"
+                }
+            }
+        },
+        "responses": {
+            "ApiStatusSuccess": {
+                "description": "The public API is available.",
+                "headers": {
+                    "X-Correlation-ID": {
+                        "$ref": "#/components/headers/CorrelationId"
+                    }
+                },
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/ApiStatusEnvelope"
+                        }
+                    }
+                }
+            },
+            "HealthSuccess": {
+                "description": "The application process is alive.",
+                "headers": {
+                    "X-Correlation-ID": {
+                        "$ref": "#/components/headers/CorrelationId"
+                    }
+                },
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/HealthEnvelope"
+                        }
+                    }
+                }
+            },
+            "ReadinessSuccess": {
+                "description": "Required dependencies are ready.",
+                "headers": {
+                    "X-Correlation-ID": {
+                        "$ref": "#/components/headers/CorrelationId"
+                    }
+                },
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/ReadinessEnvelope"
+                        }
+                    }
+                }
+            },
+            "ChurchListSuccess": {
+                "description": "Published churches.",
+                "headers": {
+                    "X-Correlation-ID": {
+                        "$ref": "#/components/headers/CorrelationId"
+                    }
+                },
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/ChurchListEnvelope"
+                        }
+                    }
+                }
+            },
+            "ChurchSuccess": {
+                "description": "A published church.",
+                "headers": {
+                    "X-Correlation-ID": {
+                        "$ref": "#/components/headers/CorrelationId"
+                    }
+                },
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/ChurchEnvelope"
+                        }
+                    }
+                }
+            },
+            "HomeChurchApplicationSuccess": {
+                "description": "An idempotent replay of a previously accepted application.",
+                "headers": {
+                    "X-Correlation-ID": {
+                        "$ref": "#/components/headers/CorrelationId"
+                    }
+                },
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/HomeChurchApplicationEnvelope"
+                        }
+                    }
+                }
+            },
+            "HomeChurchApplicationCreated": {
+                "description": "The application was accepted.",
+                "headers": {
+                    "X-Correlation-ID": {
+                        "$ref": "#/components/headers/CorrelationId"
+                    }
+                },
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/HomeChurchApplicationEnvelope"
+                        }
+                    }
+                }
+            },
+            "PressListSuccess": {
+                "description": "Public Press publications.",
+                "headers": {
+                    "X-Correlation-ID": {
+                        "$ref": "#/components/headers/CorrelationId"
+                    }
+                },
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/PressListEnvelope"
+                        }
+                    }
+                }
+            },
+            "PressSuccess": {
+                "description": "A public Press publication.",
+                "headers": {
+                    "X-Correlation-ID": {
+                        "$ref": "#/components/headers/CorrelationId"
+                    }
+                },
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/PressEnvelope"
+                        }
+                    }
+                }
+            },
+            "PressDownloadSuccess": {
+                "description": "The published Press publication file stream.",
+                "headers": {
+                    "X-Correlation-ID": {
+                        "$ref": "#/components/headers/CorrelationId"
+                    },
+                    "Content-Disposition": {
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "attachment disposition with a sanitized filename."
+                    }
+                },
+                "content": {
+                    "application/octet-stream": {
+                        "schema": {
+                            "type": "string",
+                            "format": "binary"
+                        }
+                    }
+                }
+            },
+            "EventListSuccess": {
+                "description": "Published upcoming events.",
+                "headers": {
+                    "X-Correlation-ID": {
+                        "$ref": "#/components/headers/CorrelationId"
+                    }
+                },
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/EventListEnvelope"
+                        }
+                    }
+                }
+            },
+            "EventSuccess": {
+                "description": "A published upcoming event.",
+                "headers": {
+                    "X-Correlation-ID": {
+                        "$ref": "#/components/headers/CorrelationId"
+                    }
+                },
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/EventEnvelope"
+                        }
+                    }
+                }
+            },
+            "CertificateVerificationSuccess": {
+                "description": "Verified certificate facts.",
+                "headers": {
+                    "X-Correlation-ID": {
+                        "$ref": "#/components/headers/CorrelationId"
+                    }
+                },
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/CertificateVerificationEnvelope"
+                        }
+                    }
+                }
+            },
+            "MissionLocationListSuccess": {
+                "description": "Locations with mission activity.",
+                "headers": {
+                    "X-Correlation-ID": {
+                        "$ref": "#/components/headers/CorrelationId"
+                    }
+                },
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/MissionLocationListEnvelope"
+                        }
+                    }
+                }
+            },
+            "MissionCrusadeListSuccess": {
+                "description": "Public mission crusades.",
+                "headers": {
+                    "X-Correlation-ID": {
+                        "$ref": "#/components/headers/CorrelationId"
+                    }
+                },
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/MissionCrusadeListEnvelope"
+                        }
+                    }
+                }
+            },
+            "MissionCrusadeSuccess": {
+                "description": "A public mission crusade.",
+                "headers": {
+                    "X-Correlation-ID": {
+                        "$ref": "#/components/headers/CorrelationId"
+                    }
+                },
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/MissionCrusadeEnvelope"
+                        }
+                    }
+                }
+            },
+            "MapsConfigurationSuccess": {
+                "description": "Active maps provider configuration for clients.",
+                "headers": {
+                    "X-Correlation-ID": {
+                        "$ref": "#/components/headers/CorrelationId"
+                    }
+                },
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/MapsConfigurationEnvelope"
+                        }
+                    }
+                }
+            },
+            "MapsPlacesSuccess": {
+                "description": "Map places with coordinates.",
+                "headers": {
+                    "X-Correlation-ID": {
+                        "$ref": "#/components/headers/CorrelationId"
+                    }
+                },
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/MapsPlacesEnvelope"
+                        }
+                    }
+                }
+            },
+            "ContentPageListSuccess": {
+                "description": "Published content pages.",
+                "headers": {
+                    "X-Correlation-ID": {
+                        "$ref": "#/components/headers/CorrelationId"
+                    }
+                },
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/ContentPageListEnvelope"
+                        }
+                    }
+                }
+            },
+            "ContentPageSuccess": {
+                "description": "A published content page.",
+                "headers": {
+                    "X-Correlation-ID": {
+                        "$ref": "#/components/headers/CorrelationId"
+                    }
+                },
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/ContentPageEnvelope"
+                        }
+                    }
+                }
+            },
+            "ValidationError": {
+                "description": "The request data is invalid.",
+                "headers": {
+                    "X-Correlation-ID": {
+                        "$ref": "#/components/headers/CorrelationId"
+                    }
+                },
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/ErrorEnvelope"
+                        }
+                    }
+                }
+            },
+            "NotFound": {
+                "description": "The public resource was not found.",
+                "headers": {
+                    "X-Correlation-ID": {
+                        "$ref": "#/components/headers/CorrelationId"
+                    }
+                },
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/ErrorEnvelope"
+                        }
+                    }
+                }
+            },
+            "Conflict": {
+                "description": "The idempotency key conflicts with a different payload.",
+                "headers": {
+                    "X-Correlation-ID": {
+                        "$ref": "#/components/headers/CorrelationId"
+                    }
+                },
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/ErrorEnvelope"
+                        }
+                    }
+                }
+            },
+            "RateLimited": {
+                "description": "The public API rate limit was exceeded.",
+                "headers": {
+                    "X-Correlation-ID": {
+                        "$ref": "#/components/headers/CorrelationId"
+                    },
+                    "Retry-After": {
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0
+                        }
+                    }
+                },
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/ErrorEnvelope"
+                        }
+                    }
+                }
+            },
+            "InternalError": {
+                "description": "An unexpected error occurred.",
+                "headers": {
+                    "X-Correlation-ID": {
+                        "$ref": "#/components/headers/CorrelationId"
+                    }
+                },
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/ErrorEnvelope"
+                        }
+                    }
+                }
+            },
+            "ServiceNotReady": {
+                "description": "A required dependency is not ready.",
+                "headers": {
+                    "X-Correlation-ID": {
+                        "$ref": "#/components/headers/CorrelationId"
+                    }
+                },
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
+        "schemas": {
+            "CorrelationId": {
+                "type": "string",
+                "format": "uuid"
+            },
+            "Ulid": {
+                "type": "string",
+                "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$"
+            },
+            "CountryCode": {
+                "type": "string",
+                "pattern": "^[A-Za-z]{2}$"
+            },
+            "ApiMeta": {
+                "type": "object",
+                "required": [
+                    "api_version",
+                    "timestamp"
+                ],
+                "properties": {
+                    "api_version": {
+                        "type": "string",
+                        "const": "v1"
+                    },
+                    "timestamp": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "pagination": {
+                        "$ref": "#/components/schemas/Pagination"
+                    },
+                    "idempotent_replay": {
+                        "type": "boolean"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "Pagination": {
+                "type": "object",
+                "required": [
+                    "current_page",
+                    "per_page",
+                    "total",
+                    "last_page"
+                ],
+                "properties": {
+                    "current_page": {
+                        "type": "integer",
+                        "minimum": 1
+                    },
+                    "per_page": {
+                        "type": "integer",
+                        "minimum": 1
+                    },
+                    "total": {
+                        "type": "integer",
+                        "minimum": 0
+                    },
+                    "last_page": {
+                        "type": "integer",
+                        "minimum": 1
+                    },
+                    "from": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "to": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "next_page_url": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "previous_page_url": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    }
+                },
+                "additionalProperties": false
+            },
+            "ApiError": {
+                "type": "object",
+                "required": [
+                    "code",
+                    "message",
+                    "details"
+                ],
+                "properties": {
+                    "code": {
+                        "type": "string",
+                        "pattern": "^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*$"
+                    },
+                    "message": {
+                        "type": "string"
+                    },
+                    "details": {
+                        "type": "object",
+                        "additionalProperties": true
+                    }
+                },
+                "additionalProperties": false
+            },
+            "ErrorEnvelope": {
+                "type": "object",
+                "required": [
+                    "error",
+                    "meta",
+                    "correlation_id"
+                ],
+                "properties": {
+                    "error": {
+                        "$ref": "#/components/schemas/ApiError"
+                    },
+                    "meta": {
+                        "$ref": "#/components/schemas/ApiMeta"
+                    },
+                    "correlation_id": {
+                        "$ref": "#/components/schemas/CorrelationId"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "ApiStatusData": {
+                "type": "object",
+                "required": [
+                    "name",
+                    "status",
+                    "surfaces"
+                ],
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "const": "Family House Connect API"
+                    },
+                    "status": {
+                        "type": "string",
+                        "const": "available"
+                    },
+                    "surfaces": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "enum": [
+                                "public",
+                                "user",
+                                "admin"
+                            ]
+                        }
+                    }
+                },
+                "additionalProperties": false
+            },
+            "HealthData": {
+                "type": "object",
+                "required": [
+                    "status",
+                    "service"
+                ],
+                "properties": {
+                    "status": {
+                        "type": "string",
+                        "const": "ok"
+                    },
+                    "service": {
+                        "type": "string",
+                        "const": "family-house-connect-api"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "ReadinessChecks": {
+                "type": "object",
+                "required": [
+                    "database",
+                    "cache",
+                    "queue"
+                ],
+                "properties": {
+                    "database": {
+                        "type": "string",
+                        "enum": [
+                            "ok",
+                            "failed"
+                        ]
+                    },
+                    "cache": {
+                        "type": "string",
+                        "enum": [
+                            "ok",
+                            "failed"
+                        ]
+                    },
+                    "queue": {
+                        "type": "string",
+                        "enum": [
+                            "ok",
+                            "failed"
+                        ]
+                    }
+                },
+                "additionalProperties": false
+            },
+            "ReadinessData": {
+                "type": "object",
+                "required": [
+                    "status",
+                    "checks"
+                ],
+                "properties": {
+                    "status": {
+                        "type": "string",
+                        "const": "ready"
+                    },
+                    "checks": {
+                        "$ref": "#/components/schemas/ReadinessChecks"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "CountrySummary": {
+                "type": "object",
+                "required": [
+                    "code",
+                    "name"
+                ],
+                "properties": {
+                    "code": {
+                        "$ref": "#/components/schemas/CountryCode"
+                    },
+                    "name": {
+                        "type": "string"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "ChurchLocation": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "name",
+                    "locality",
+                    "timezone",
+                    "country",
+                    "administrative_unit"
+                ],
+                "properties": {
+                    "id": {
+                        "$ref": "#/components/schemas/Ulid"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "locality": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "timezone": {
+                        "type": "string"
+                    },
+                    "country": {
+                        "type": "object",
+                        "required": [
+                            "id",
+                            "code",
+                            "name"
+                        ],
+                        "properties": {
+                            "id": {
+                                "$ref": "#/components/schemas/Ulid"
+                            },
+                            "code": {
+                                "$ref": "#/components/schemas/CountryCode"
+                            },
+                            "name": {
+                                "type": "string"
+                            }
+                        },
+                        "additionalProperties": false
+                    },
+                    "administrative_unit": {
+                        "oneOf": [
+                            {
+                                "type": "null"
+                            },
+                            {
+                                "type": "object",
+                                "required": [
+                                    "id",
+                                    "name"
+                                ],
+                                "properties": {
+                                    "id": {
+                                        "$ref": "#/components/schemas/Ulid"
+                                    },
+                                    "name": {
+                                        "type": "string"
+                                    }
+                                },
+                                "additionalProperties": false
+                            }
+                        ]
+                    }
+                },
+                "additionalProperties": false
+            },
+            "Church": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "name",
+                    "location",
+                    "published_at"
+                ],
+                "properties": {
+                    "id": {
+                        "$ref": "#/components/schemas/Ulid"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "location": {
+                        "$ref": "#/components/schemas/ChurchLocation"
+                    },
+                    "published_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "HomeChurchApplicantInput": {
+                "type": "object",
+                "required": [
+                    "given_name",
+                    "family_name"
+                ],
+                "properties": {
+                    "given_name": {
+                        "type": "string",
+                        "maxLength": 100
+                    },
+                    "middle_name": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 100
+                    },
+                    "family_name": {
+                        "type": "string",
+                        "maxLength": 100
+                    },
+                    "preferred_name": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 100
+                    }
+                },
+                "additionalProperties": false
+            },
+            "HomeChurchApplicationInput": {
+                "type": "object",
+                "required": [
+                    "church_id",
+                    "location_id",
+                    "administrative_unit_id",
+                    "applicant",
+                    "proposed_name",
+                    "expected_participants",
+                    "meeting_day",
+                    "meeting_time",
+                    "contact_email",
+                    "contact_phone",
+                    "guidelines_agreed"
+                ],
+                "properties": {
+                    "church_id": {
+                        "$ref": "#/components/schemas/Ulid"
+                    },
+                    "location_id": {
+                        "$ref": "#/components/schemas/Ulid"
+                    },
+                    "administrative_unit_id": {
+                        "$ref": "#/components/schemas/Ulid"
+                    },
+                    "applicant": {
+                        "$ref": "#/components/schemas/HomeChurchApplicantInput"
+                    },
+                    "proposed_name": {
+                        "type": "string",
+                        "maxLength": 191
+                    },
+                    "expected_participants": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 65535
+                    },
+                    "meeting_day": {
+                        "type": "string",
+                        "enum": [
+                            "monday",
+                            "tuesday",
+                            "wednesday",
+                            "thursday",
+                            "friday",
+                            "saturday",
+                            "sunday"
+                        ]
+                    },
+                    "meeting_time": {
+                        "type": "string",
+                        "pattern": "^(?:[01][0-9]|2[0-3]):[0-5][0-9]$"
+                    },
+                    "contact_email": {
+                        "type": "string",
+                        "format": "email",
+                        "maxLength": 254
+                    },
+                    "contact_phone": {
+                        "type": "string",
+                        "maxLength": 32
+                    },
+                    "guidelines_agreed": {
+                        "type": "boolean",
+                        "const": true
+                    }
+                },
+                "additionalProperties": false
+            },
+            "HomeChurchApplicationReceipt": {
+                "type": "object",
+                "required": [
+                    "application_id",
+                    "status",
+                    "received_at"
+                ],
+                "properties": {
+                    "application_id": {
+                        "$ref": "#/components/schemas/Ulid"
+                    },
+                    "status": {
+                        "type": "string",
+                        "const": "draft"
+                    },
+                    "received_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "PressTranslation": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "language",
+                    "title",
+                    "subtitle",
+                    "description",
+                    "approved_at"
+                ],
+                "properties": {
+                    "id": {
+                        "$ref": "#/components/schemas/Ulid"
+                    },
+                    "language": {
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "subtitle": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "description": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "approved_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "PressPublication": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "title",
+                    "subtitle",
+                    "publisher",
+                    "edition",
+                    "publication_date",
+                    "copyright_year",
+                    "language",
+                    "page_count",
+                    "category",
+                    "description",
+                    "isbn",
+                    "isbn_type",
+                    "format",
+                    "availability",
+                    "published_at"
+                ],
+                "properties": {
+                    "id": {
+                        "$ref": "#/components/schemas/Ulid"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "subtitle": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "publisher": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "edition": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "publication_date": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date"
+                    },
+                    "copyright_year": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "language": {
+                        "type": "string"
+                    },
+                    "page_count": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "category": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "description": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "isbn": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "isbn_type": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "format": {
+                        "type": "string"
+                    },
+                    "availability": {
+                        "type": "string"
+                    },
+                    "published_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "translations": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/PressTranslation"
+                        }
+                    }
+                },
+                "additionalProperties": false
+            },
+            "PublicEvent": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "category",
+                    "name",
+                    "starts_at",
+                    "ends_at",
+                    "location",
+                    "fee"
+                ],
+                "properties": {
+                    "id": {
+                        "$ref": "#/components/schemas/Ulid"
+                    },
+                    "category": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "starts_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "ends_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "location": {
+                        "oneOf": [
+                            {
+                                "type": "null"
+                            },
+                            {
+                                "type": "object",
+                                "required": [
+                                    "id",
+                                    "name",
+                                    "locality",
+                                    "timezone"
+                                ],
+                                "properties": {
+                                    "id": {
+                                        "$ref": "#/components/schemas/Ulid"
+                                    },
+                                    "name": {
+                                        "type": "string"
+                                    },
+                                    "locality": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ]
+                                    },
+                                    "timezone": {
+                                        "type": "string"
+                                    }
+                                },
+                                "additionalProperties": false
+                            }
+                        ]
+                    },
+                    "fee": {
+                        "oneOf": [
+                            {
+                                "type": "null"
+                            },
+                            {
+                                "type": "object",
+                                "required": [
+                                    "amount_minor",
+                                    "currency"
+                                ],
+                                "properties": {
+                                    "amount_minor": {
+                                        "type": "integer",
+                                        "minimum": 0
+                                    },
+                                    "currency": {
+                                        "type": "string"
+                                    }
+                                },
+                                "additionalProperties": false
+                            }
+                        ]
+                    }
+                },
+                "additionalProperties": false
+            },
+            "CertificateVerification": {
+                "type": "object",
+                "required": [
+                    "verified",
+                    "certificate_number",
+                    "completion_on",
+                    "issued_at"
+                ],
+                "properties": {
+                    "verified": {
+                        "type": "boolean",
+                        "const": true
+                    },
+                    "certificate_number": {
+                        "type": "string"
+                    },
+                    "completion_on": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "issued_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "MissionLocation": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "name",
+                    "locality",
+                    "timezone",
+                    "coordinates",
+                    "country"
+                ],
+                "properties": {
+                    "id": {
+                        "$ref": "#/components/schemas/Ulid"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "locality": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "timezone": {
+                        "type": "string"
+                    },
+                    "coordinates": {
+                        "oneOf": [
+                            {
+                                "type": "null"
+                            },
+                            {
+                                "type": "object",
+                                "required": [
+                                    "latitude",
+                                    "longitude"
+                                ],
+                                "properties": {
+                                    "latitude": {
+                                        "type": "number",
+                                        "minimum": -90,
+                                        "maximum": 90
+                                    },
+                                    "longitude": {
+                                        "type": "number",
+                                        "minimum": -180,
+                                        "maximum": 180
+                                    }
+                                },
+                                "additionalProperties": false
+                            }
+                        ]
+                    },
+                    "country": {
+                        "$ref": "#/components/schemas/CountrySummary"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "MissionCrusade": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "name",
+                    "starts_at",
+                    "ends_at",
+                    "location"
+                ],
+                "properties": {
+                    "id": {
+                        "$ref": "#/components/schemas/Ulid"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "starts_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    },
+                    "ends_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    },
+                    "location": {
+                        "oneOf": [
+                            {
+                                "type": "null"
+                            },
+                            {
+                                "$ref": "#/components/schemas/MissionLocation"
+                            }
+                        ]
+                    }
+                },
+                "additionalProperties": false
+            },
+            "ApiStatusEnvelope": {
+                "$ref": "#/components/schemas/EnvelopeBase",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/ApiStatusData"
+                    }
+                }
+            },
+            "HealthEnvelope": {
+                "$ref": "#/components/schemas/EnvelopeBase",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/HealthData"
+                    }
+                }
+            },
+            "ReadinessEnvelope": {
+                "$ref": "#/components/schemas/EnvelopeBase",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/ReadinessData"
+                    }
+                }
+            },
+            "ServiceNotReadyEnvelope": {
+                "$ref": "#/components/schemas/ErrorEnvelope"
+            },
+            "ChurchListEnvelope": {
+                "$ref": "#/components/schemas/EnvelopeBase",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "required": [
+                            "items"
+                        ],
+                        "properties": {
+                            "items": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/Church"
+                                }
+                            }
+                        },
+                        "additionalProperties": false
+                    }
+                }
+            },
+            "ChurchEnvelope": {
+                "$ref": "#/components/schemas/EnvelopeBase",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/Church"
+                    }
+                }
+            },
+            "HomeChurchApplicationEnvelope": {
+                "$ref": "#/components/schemas/EnvelopeBase",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/HomeChurchApplicationReceipt"
+                    }
+                }
+            },
+            "PressListEnvelope": {
+                "$ref": "#/components/schemas/EnvelopeBase",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/PressPublication"
+                        }
+                    }
+                }
+            },
+            "PressEnvelope": {
+                "$ref": "#/components/schemas/EnvelopeBase",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/PressPublication"
+                    }
+                }
+            },
+            "EventListEnvelope": {
+                "$ref": "#/components/schemas/EnvelopeBase",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/PublicEvent"
+                        }
+                    }
+                }
+            },
+            "EventEnvelope": {
+                "$ref": "#/components/schemas/EnvelopeBase",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/PublicEvent"
+                    }
+                }
+            },
+            "CertificateVerificationEnvelope": {
+                "$ref": "#/components/schemas/EnvelopeBase",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/CertificateVerification"
+                    }
+                }
+            },
+            "MissionLocationListEnvelope": {
+                "$ref": "#/components/schemas/EnvelopeBase",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/MissionLocation"
+                        }
+                    }
+                }
+            },
+            "MissionCrusadeListEnvelope": {
+                "$ref": "#/components/schemas/EnvelopeBase",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/MissionCrusade"
+                        }
+                    }
+                }
+            },
+            "MissionCrusadeEnvelope": {
+                "$ref": "#/components/schemas/EnvelopeBase",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/MissionCrusade"
+                    }
+                }
+            },
+            "MapsConfiguration": {
+                "type": "object",
+                "required": [
+                    "active",
+                    "provider",
+                    "default_center",
+                    "default_zoom",
+                    "features"
+                ],
+                "properties": {
+                    "active": {
+                        "type": "boolean"
+                    },
+                    "provider": {
+                        "type": "string",
+                        "enum": [
+                            "google",
+                            "mapbox",
+                            "leaflet"
+                        ]
+                    },
+                    "client_api_key": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "tile_url": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "default_center": {
+                        "type": "object",
+                        "required": [
+                            "latitude",
+                            "longitude"
+                        ],
+                        "properties": {
+                            "latitude": {
+                                "type": "number",
+                                "minimum": -90,
+                                "maximum": 90
+                            },
+                            "longitude": {
+                                "type": "number",
+                                "minimum": -180,
+                                "maximum": 180
+                            }
+                        },
+                        "additionalProperties": false
+                    },
+                    "default_zoom": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 22
+                    },
+                    "features": {
+                        "type": "object",
+                        "required": [
+                            "interactive",
+                            "geolocation",
+                            "directions",
+                            "markers"
+                        ],
+                        "properties": {
+                            "interactive": {
+                                "type": "boolean"
+                            },
+                            "geolocation": {
+                                "type": "boolean"
+                            },
+                            "directions": {
+                                "type": "boolean"
+                            },
+                            "markers": {
+                                "type": "boolean"
+                            }
+                        },
+                        "additionalProperties": false
+                    },
+                    "fallback_mode": {
+                        "type": "string"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "MapsPlace": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "name",
+                    "type",
+                    "address",
+                    "coordinates",
+                    "href"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "church",
+                            "home_church"
+                        ]
+                    },
+                    "address": {
+                        "type": "string"
+                    },
+                    "coordinates": {
+                        "type": "object",
+                        "required": [
+                            "latitude",
+                            "longitude"
+                        ],
+                        "properties": {
+                            "latitude": {
+                                "type": "number",
+                                "minimum": -90,
+                                "maximum": 90
+                            },
+                            "longitude": {
+                                "type": "number",
+                                "minimum": -180,
+                                "maximum": 180
+                            }
+                        },
+                        "additionalProperties": false
+                    },
+                    "href": {
+                        "type": "string"
+                    },
+                    "distance_km": {
+                        "type": "number"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "MapsConfigurationEnvelope": {
+                "$ref": "#/components/schemas/EnvelopeBase",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/MapsConfiguration"
+                    }
+                }
+            },
+            "MapsPlacesEnvelope": {
+                "$ref": "#/components/schemas/EnvelopeBase",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/MapsPlace"
+                        }
+                    }
+                }
+            },
+            "ContentPageSummary": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "slug",
+                    "title",
+                    "summary",
+                    "locale",
+                    "published_at"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "ulid"
+                    },
+                    "slug": {
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "summary": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "locale": {
+                        "type": "string"
+                    },
+                    "published_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "ContentItem": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "kind",
+                    "title",
+                    "body",
+                    "meta",
+                    "href",
+                    "sort_order",
+                    "published_at"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "ulid"
+                    },
+                    "kind": {
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "body": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "meta": {
+                        "type": [
+                            "object",
+                            "null"
+                        ],
+                        "additionalProperties": true
+                    },
+                    "href": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "sort_order": {
+                        "type": "integer"
+                    },
+                    "published_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "ContentPage": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "slug",
+                    "title",
+                    "summary",
+                    "body",
+                    "locale",
+                    "published_at",
+                    "items"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "ulid"
+                    },
+                    "slug": {
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "summary": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "body": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "locale": {
+                        "type": "string"
+                    },
+                    "published_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    },
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ContentItem"
+                        }
+                    }
+                },
+                "additionalProperties": false
+            },
+            "ContentPageListEnvelope": {
+                "$ref": "#/components/schemas/EnvelopeBase",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ContentPageSummary"
+                        }
+                    }
+                }
+            },
+            "ContentPageEnvelope": {
+                "$ref": "#/components/schemas/EnvelopeBase",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/ContentPage"
+                    }
+                }
+            },
+            "EnvelopeBase": {
+                "type": "object",
+                "required": [
+                    "data",
+                    "meta",
+                    "correlation_id"
+                ],
+                "properties": {
+                    "data": [],
+                    "meta": {
+                        "$ref": "#/components/schemas/ApiMeta"
+                    },
+                    "correlation_id": {
+                        "$ref": "#/components/schemas/CorrelationId"
+                    }
+                },
+                "additionalProperties": false
+            }
+        }
+    }
+}

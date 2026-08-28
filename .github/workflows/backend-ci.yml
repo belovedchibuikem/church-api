@@ -94,6 +94,31 @@ jobs:
       - name: Audit locked dependencies
         run: composer audit --locked
 
+      - name: Validate OpenAPI and generated public/protected clients
+        run: composer clients:integration-check
+
+      - name: Set up Node.js for the generated TypeScript client
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+
+      - name: Type-check the generated TypeScript client and Next.js example
+        working-directory: clients/typescript
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run typecheck
+
+      - name: Set up Dart for the generated Flutter client
+        uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+
+      - name: Analyze the generated Dart client and Flutter example
+        working-directory: clients/dart
+        run: |
+          dart pub get
+          dart analyze
+
       - name: Clear cached configuration
         run: php artisan config:clear --ansi
 
