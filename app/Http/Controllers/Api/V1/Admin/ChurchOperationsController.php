@@ -101,6 +101,11 @@ class ChurchOperationsController extends Controller
         return $this->page($request, $catalog->firstTimers($context->scope($request), $request->validated('filter', []), (int) $request->validated('per_page', 25)));
     }
 
+    public function memberships(ListProtectedDomainRecordsRequest $request, ProtectedDomainCatalogQuery $catalog, ProtectedAdminContext $context): JsonResponse
+    {
+        return $this->page($request, $catalog->memberships($context->scope($request), $request->validated('filter', []), (int) $request->validated('per_page', 25)));
+    }
+
     public function registerFirstTimer(RegisterFirstTimerRequest $request, RegisterFirstTimerAction $action, ProtectedAdminContext $context): JsonResponse
     {
         $person = Person::query()->where('public_id', $request->validated('person_id'))->firstOrFail();

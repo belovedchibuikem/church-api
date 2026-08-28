@@ -18,6 +18,7 @@ use App\Support\Authorization\AssignRoleToUserAction;
 use App\Support\Authorization\AssignScopeToRoleAssignmentAction;
 use App\Support\Authorization\GrantPermissionToRoleAction;
 use App\Support\Authorization\ScopeReference;
+use App\Support\Church\StartChurchMembershipAction;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Tests\TestCase;
 
@@ -104,6 +105,27 @@ class AdminDomainOperationsApiTest extends TestCase
             ->assertJsonPath('data.person_id', $person->public_id)
             ->assertJsonPath('data.church_id', $church->public_id)
             ->assertJsonPath('data.status', 'active');
+    }
+
+    public function test_admin_can_list_church_memberships_in_scope(): void
+    {
+        $location = Location::factory()->create();
+        $unit = AdministrativeUnit::factory()->create(['country_id' => $location->country_id]);
+        $church = Church::factory()->create([
+            'location_id' => $location->getKey(),
+            'administrative_unit_id' => $unit->getKey(),
+        ]);
+        $person = Person::factory()->create();
+        $this->app->make(StartChurchMembershipAction::class)->handle($person, $church, null, now());
+        $scope = new ScopeReference('administrative_unit', $unit->public_id);
+        $actor = $this->actorWithPermissions(['church.churches.view'], $scope);
+        $this->authenticate($actor);
+
+        $this->withHeaders($this->headers($scope))
+            ->getJson('/api/v1/admin/church/memberships')
+            ->assertOk()
+            ->assertJsonPath('data.0.person_id', $person->public_id)
+            ->assertJsonPath('data.0.church_id', $church->public_id);
     }
 
     public function test_finance_payment_intent_returns_governance_denial(): void

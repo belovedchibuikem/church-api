@@ -340,6 +340,7 @@ Route::prefix('church')->name('church.')->controller(ChurchOperationsController:
     Route::get('/home-church-applications', 'applications')->middleware(RequirePermissionAndScope::class.':church.home_church_applications.review')->name('home_church_applications.index');
     Route::post('/home-church-applications', 'storeApplication')->middleware(RequirePermissionAndScope::class.':church.home_church_applications.manage')->name('home_church_applications.store');
     Route::post('/home-church-applications/{application}/transitions', 'transitionApplication')->whereUlid('application')->middleware(RequirePermissionAndScope::class.':church.home_church_applications.review')->name('home_church_applications.transitions.store');
+    Route::get('/memberships', 'memberships')->middleware(RequirePermissionAndScope::class.':church.churches.view')->name('memberships.index');
     Route::post('/memberships', 'startMembership')->middleware(RequirePermissionAndScope::class.':church.memberships.manage')->name('memberships.store');
     Route::post('/memberships/{membership}/end', 'endMembership')->whereUlid('membership')->middleware(RequirePermissionAndScope::class.':church.memberships.manage')->name('memberships.end');
     Route::get('/first-timers', 'firstTimers')->middleware(RequirePermissionAndScope::class.':church.first_timers.view')->name('first_timers.index');

@@ -120,6 +120,7 @@ class ProtectedCatalogRecordResource extends JsonResource
             $this->resource instanceof KcaCohort => [
                 'id' => $this->public_id,
                 'year_id' => $this->year?->public_id,
+                'year_name' => $this->year?->name,
                 'code' => $this->code,
                 'name' => $this->name,
                 'starts_on' => $this->starts_on?->toDateString(),

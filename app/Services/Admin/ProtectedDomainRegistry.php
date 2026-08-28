@@ -15,8 +15,10 @@ use App\Models\FileAsset;
 use App\Models\KcaApplication;
 use App\Models\KcaAssessmentResult;
 use App\Models\KcaCertificate;
+use App\Models\KcaCohort;
 use App\Models\KcaEnrollment;
 use App\Models\KcaEvidenceSubmission;
+use App\Models\KcaYear;
 use App\Models\MinistryEvent;
 use App\Models\PaymentDispute;
 use App\Models\PaymentIntent;
@@ -92,6 +94,25 @@ class ProtectedDomainRegistry
                 'model' => KcaCertificate::class,
                 'with' => [...PersonDisplayName::eager(), 'enrollment:id,public_id'],
                 'order_column' => 'issued_at',
+            ],
+            'kca.years' => [
+                'permission' => 'kca.enrollments.view',
+                'path' => 'kca/years',
+                'operation_id' => 'listAdminCatalogKcaYears',
+                'model' => KcaYear::class,
+                'order_column' => 'starts_on',
+                'order_direction' => 'desc',
+                'search_column' => 'name',
+            ],
+            'kca.cohorts' => [
+                'permission' => 'kca.enrollments.view',
+                'path' => 'kca/cohorts',
+                'operation_id' => 'listAdminCatalogKcaCohorts',
+                'model' => KcaCohort::class,
+                'with' => ['year:id,public_id,name,code'],
+                'order_column' => 'starts_on',
+                'order_direction' => 'desc',
+                'search_column' => 'name',
             ],
             'press.publications' => [
                 'permission' => 'press.publications.view',

@@ -4,6 +4,7 @@ namespace App\Queries\Admin;
 
 use App\Models\AdministrativeUnit;
 use App\Models\Church;
+use App\Models\ChurchMembership;
 use App\Models\Crusade;
 use App\Models\FirstTimer;
 use App\Models\FollowUpTask;
@@ -59,6 +60,20 @@ class ProtectedDomainCatalogQuery
         $this->applyChurchForeignKeyScope($query, $scope);
 
         return $query->latest('registered_at')->paginate($perPage);
+    }
+
+    /** @return LengthAwarePaginator<ChurchMembership> */
+    public function memberships(ScopeReference $scope, array $filters, int $perPage): LengthAwarePaginator
+    {
+        $query = ChurchMembership::query()->with([
+            ...PersonDisplayName::eager(),
+            'church:id,public_id,name',
+            'homeChurch:id,public_id,name',
+        ]);
+        $this->applyChurchForeignKeyScope($query, $scope);
+        $this->applyStatus($query, $filters);
+
+        return $query->latest('joined_at')->paginate($perPage);
     }
 
     /** @return LengthAwarePaginator<FollowUpTask> */
