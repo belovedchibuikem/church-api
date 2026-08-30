@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'middle_name',
     'family_name',
     'preferred_name',
+    'phone',
     'country',
     'region',
     'locality',
@@ -31,5 +32,13 @@ class PersonProfile extends Model
     public function avatarFileAsset(): BelongsTo
     {
         return $this->belongsTo(FileAsset::class, 'avatar_file_asset_id');
+    }
+
+    /** @return array<string, string> */
+    protected function casts(): array
+    {
+        return [
+            'phone' => 'encrypted',
+        ];
     }
 }

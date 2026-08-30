@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['location_id', 'administrative_unit_id', 'name'])]
+#[Fillable(['location_id', 'administrative_unit_id', 'name', 'published_at'])]
 class Church extends Model
 {
     /** @use HasFactory<ChurchFactory> */

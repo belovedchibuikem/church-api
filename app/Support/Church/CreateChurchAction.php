@@ -57,6 +57,7 @@ class CreateChurchAction
                 'location_id' => $lockedLocation->getKey(),
                 'administrative_unit_id' => $lockedUnit->getKey(),
                 'name' => $normalizedName,
+                'published_at' => now()->utc(),
             ]);
 
             $this->recordAuditEvent->handle(new AuditEventData(

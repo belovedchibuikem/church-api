@@ -15,7 +15,7 @@ final class PersonDisplayName
     {
         return [
             $relation.':id,public_id',
-            $relation.'.profile:id,person_id,given_name,middle_name,family_name,preferred_name',
+            $relation.'.profile:id,person_id,given_name,middle_name,family_name,preferred_name,phone',
             $relation.'.user:id,person_id,name,email',
         ];
     }
@@ -46,5 +46,10 @@ final class PersonDisplayName
     public static function email(?Person $person): string
     {
         return trim((string) ($person?->user?->email ?? ''));
+    }
+
+    public static function phone(?Person $person): string
+    {
+        return trim((string) ($person?->profile?->phone ?? ''));
     }
 }

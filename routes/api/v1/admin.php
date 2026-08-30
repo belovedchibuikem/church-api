@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\V1\Admin\AdminDashboardController;
 use App\Http\Controllers\Api\V1\Admin\AdminProfileController;
 use App\Http\Controllers\Api\V1\Admin\AdvisoryAiOperationsController;
 use App\Http\Controllers\Api\V1\Admin\AuditReviewController;
+use App\Http\Controllers\Api\V1\Admin\ChurchMinistryOperationsController;
 use App\Http\Controllers\Api\V1\Admin\ChurchOperationsController;
 use App\Http\Controllers\Api\V1\Admin\CommunicationOperationsController;
 use App\Http\Controllers\Api\V1\Admin\ContentAdministrationController;
@@ -348,6 +349,8 @@ Route::prefix('church')->name('church.')->controller(ChurchOperationsController:
     Route::post('/memberships/{membership}/end', 'endMembership')->whereUlid('membership')->middleware(RequirePermissionAndScope::class.':church.memberships.manage')->name('memberships.end');
     Route::get('/first-timers', 'firstTimers')->middleware(RequirePermissionAndScope::class.':church.first_timers.view')->name('first_timers.index');
     Route::post('/first-timers', 'registerFirstTimer')->middleware(RequirePermissionAndScope::class.':church.first_timers.manage')->name('first_timers.store');
+    Route::put('/first-timers/{firstTimer}', 'updateFirstTimer')->whereUlid('firstTimer')->middleware(RequirePermissionAndScope::class.':church.first_timers.manage')->name('first_timers.update');
+    Route::delete('/first-timers/{firstTimer}', 'destroyFirstTimer')->whereUlid('firstTimer')->middleware(RequirePermissionAndScope::class.':church.first_timers.manage')->name('first_timers.destroy');
     Route::get('/follow-up-tasks', 'followUpTasks')->middleware(RequirePermissionAndScope::class.':church.follow_up.view')->name('follow_up_tasks.index');
     Route::post('/follow-up-tasks/{task}/completion', 'completeFollowUpTask')->whereUlid('task')->middleware(RequirePermissionAndScope::class.':church.follow_up.complete')->name('follow_up_tasks.complete');
     Route::get('/prayer-requests', 'prayerRequests')->middleware(RequirePermissionAndScope::class.':church.follow_up.view')->name('prayer_requests.index');
@@ -355,6 +358,49 @@ Route::prefix('church')->name('church.')->controller(ChurchOperationsController:
     Route::post('/prayer-requests/{prayer}/transitions', 'transitionPrayerRequest')->whereUlid('prayer')->middleware(RequirePermissionAndScope::class.':church.follow_up.complete')->name('prayer_requests.transitions.store');
     Route::get('/pastoral-needs', 'pastoralNeeds')->middleware(RequirePermissionAndScope::class.':church.follow_up.view')->name('pastoral_needs.index');
     Route::post('/pastoral-needs/{need}/transitions', 'transitionPastoralNeed')->whereUlid('need')->middleware(RequirePermissionAndScope::class.':church.follow_up.complete')->name('pastoral_needs.transitions.store');
+});
+
+Route::prefix('church')->name('church.ministry.')->controller(ChurchMinistryOperationsController::class)->group(function (): void {
+    Route::get('/people', 'people')->middleware(RequirePermissionAndScope::class.':church.churches.view')->name('people.index');
+    Route::put('/people/{person}', 'updatePersonPhone')->whereUlid('person')->middleware(RequirePermissionAndScope::class.':church.churches.manage')->name('people.update');
+    Route::get('/converts', 'converts')->middleware(RequirePermissionAndScope::class.':church.churches.view')->name('converts.index');
+    Route::post('/converts', 'storeConvert')->middleware(RequirePermissionAndScope::class.':church.churches.manage')->name('converts.store');
+    Route::put('/converts/{convert}', 'updateConvert')->whereUlid('convert')->middleware(RequirePermissionAndScope::class.':church.churches.manage')->name('converts.update');
+    Route::delete('/converts/{convert}', 'destroyConvert')->whereUlid('convert')->middleware(RequirePermissionAndScope::class.':church.churches.manage')->name('converts.destroy');
+    Route::get('/evangelism-activities', 'evangelismActivities')->middleware(RequirePermissionAndScope::class.':church.churches.view')->name('evangelism.index');
+    Route::post('/evangelism-activities', 'storeEvangelismActivity')->middleware(RequirePermissionAndScope::class.':church.churches.manage')->name('evangelism.store');
+    Route::put('/evangelism-activities/{activity}', 'updateEvangelismActivity')->whereUlid('activity')->middleware(RequirePermissionAndScope::class.':church.churches.manage')->name('evangelism.update');
+    Route::delete('/evangelism-activities/{activity}', 'destroyEvangelismActivity')->whereUlid('activity')->middleware(RequirePermissionAndScope::class.':church.churches.manage')->name('evangelism.destroy');
+    Route::get('/departments', 'departments')->middleware(RequirePermissionAndScope::class.':church.churches.view')->name('departments.index');
+    Route::post('/departments', 'storeDepartment')->middleware(RequirePermissionAndScope::class.':church.churches.manage')->name('departments.store');
+    Route::put('/departments/{department}', 'updateDepartment')->whereUlid('department')->middleware(RequirePermissionAndScope::class.':church.churches.manage')->name('departments.update');
+    Route::delete('/departments/{department}', 'destroyDepartment')->whereUlid('department')->middleware(RequirePermissionAndScope::class.':church.churches.manage')->name('departments.destroy');
+    Route::get('/workers', 'workers')->middleware(RequirePermissionAndScope::class.':church.churches.view')->name('workers.index');
+    Route::get('/leaders', 'leaders')->middleware(RequirePermissionAndScope::class.':church.churches.view')->name('leaders.index');
+    Route::get('/disciples', 'disciples')->middleware(RequirePermissionAndScope::class.':church.churches.view')->name('disciples.index');
+    Route::post('/role-assignments', 'storeRoleAssignment')->middleware(RequirePermissionAndScope::class.':church.churches.manage')->name('role_assignments.store');
+    Route::put('/role-assignments/{assignment}', 'updateRoleAssignment')->whereUlid('assignment')->middleware(RequirePermissionAndScope::class.':church.churches.manage')->name('role_assignments.update');
+    Route::delete('/role-assignments/{assignment}', 'destroyRoleAssignment')->whereUlid('assignment')->middleware(RequirePermissionAndScope::class.':church.churches.manage')->name('role_assignments.destroy');
+    Route::get('/counselling-cases', 'counsellingCases')->middleware(RequirePermissionAndScope::class.':church.follow_up.view')->name('counselling.index');
+    Route::post('/counselling-cases', 'storeCounsellingCase')->middleware(RequirePermissionAndScope::class.':church.follow_up.complete')->name('counselling.store');
+    Route::put('/counselling-cases/{case}', 'updateCounsellingCase')->whereUlid('case')->middleware(RequirePermissionAndScope::class.':church.follow_up.complete')->name('counselling.update');
+    Route::delete('/counselling-cases/{case}', 'destroyCounsellingCase')->whereUlid('case')->middleware(RequirePermissionAndScope::class.':church.follow_up.complete')->name('counselling.destroy');
+    Route::get('/testimonies', 'testimonies')->middleware(RequirePermissionAndScope::class.':church.churches.view')->name('testimonies.index');
+    Route::post('/testimonies', 'storeTestimony')->middleware(RequirePermissionAndScope::class.':church.churches.manage')->name('testimonies.store');
+    Route::put('/testimonies/{testimony}', 'updateTestimony')->whereUlid('testimony')->middleware(RequirePermissionAndScope::class.':church.churches.manage')->name('testimonies.update');
+    Route::delete('/testimonies/{testimony}', 'destroyTestimony')->whereUlid('testimony')->middleware(RequirePermissionAndScope::class.':church.churches.manage')->name('testimonies.destroy');
+    Route::get('/attendance', 'attendance')->middleware(RequirePermissionAndScope::class.':church.home_churches.view')->name('attendance.index');
+    Route::post('/attendance', 'storeAttendance')->middleware(RequirePermissionAndScope::class.':church.churches.manage')->name('attendance.store');
+    Route::put('/attendance/{attendance}', 'updateAttendance')->whereUlid('attendance')->middleware(RequirePermissionAndScope::class.':church.churches.manage')->name('attendance.update');
+    Route::delete('/attendance/{attendance}', 'destroyAttendance')->whereUlid('attendance')->middleware(RequirePermissionAndScope::class.':church.churches.manage')->name('attendance.destroy');
+    Route::get('/groups', 'churchGroups')->middleware(RequirePermissionAndScope::class.':church.churches.view')->name('groups.index');
+    Route::get('/announcements', 'announcements')->middleware(RequirePermissionAndScope::class.':church.churches.view')->name('announcements.index');
+});
+
+Route::prefix('safeguarding')->name('safeguarding.')->controller(SafeguardingOperationsController::class)->group(function (): void {
+    Route::get('/incidents', [ChurchMinistryOperationsController::class, 'safeguardingIncidents'])->middleware(RequirePermissionAndScope::class.':safeguarding.incidents.report')->name('incidents.index');
+    Route::post('/incidents', 'reportIncident')->middleware(RequirePermissionAndScope::class.':safeguarding.incidents.report')->name('incidents.store');
+    Route::post('/guardian-relationships', 'registerGuardian')->middleware(RequirePermissionAndScope::class.':safeguarding.guardians.register')->name('guardian_relationships.store');
 });
 
 Route::prefix('mission')->name('mission.')->controller(MissionOperationsController::class)->group(function (): void {
@@ -437,11 +483,6 @@ Route::prefix('privacy')->name('privacy.')->controller(PrivacyOperationsControll
     Route::post('/data-subject-requests/{dataSubjectRequest}/exports/begin', 'beginExport')->whereUlid('dataSubjectRequest')->middleware(RequirePermissionAndScope::class.':privacy.data_exports.begin')->name('data_subject_requests.exports.begin');
     Route::post('/data-subject-requests/{dataSubjectRequest}/exports/complete', 'completeExport')->whereUlid('dataSubjectRequest')->middleware(RequirePermissionAndScope::class.':privacy.data_exports.complete')->name('data_subject_requests.exports.complete');
     Route::post('/data-subject-requests/{dataSubjectRequest}/exports/expire', 'expireExport')->whereUlid('dataSubjectRequest')->middleware(RequirePermissionAndScope::class.':privacy.data_exports.expire')->name('data_subject_requests.exports.expire');
-});
-
-Route::prefix('safeguarding')->name('safeguarding.')->controller(SafeguardingOperationsController::class)->group(function (): void {
-    Route::post('/incidents', 'reportIncident')->middleware(RequirePermissionAndScope::class.':safeguarding.incidents.report')->name('incidents.store');
-    Route::post('/guardian-relationships', 'registerGuardian')->middleware(RequirePermissionAndScope::class.':safeguarding.guardians.register')->name('guardian_relationships.store');
 });
 
 Route::prefix('catalog')->name('catalog.')->group(function (): void {

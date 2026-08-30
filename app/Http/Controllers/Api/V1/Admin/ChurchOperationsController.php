@@ -14,6 +14,7 @@ use App\Http\Requests\Api\V1\Admin\EndChurchMembershipRequest;
 use App\Http\Requests\Api\V1\Admin\UpdateChurchRequest;
 use App\Http\Requests\Api\V1\Admin\ListProtectedDomainRecordsRequest;
 use App\Http\Requests\Api\V1\Admin\RegisterFirstTimerRequest;
+use App\Http\Requests\Api\V1\Admin\UpdateFirstTimerRequest;
 use App\Http\Requests\Api\V1\Admin\StartChurchMembershipRequest;
 use App\Http\Requests\Api\V1\Admin\TransitionHomeChurchApplicationRequest;
 use App\Http\Requests\Api\V1\Admin\TransitionPastoralRecordRequest;
@@ -38,8 +39,10 @@ use App\Support\Church\CompleteFollowUpTaskAction;
 use App\Support\Church\CreateChurchAction;
 use App\Support\Church\CreateHomeChurchApplicationAction;
 use App\Support\Church\DeleteChurchAction;
+use App\Support\Church\DeleteFirstTimerAction;
 use App\Support\Church\EndChurchMembershipAction;
 use App\Support\Church\UpdateChurchAction;
+use App\Support\Church\UpdateFirstTimerAction;
 use App\Support\Church\HomeChurchApplicationData;
 use App\Support\Church\RegisterFirstTimerAction;
 use App\Support\Church\StartChurchMembershipAction;
@@ -68,7 +71,11 @@ class ChurchOperationsController extends Controller
         $unit = AdministrativeUnit::query()->where('public_id', $request->validated('administrative_unit_id'))->firstOrFail();
         $context->ensureContains($request, new ScopeReference('administrative_unit', $unit->public_id));
         $church = $this->execute(fn (): Church => $action->handle((string) $request->validated('name'), $location, $unit, $context->actor($request)));
-        $church->load(['location:id,public_id,name', 'administrativeUnit:id,public_id,name']);
+        $church->load([
+            'location:id,public_id,country_id,administrative_unit_id,name,address_line_one,address_line_two,locality,postal_code,timezone',
+            'location.country:id,public_id,iso_code,name',
+            'administrativeUnit:id,public_id,name',
+        ]);
 
         return ApiResponse::success($request, (new ProtectedDomainRecordResource($church))->resolve($request), status: 201);
     }
@@ -87,7 +94,11 @@ class ChurchOperationsController extends Controller
             $unit,
             $context->actor($request),
         ));
-        $updated->load(['location:id,public_id,name', 'administrativeUnit:id,public_id,name']);
+        $updated->load([
+            'location:id,public_id,country_id,administrative_unit_id,name,address_line_one,address_line_two,locality,postal_code,timezone',
+            'location.country:id,public_id,iso_code,name',
+            'administrativeUnit:id,public_id,name',
+        ]);
 
         return ApiResponse::success($request, (new ProtectedDomainRecordResource($updated))->resolve($request));
     }
@@ -156,6 +167,42 @@ class ChurchOperationsController extends Controller
         $firstTimer->load([...PersonDisplayName::eager(), 'church:id,public_id,name', 'homeChurch:id,public_id,name']);
 
         return ApiResponse::success($request, (new ProtectedDomainRecordResource($firstTimer))->resolve($request), status: 201);
+    }
+
+    public function updateFirstTimer(UpdateFirstTimerRequest $request, string $firstTimer, UpdateFirstTimerAction $action, ProtectedAdminContext $context): JsonResponse
+    {
+        $target = FirstTimer::query()->with('church')->where('public_id', $firstTimer)->firstOrFail();
+        $context->ensureContains($request, $target->church->scopeReference());
+        $person = Person::query()->where('public_id', $request->validated('person_id'))->firstOrFail();
+        $church = Church::query()->where('public_id', $request->validated('church_id'))->firstOrFail();
+        $homeChurch = $request->validated('home_church_id') === null
+            ? null
+            : HomeChurch::query()->where('public_id', $request->validated('home_church_id'))->firstOrFail();
+        $context->ensureContains($request, $church->scopeReference());
+        $updated = $this->execute(fn (): FirstTimer => $action->handle(
+            $target,
+            $person,
+            $church,
+            $homeChurch,
+            $request->validated('registered_at') === null ? null : CarbonImmutable::parse((string) $request->validated('registered_at')),
+            $context->actor($request),
+        ));
+        $updated->load([...PersonDisplayName::eager(), 'church:id,public_id,name', 'homeChurch:id,public_id,name']);
+
+        return ApiResponse::success($request, (new ProtectedDomainRecordResource($updated))->resolve($request));
+    }
+
+    public function destroyFirstTimer(Request $request, string $firstTimer, DeleteFirstTimerAction $action, ProtectedAdminContext $context): JsonResponse
+    {
+        $target = FirstTimer::query()->with('church')->where('public_id', $firstTimer)->firstOrFail();
+        $context->ensureContains($request, $target->church->scopeReference());
+        $this->execute(function () use ($action, $target, $context, $request): true {
+            $action->handle($target, $context->actor($request));
+
+            return true;
+        });
+
+        return ApiResponse::success($request, ['id' => $firstTimer, 'deleted' => true]);
     }
 
     public function followUpTasks(ListProtectedDomainRecordsRequest $request, ProtectedDomainCatalogQuery $catalog, ProtectedAdminContext $context): JsonResponse

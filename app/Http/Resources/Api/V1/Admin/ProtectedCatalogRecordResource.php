@@ -59,6 +59,13 @@ class ProtectedCatalogRecordResource extends JsonResource
                 'person_name' => PersonDisplayName::of($this->person),
                 'status' => $this->status->value,
                 'application_data' => $this->application_data,
+                'church_name' => data_get($this->application_data, 'church_name')
+                    ?? data_get($this->application_data, 'church')
+                    ?? data_get($this->application_data, 'home_church'),
+                'batch_name' => data_get($this->application_data, 'batch_name')
+                    ?? data_get($this->application_data, 'batch')
+                    ?? data_get($this->application_data, 'cohort_name')
+                    ?? data_get($this->application_data, 'year_name'),
                 'received_at' => $this->received_at?->utc()->toIso8601String(),
                 'reviewed_at' => $this->reviewed_at?->utc()->toIso8601String(),
             ],
