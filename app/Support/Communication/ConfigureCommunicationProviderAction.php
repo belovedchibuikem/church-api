@@ -25,6 +25,9 @@ class ConfigureCommunicationProviderAction
                 'email_provider',
                 'email_sender_name',
                 'email_sender_address',
+                'email_smtp_host',
+                'email_smtp_username',
+                'email_smtp_encryption',
                 'sms_provider',
                 'sms_sender_id',
                 'whatsapp_provider',
@@ -36,9 +39,14 @@ class ConfigureCommunicationProviderAction
                 }
             }
 
-            foreach (['email_api_key', 'sms_api_key', 'sms_api_secret', 'whatsapp_access_token', 'push_server_key'] as $secret) {
+            if (array_key_exists('email_smtp_port', $input) && $input['email_smtp_port'] !== null) {
+                $configuration->email_smtp_port = (int) $input['email_smtp_port'];
+            }
+
+            foreach (['email_api_key', 'email_smtp_password', 'sms_api_key', 'sms_api_secret', 'whatsapp_access_token', 'push_server_key'] as $secret) {
                 if (array_key_exists($secret, $input) && filled($input[$secret])) {
-                    $configuration->{$secret} = (string) $input[$secret];
+                    $target = $secret === 'email_smtp_password' ? 'email_api_key' : $secret;
+                    $configuration->{$target} = (string) $input[$secret];
                 }
             }
 

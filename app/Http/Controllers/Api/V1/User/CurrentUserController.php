@@ -16,7 +16,7 @@ class CurrentUserController extends Controller
         $user = $request->user();
         abort_unless($user instanceof User, 401);
 
-        $user->loadMissing(['person.profile', 'person.preference']);
+        $user->loadMissing(['person.profile.avatarFileAsset', 'person.preference']);
 
         return ApiResponse::success(
             $request,

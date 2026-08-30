@@ -22,7 +22,9 @@ return [
         'home_church_application_per_contact_per_hour' => (int) env('HOME_CHURCH_APPLICATION_RATE_LIMIT_PER_CONTACT_PER_HOUR', 10),
         'mobile_login_per_minute' => (int) env('MOBILE_LOGIN_RATE_LIMIT_PER_MINUTE', 5),
         'mobile_login_per_email_per_minute' => (int) env('MOBILE_LOGIN_RATE_LIMIT_PER_EMAIL_PER_MINUTE', 5),
+        'mobile_registration_per_hour' => (int) env('MOBILE_REGISTRATION_RATE_LIMIT_PER_HOUR', 5),
         'mobile_refresh_per_minute' => (int) env('MOBILE_REFRESH_RATE_LIMIT_PER_MINUTE', 10),
+
         'mfa_setup_per_hour' => (int) env('MFA_SETUP_RATE_LIMIT_PER_HOUR', 5),
         'mfa_challenge_per_minute' => (int) env('MFA_CHALLENGE_RATE_LIMIT_PER_MINUTE', 5),
         'browser_csrf_per_minute' => (int) env('BROWSER_CSRF_RATE_LIMIT_PER_MINUTE', 60),

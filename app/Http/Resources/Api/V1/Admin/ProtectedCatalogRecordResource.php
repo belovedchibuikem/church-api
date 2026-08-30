@@ -24,7 +24,9 @@ use App\Models\KcaCohort;
 use App\Models\KcaEnrollment;
 use App\Models\KcaEvidenceReview;
 use App\Models\KcaEvidenceSubmission;
+use App\Models\KcaLecturerAssignment;
 use App\Models\KcaLesson;
+use App\Models\KcaMentorAssignment;
 use App\Models\KcaModule;
 use App\Models\KcaYear;
 use App\Models\MinistryEvent;
@@ -56,6 +58,7 @@ class ProtectedCatalogRecordResource extends JsonResource
                 'person_id' => $this->person?->public_id,
                 'person_name' => PersonDisplayName::of($this->person),
                 'status' => $this->status->value,
+                'application_data' => $this->application_data,
                 'received_at' => $this->received_at?->utc()->toIso8601String(),
                 'reviewed_at' => $this->reviewed_at?->utc()->toIso8601String(),
             ],
@@ -140,6 +143,31 @@ class ProtectedCatalogRecordResource extends JsonResource
                 'title' => $this->title,
                 'sequence' => $this->sequence,
             ],
+            $this->resource instanceof KcaLecturerAssignment => [
+                'id' => $this->public_id,
+                'lecturer_person_id' => $this->lecturer?->public_id,
+                'lecturer_name' => PersonDisplayName::of($this->lecturer),
+                'person_name' => PersonDisplayName::of($this->lecturer),
+                'module_id' => $this->module?->public_id,
+                'module_title' => $this->module?->title,
+                'module_code' => $this->module?->code,
+                'cohort_id' => $this->cohort?->public_id,
+                'cohort_name' => $this->cohort?->name,
+                'starts_at' => $this->starts_at?->utc()->toIso8601String(),
+                'ends_at' => $this->ends_at?->utc()->toIso8601String(),
+                'status' => $this->ends_at === null || $this->ends_at->isFuture() ? 'Active' : 'Ended',
+            ],
+            $this->resource instanceof KcaMentorAssignment => [
+                'id' => $this->public_id,
+                'mentor_person_id' => $this->mentor?->public_id,
+                'mentor_name' => PersonDisplayName::of($this->mentor),
+                'person_name' => PersonDisplayName::of($this->mentor),
+                'enrollment_id' => $this->enrollment?->public_id,
+                'student_name' => PersonDisplayName::of($this->enrollment?->person),
+                'starts_at' => $this->starts_at?->utc()->toIso8601String(),
+                'ends_at' => $this->ends_at?->utc()->toIso8601String(),
+                'status' => $this->ends_at === null || $this->ends_at->isFuture() ? 'Active' : 'Ended',
+            ],
             $this->resource instanceof KcaAttendance => [
                 'id' => $this->public_id,
                 'enrollment_id' => $this->enrollment?->public_id,
@@ -198,6 +226,17 @@ class ProtectedCatalogRecordResource extends JsonResource
                 'fee_amount_minor' => $this->event?->fee_amount_minor,
                 'fee_currency' => $this->event?->fee_currency,
                 'event_name' => $this->event?->name,
+                'ticket_code' => $this->ticket_code,
+                'qr_payload' => $this->ticket_code ? 'fhc:ticket:'.$this->ticket_code : null,
+                'starts_at' => $this->event?->starts_at?->utc()->toIso8601String(),
+                'ends_at' => $this->event?->ends_at?->utc()->toIso8601String(),
+                'location' => $this->event !== null && $this->event->relationLoaded('location')
+                    ? ($this->event->location === null ? null : [
+                        'id' => $this->event->location->public_id,
+                        'name' => $this->event->location->name,
+                        'locality' => $this->event->location->locality,
+                    ])
+                    : null,
             ],
             $this->resource instanceof EventAttendance => [
                 'id' => $this->public_id,

@@ -626,6 +626,10 @@ export class FamilyHouseProtectedApiClient {
     return this.request<JsonValue>('POST', '/api/v1/auth/register', options, body as unknown as JsonObject);
   }
 
+  public mobileRegister(body: JsonObject = {}, options: ProtectedRequestOptions = {}): Promise<SuccessEnvelope<JsonValue>> {
+    return this.request<JsonValue>('POST', '/api/v1/mobile/auth/register', options, body as unknown as JsonObject);
+  }
+
   public mobileLogin(body: JsonObject = {}, options: ProtectedRequestOptions = {}): Promise<SuccessEnvelope<JsonValue>> {
     return this.request<JsonValue>('POST', '/api/v1/mobile/auth/login', options, body as unknown as JsonObject);
   }

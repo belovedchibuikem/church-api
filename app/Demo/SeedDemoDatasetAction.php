@@ -2,6 +2,7 @@
 
 namespace App\Demo;
 
+use App\Church\ChurchGroupMembershipStatus;
 use App\Church\HomeChurchApplicationStatus;
 use App\Church\HomeChurchStatus;
 use App\Communication\CommunicationBroadcastStatus;
@@ -21,6 +22,10 @@ use App\Models\AdministrativeLevel;
 use App\Models\AdministrativeUnit;
 use App\Models\AlertRule;
 use App\Models\Church;
+use App\Models\ChurchAnnouncement;
+use App\Models\ChurchDocument;
+use App\Models\ChurchGroup;
+use App\Models\ChurchGroupMembership;
 use App\Models\ChurchMembership;
 use App\Models\CommunicationAudience;
 use App\Models\CommunicationBroadcast;
@@ -45,6 +50,7 @@ use App\Models\KcaEnrollment;
 use App\Models\KcaLesson;
 use App\Models\KcaModule;
 use App\Models\KcaYear;
+use App\Models\Livestream;
 use App\Models\Location;
 use App\Models\MinistryEvent;
 use App\Models\MissionSoulJourney;
@@ -65,6 +71,8 @@ use App\Reporting\AlertSeverity;
 use App\Storage\StorageProvider;
 use App\Support\Authorization\AssignRoleToUserAction;
 use App\Support\Authorization\AssignScopeToRoleAssignmentAction;
+use App\Support\Identity\PersonDisplayName;
+use App\Support\Livestream\UpsertLivestreamAction;
 use App\Support\Authorization\AuthorizationBundleCatalog;
 use App\Support\Authorization\ProvisionAuthorizationBundlesAction;
 use App\Support\Authorization\ScopeReference;
@@ -138,7 +146,9 @@ class SeedDemoDatasetAction
 
             $churches = $this->churches($countries, $palette);
             $homeChurches = $this->homeChurches($churches, $pastor, $leaders);
+            $this->livestream($churches[2] ?? $churches[0], $pastor->person);
             $this->memberships($churches, $homeChurches, array_merge([$admin->person, $pastor->person, $student->person], $leaders, $members));
+            $this->churchCommunity($churches, $pastor->person, array_merge([$student->person], array_slice($members, 0, 6)));
             $this->firstTimersAndFollowUps($churches[0], $homeChurches[0], $members, $pastor->person);
             $this->homeChurchApplications($churches[0], $members);
             $events = $this->events($countries['ng']['locations']['ikeja'], $palette);
@@ -166,6 +176,7 @@ class SeedDemoDatasetAction
                 'users' => User::query()->count(),
                 'press' => PressPublication::query()->count(),
                 'media' => FileAsset::query()->count(),
+                'livestreams' => Livestream::query()->count(),
                 'accounts' => [
                     'admin@familyhouse.demo',
                     'pastor@familyhouse.demo',
@@ -285,6 +296,26 @@ class SeedDemoDatasetAction
         return $churches;
     }
 
+    private function livestream(Church $church, Person $host): void
+    {
+        $youtubeUrl = env(
+            'FHC_DEMO_YOUTUBE_LIVE_URL',
+            'https://www.youtube.com/watch?v=EngW7tLk6R8',
+        );
+
+        app(UpsertLivestreamAction::class)->handle([
+            'title' => 'Sunday Celebration Live',
+            'subtitle' => $church->name,
+            'host_name' => PersonDisplayName::of($host) ?: 'Family House',
+            'youtube_url' => $youtubeUrl,
+            'status' => 'live',
+            'church_id' => $church->public_id,
+            'viewer_count' => 128,
+            'reaction_count' => 42,
+            'starts_at' => now()->utc()->subMinutes(15)->toIso8601String(),
+        ]);
+    }
+
     /**
      * @param  list<Church>  $churches
      * @param  list<Person>  $leaders
@@ -312,6 +343,70 @@ class SeedDemoDatasetAction
         }
 
         return $created;
+    }
+
+    /**
+     * @param  list<Church>  $churches
+     * @param  list<Person>  $members
+     */
+    private function churchCommunity(array $churches, Person $leader, array $members): void
+    {
+        $church = $churches[0];
+        $groupSpecs = [
+            ['Faith Builders', 'Weekly discipleship small group'],
+            ['Young Adults', 'Fellowship for young adults'],
+            ['Men of Valor', 'Men\'s mentoring circle'],
+        ];
+        foreach ($groupSpecs as $index => [$name, $description]) {
+            $group = new ChurchGroup([
+                'church_id' => $church->getKey(),
+                'name' => $name,
+                'description' => $description,
+                'leader_person_id' => $leader->getKey(),
+                'capacity' => 30,
+                'is_published' => true,
+            ]);
+            $group->save();
+            $this->remember($group);
+
+            foreach (array_slice($members, 0, 3 + $index) as $person) {
+                $membership = new ChurchGroupMembership([
+                    'church_group_id' => $group->getKey(),
+                    'person_id' => $person->getKey(),
+                    'status' => ChurchGroupMembershipStatus::Active,
+                    'joined_at' => now()->subWeeks($index + 1),
+                ]);
+                $membership->save();
+                $this->remember($membership);
+            }
+        }
+
+        foreach ([
+            ['Sunday Celebration Reminder', 'Join us this Sunday at 8:00 AM for celebration service.'],
+            ['Workers Meeting', 'All department leaders meet Wednesday at 6:00 PM.'],
+            ['Prayer & Fasting Week', 'Corporate prayer and fasting begins Monday.'],
+        ] as $index => [$title, $body]) {
+            $announcement = new ChurchAnnouncement([
+                'church_id' => $church->getKey(),
+                'title' => $title,
+                'body' => $body,
+                'published_at' => now()->subDays($index),
+                'created_by_person_id' => $leader->getKey(),
+            ]);
+            $announcement->save();
+            $this->remember($announcement);
+        }
+
+        foreach (['Membership Handbook', 'Safeguarding Policy', 'Worship Guidelines'] as $index => $title) {
+            $document = new ChurchDocument([
+                'church_id' => $church->getKey(),
+                'title' => $title,
+                'description' => 'Official church document for members.',
+                'published_at' => now()->subDays(10 + $index),
+            ]);
+            $document->save();
+            $this->remember($document);
+        }
     }
 
     /**
@@ -435,6 +530,7 @@ class SeedDemoDatasetAction
                 'person_id' => $person->getKey(),
                 'status' => EventRegistrationStatus::Confirmed,
                 'idempotency_scope_hash' => hash('sha256', 'demo-reg-'.$person->getKey().'-'.$event->getKey()),
+                'ticket_code' => 'EVT-'.Str::upper(Str::random(10)),
             ]);
             $this->remember($registration);
         }
@@ -836,7 +932,16 @@ class SeedDemoDatasetAction
 
     private function grantAllAdminRoles(User $user): void
     {
-        $this->grantRoles($user, array_keys(AuthorizationBundleCatalog::BUNDLES));
+        $scope = new ScopeReference('global', 'platform');
+        $role = Role::query()->where('code', AuthorizationBundleCatalog::SUPER_ADMINISTRATOR_ROLE)->first();
+        if ($role === null) {
+            $this->grantRoles($user, array_keys(AuthorizationBundleCatalog::BUNDLES));
+
+            return;
+        }
+
+        $assignment = $this->assignRole->handle($user, $role);
+        $this->assignScope->handle($assignment, $scope);
     }
 
     /** @param  list<string>  $codes */

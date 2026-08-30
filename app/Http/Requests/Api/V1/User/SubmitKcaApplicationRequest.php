@@ -17,6 +17,7 @@ class SubmitKcaApplicationRequest extends FormRequest
         return [
             'application_data' => ['required', 'array', 'min:1'],
             'application_data.*' => ['nullable', 'string', 'max:5000'],
+            'finalize' => ['sometimes', 'boolean'],
         ];
     }
 }

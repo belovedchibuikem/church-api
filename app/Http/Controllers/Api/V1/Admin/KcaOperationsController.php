@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Api\V1\Admin;
 use App\Http\Controllers\Api\V1\Admin\Concerns\ExecutesDomainMutations;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Admin\CreateKcaCohortRequest;
+use App\Http\Requests\Api\V1\Admin\CreateKcaLecturerAssignmentRequest;
 use App\Http\Requests\Api\V1\Admin\CreateKcaLessonRequest;
+use App\Http\Requests\Api\V1\Admin\CreateKcaMentorAssignmentRequest;
 use App\Http\Requests\Api\V1\Admin\CreateKcaModuleRequest;
 use App\Http\Requests\Api\V1\Admin\CreateKcaYearRequest;
 use App\Http\Requests\Api\V1\Admin\EnrollKcaStudentRequest;
@@ -30,14 +32,18 @@ use App\Models\KcaCohort;
 use App\Models\KcaEnrollment;
 use App\Models\KcaEvidenceReview;
 use App\Models\KcaEvidenceSubmission;
+use App\Models\KcaLecturerAssignment;
 use App\Models\KcaLesson;
+use App\Models\KcaMentorAssignment;
 use App\Models\KcaModule;
 use App\Models\KcaYear;
 use App\Models\Person;
 use App\Services\Admin\ProtectedAdminContext;
 use App\Support\Api\ApiResponse;
 use App\Support\Kca\CreateKcaCohortAction;
+use App\Support\Kca\CreateKcaLecturerAssignmentAction;
 use App\Support\Kca\CreateKcaLessonAction;
+use App\Support\Kca\CreateKcaMentorAssignmentAction;
 use App\Support\Kca\CreateKcaModuleAction;
 use App\Support\Kca\CreateKcaYearAction;
 use App\Support\Kca\EnrollKcaStudentAction;
@@ -48,8 +54,10 @@ use App\Support\Kca\ReviewKcaEvidenceAction;
 use App\Support\Kca\SubmitKcaEvidenceAction;
 use App\Support\Kca\TransitionKcaApplicationAction;
 use App\Support\Kca\TransitionKcaAssignmentAction;
+use App\Support\Identity\PersonDisplayName;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class KcaOperationsController extends Controller
 {
@@ -247,5 +255,70 @@ class KcaOperationsController extends Controller
         $attendance->load(['enrollment:id,public_id', 'lesson:id,public_id']);
 
         return ApiResponse::success($request, (new ProtectedCatalogRecordResource($attendance))->resolve($request), status: 201);
+    }
+
+    public function storeLecturerAssignment(CreateKcaLecturerAssignmentRequest $request, CreateKcaLecturerAssignmentAction $action, ProtectedAdminContext $context): JsonResponse
+    {
+        $context->ensureGlobal($request);
+        $assignment = $this->execute(fn (): KcaLecturerAssignment => $action->handle(
+            KcaModule::query()->where('public_id', $request->validated('kca_module_id'))->firstOrFail(),
+            KcaCohort::query()->where('public_id', $request->validated('kca_cohort_id'))->firstOrFail(),
+            Person::query()->where('public_id', $request->validated('lecturer_person_id'))->firstOrFail(),
+            CarbonImmutable::parse((string) $request->validated('starts_at')),
+            $request->validated('ends_at') === null ? null : CarbonImmutable::parse((string) $request->validated('ends_at')),
+            $context->actor($request),
+        ));
+        $assignment->load([
+            'module:id,public_id,title,code',
+            'cohort:id,public_id,name,code',
+            ...PersonDisplayName::eager('lecturer'),
+        ]);
+
+        return ApiResponse::success($request, (new ProtectedCatalogRecordResource($assignment))->resolve($request), status: 201);
+    }
+
+    public function destroyLecturerAssignment(Request $request, string $assignment, ProtectedAdminContext $context): JsonResponse
+    {
+        $context->ensureGlobal($request);
+        $target = KcaLecturerAssignment::query()->where('public_id', $assignment)->firstOrFail();
+        $this->execute(function () use ($target): true {
+            $target->delete();
+
+            return true;
+        });
+
+        return ApiResponse::success($request, ['id' => $assignment, 'deleted' => true]);
+    }
+
+    public function storeMentorAssignment(CreateKcaMentorAssignmentRequest $request, CreateKcaMentorAssignmentAction $action, ProtectedAdminContext $context): JsonResponse
+    {
+        $context->ensureGlobal($request);
+        $assignment = $this->execute(fn (): KcaMentorAssignment => $action->handle(
+            KcaEnrollment::query()->where('public_id', $request->validated('kca_enrollment_id'))->firstOrFail(),
+            Person::query()->where('public_id', $request->validated('mentor_person_id'))->firstOrFail(),
+            CarbonImmutable::parse((string) $request->validated('starts_at')),
+            $request->validated('ends_at') === null ? null : CarbonImmutable::parse((string) $request->validated('ends_at')),
+            $context->actor($request),
+        ));
+        $assignment->load([
+            'enrollment:id,public_id',
+            ...PersonDisplayName::eager('mentor'),
+            ...PersonDisplayName::eager('enrollment.person'),
+        ]);
+
+        return ApiResponse::success($request, (new ProtectedCatalogRecordResource($assignment))->resolve($request), status: 201);
+    }
+
+    public function destroyMentorAssignment(Request $request, string $assignment, ProtectedAdminContext $context): JsonResponse
+    {
+        $context->ensureGlobal($request);
+        $target = KcaMentorAssignment::query()->where('public_id', $assignment)->firstOrFail();
+        $this->execute(function () use ($target): true {
+            $target->delete();
+
+            return true;
+        });
+
+        return ApiResponse::success($request, ['id' => $assignment, 'deleted' => true]);
     }
 }

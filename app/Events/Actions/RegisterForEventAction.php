@@ -33,7 +33,7 @@ class RegisterForEventAction
                     throw new DomainException('Event registration idempotency key conflict.');
                 }
 
-                return $retry;
+                return $this->ensureTicketCode($retry);
             }
             $lockedEvent = MinistryEvent::query()->lockForUpdate()->findOrFail($event->getKey());
             if (($lockedEvent->registration_opens_at?->isFuture() ?? false) || ($lockedEvent->registration_closes_at?->isPast() ?? false)) {
@@ -44,14 +44,38 @@ class RegisterForEventAction
             }
             $existing = EventRegistration::query()->whereBelongsTo($lockedEvent, 'event')->whereBelongsTo($person)->first();
             if ($existing !== null) {
-                return $existing;
+                return $this->ensureTicketCode($existing);
             }
             $requiresPayment = ($lockedEvent->fee_amount_minor ?? 0) > 0;
             $registration = new EventRegistration;
-            $registration->forceFill(['ministry_event_id' => $lockedEvent->getKey(), 'person_id' => $person->getKey(), 'status' => $requiresPayment ? EventRegistrationStatus::PaymentPending : EventRegistrationStatus::Confirmed, 'idempotency_scope_hash' => $scopeHash, 'registered_at' => now()->utc(), 'confirmed_at' => $requiresPayment ? null : now()->utc()])->save();
+            $registration->forceFill([
+                'ministry_event_id' => $lockedEvent->getKey(),
+                'person_id' => $person->getKey(),
+                'status' => $requiresPayment ? EventRegistrationStatus::PaymentPending : EventRegistrationStatus::Confirmed,
+                'idempotency_scope_hash' => $scopeHash,
+                'registered_at' => now()->utc(),
+                'confirmed_at' => $requiresPayment ? null : now()->utc(),
+                'ticket_code' => $this->generateTicketCode(),
+            ])->save();
             $this->recordAuditEvent->handle(new AuditEventData(action: 'events.registration.created', actor: $actor, targetType: 'event_registration', targetId: $registration->public_id, scopeType: 'ministry_event', scopeId: $lockedEvent->public_id, metadata: ['payment_required' => $requiresPayment]));
 
             return $registration;
         }, attempts: 3);
+    }
+
+    private function ensureTicketCode(EventRegistration $registration): EventRegistration
+    {
+        if (filled($registration->ticket_code)) {
+            return $registration;
+        }
+
+        $registration->forceFill(['ticket_code' => $this->generateTicketCode()])->save();
+
+        return $registration;
+    }
+
+    private function generateTicketCode(): string
+    {
+        return 'EVT-'.Str::upper(Str::random(10));
     }
 }

@@ -18,6 +18,9 @@ use App\Models\KcaCertificate;
 use App\Models\KcaCohort;
 use App\Models\KcaEnrollment;
 use App\Models\KcaEvidenceSubmission;
+use App\Models\KcaLecturerAssignment;
+use App\Models\KcaMentorAssignment;
+use App\Models\KcaModule;
 use App\Models\KcaYear;
 use App\Models\MinistryEvent;
 use App\Models\PaymentDispute;
@@ -113,6 +116,41 @@ class ProtectedDomainRegistry
                 'order_column' => 'starts_on',
                 'order_direction' => 'desc',
                 'search_column' => 'name',
+            ],
+            'kca.modules' => [
+                'permission' => 'kca.enrollments.view',
+                'path' => 'kca/modules',
+                'operation_id' => 'listAdminCatalogKcaModules',
+                'model' => KcaModule::class,
+                'order_column' => 'sequence',
+                'order_direction' => 'asc',
+                'search_column' => 'title',
+            ],
+            'kca.lecturer_assignments' => [
+                'permission' => 'kca.enrollments.view',
+                'path' => 'kca/lecturer-assignments',
+                'operation_id' => 'listAdminCatalogKcaLecturerAssignments',
+                'model' => KcaLecturerAssignment::class,
+                'with' => [
+                    'module:id,public_id,title,code',
+                    'cohort:id,public_id,name,code',
+                    ...PersonDisplayName::eager('lecturer'),
+                ],
+                'order_column' => 'starts_at',
+                'order_direction' => 'desc',
+            ],
+            'kca.mentor_assignments' => [
+                'permission' => 'kca.enrollments.view',
+                'path' => 'kca/mentor-assignments',
+                'operation_id' => 'listAdminCatalogKcaMentorAssignments',
+                'model' => KcaMentorAssignment::class,
+                'with' => [
+                    'enrollment:id,public_id',
+                    ...PersonDisplayName::eager('mentor'),
+                    ...PersonDisplayName::eager('enrollment.person'),
+                ],
+                'order_column' => 'starts_at',
+                'order_direction' => 'desc',
             ],
             'press.publications' => [
                 'permission' => 'press.publications.view',

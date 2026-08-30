@@ -10,6 +10,8 @@ use App\Models\User;
 use App\Support\Api\ApiResponse;
 use App\Support\Identity\UpdatePersonProfileAction;
 use Illuminate\Http\JsonResponse;
+use InvalidArgumentException;
+use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
 
 class ProfileController extends Controller
 {
@@ -23,8 +25,13 @@ class ProfileController extends Controller
         $person = $user->person;
         abort_unless($person instanceof Person, 409, 'The account is not linked to a person profile.');
 
-        $updateProfile->handle($person, $request->validated(), $user);
-        $user->loadMissing(['person.profile', 'person.preference']);
+        try {
+            $updateProfile->handle($person, $request->validated(), $user);
+        } catch (InvalidArgumentException $exception) {
+            throw new UnprocessableEntityHttpException($exception->getMessage(), $exception);
+        }
+
+        $user->loadMissing(['person.profile.avatarFileAsset', 'person.preference']);
 
         return ApiResponse::success(
             $request,

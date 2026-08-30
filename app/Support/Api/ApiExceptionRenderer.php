@@ -115,7 +115,7 @@ class ApiExceptionRenderer
             413 => ['PAYLOAD_TOO_LARGE', 'The request payload is too large.'],
             415 => ['UNSUPPORTED_MEDIA_TYPE', 'The request media type is not supported.'],
             422 => ['VALIDATION_FAILED', 'The request data is invalid.'],
-            419 => ['CSRF_TOKEN_MISMATCH', 'Your sign-in session expired. Refresh the page and try again.'],
+            419 => ['CSRF_TOKEN_MISMATCH', 'Your session expired. Sign in again and try again.'],
             429 => ['RATE_LIMIT_EXCEEDED', 'Too many requests. Please try again later.'],
             503 => ['SERVICE_UNAVAILABLE', 'The service is temporarily unavailable.'],
             default => ['HTTP_ERROR', 'The request could not be completed.'],

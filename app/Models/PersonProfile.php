@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'country',
     'region',
     'locality',
+    'avatar_file_asset_id',
 ])]
 class PersonProfile extends Model
 {
@@ -25,5 +26,10 @@ class PersonProfile extends Model
     public function person(): BelongsTo
     {
         return $this->belongsTo(Person::class);
+    }
+
+    public function avatarFileAsset(): BelongsTo
+    {
+        return $this->belongsTo(FileAsset::class, 'avatar_file_asset_id');
     }
 }

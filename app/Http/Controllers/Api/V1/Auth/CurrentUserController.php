@@ -15,7 +15,7 @@ class CurrentUserController extends Controller
     {
         /** @var User $user */
         $user = $request->user('web');
-        $user->loadMissing('person.profile');
+        $user->loadMissing('person.profile.avatarFileAsset');
 
         return ApiResponse::success(
             $request,

@@ -27,6 +27,7 @@ class UpdateProfileRequest extends FormRequest
             'middle_name' => ['nullable', 'string', 'max:120'],
             'family_name' => ['required', 'string', 'max:120'],
             'preferred_name' => ['nullable', 'string', 'max:120'],
+            'avatar_file_asset_id' => ['nullable', 'string', 'ulid'],
         ];
     }
 }

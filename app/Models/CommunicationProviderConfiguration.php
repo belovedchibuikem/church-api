@@ -13,6 +13,10 @@ use Illuminate\Database\Eloquent\Model;
     'email_sender_name',
     'email_sender_address',
     'email_api_key',
+    'email_smtp_host',
+    'email_smtp_port',
+    'email_smtp_username',
+    'email_smtp_encryption',
     'sms_provider',
     'sms_sender_id',
     'sms_api_key',
@@ -73,7 +77,17 @@ class CommunicationProviderConfiguration extends Model
     public function channelConfigured(string $channel): bool
     {
         return match ($channel) {
-            'email' => $this->email_provider !== 'none' && filled($this->email_sender_address) && filled($this->email_api_key),
+            'email' => match ($this->email_provider) {
+                'none' => false,
+                'smtp' => filled($this->email_sender_address)
+                    && filled($this->email_smtp_host)
+                    && filled($this->email_smtp_port)
+                    && filled($this->email_smtp_username)
+                    && filled($this->email_api_key),
+                default => $this->email_provider !== 'none'
+                    && filled($this->email_sender_address)
+                    && filled($this->email_api_key),
+            },
             'sms' => $this->sms_provider !== 'none' && filled($this->sms_api_key),
             'whatsapp' => $this->whatsapp_provider !== 'none' && filled($this->whatsapp_access_token),
             'push' => $this->push_provider !== 'none' && filled($this->push_server_key),

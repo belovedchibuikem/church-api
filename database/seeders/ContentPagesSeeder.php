@@ -57,6 +57,8 @@ class ContentPagesSeeder extends Seeder
                 'summary' => 'Find community, grow in faith, and serve across the Family House network.',
                 'body' => 'Welcome to Family House Connect — churches, missions, Kingdom training, and resources for every believer.',
                 'items' => [
+                    ['kind' => 'heading', 'title' => 'Our Four Pillars', 'body' => 'Everything you need to belong, grow, and multiply.', 'meta' => ['section' => 'pillars']],
+                    ['kind' => 'heading', 'title' => 'Get Started', 'body' => 'Take your next Kingdom step.', 'meta' => ['section' => 'actions']],
                     ['kind' => 'metric', 'title' => 'Lives Impacted', 'body' => '50,000+', 'meta' => ['change' => '+12.4%']],
                     ['kind' => 'metric', 'title' => 'Active Churches', 'body' => '1,842', 'meta' => ['change' => '+8.1%']],
                     ['kind' => 'metric', 'title' => 'Countries', 'body' => '147', 'meta' => ['change' => '+3.2%']],
@@ -218,6 +220,16 @@ class ContentPagesSeeder extends Seeder
                     ['kind' => 'card', 'title' => 'Belong', 'body' => 'Churches and home churches that make family real.'],
                     ['kind' => 'card', 'title' => 'Grow', 'body' => 'KCA, sermons, and pastoral care that form disciples.'],
                     ['kind' => 'card', 'title' => 'Send', 'body' => 'Missions and compassion that reach the lost.'],
+                ],
+            ],
+            [
+                'slug' => 'events',
+                'title' => 'Events',
+                'summary' => 'Gather, worship, learn, and serve together.',
+                'body' => 'Family House events bring the family together for training, worship, and Kingdom advancement.',
+                'items' => [
+                    ['kind' => 'card', 'title' => 'View Calendar', 'body' => 'See upcoming gatherings across the network.', 'href' => '/account/calendar'],
+                    ['kind' => 'card', 'title' => 'Register', 'body' => 'Save your seat at conferences, retreats, and summits.', 'href' => '/events'],
                 ],
             ],
         ];

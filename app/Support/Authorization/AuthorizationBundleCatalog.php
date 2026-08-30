@@ -20,6 +20,9 @@ final class AuthorizationBundleCatalog
 
     public const DOMAIN_OPERATIONS_ADMINISTRATOR_ROLE = 'domain_operations_administrator';
 
+    /** Single role carrying every permission code — assign at global/platform scope for full admin access. */
+    public const SUPER_ADMINISTRATOR_ROLE = 'super_administrator';
+
     /** @var array<string, array{name: string, permissions: array<int, string>}> */
     public const BUNDLES = [
         self::MEMBER_SECURITY_ROLE => [

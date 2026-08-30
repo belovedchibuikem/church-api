@@ -51,9 +51,44 @@ class UserDomainOperationsController extends Controller
             (string) $request->validated('idempotency_key'),
             $user,
         ));
-        $registration->load(['event:id,public_id,name,fee_amount_minor,fee_currency', 'person:id,public_id']);
+        $registration->load([
+            'event:id,public_id,name,starts_at,ends_at,location_id,fee_amount_minor,fee_currency',
+            'event.location:id,public_id,name,locality',
+            'person:id,public_id',
+        ]);
 
         return ApiResponse::success($request, (new ProtectedCatalogRecordResource($registration))->resolve($request), status: 201);
+    }
+
+    public function listRegistrations(ListUserRecordsRequest $request): JsonResponse
+    {
+        $user = $this->actor($request);
+        $person = $user->person;
+        if ($person === null) {
+            throw new UnprocessableEntityHttpException('The authenticated user is not linked to a person.');
+        }
+
+        $when = (string) $request->validated('filter.when', 'all');
+        $now = now()->utc();
+        $query = EventRegistration::query()
+            ->with([
+                'event:id,public_id,name,starts_at,ends_at,location_id,fee_amount_minor,fee_currency',
+                'event.location:id,public_id,name,locality',
+                'person:id,public_id',
+            ])
+            ->where('person_id', $person->getKey())
+            ->whereHas('event', function ($eventQuery) use ($when, $now): void {
+                if ($when === 'upcoming') {
+                    $eventQuery->where('starts_at', '>=', $now);
+                } elseif ($when === 'past') {
+                    $eventQuery->where('starts_at', '<', $now);
+                }
+            })
+            ->latest('registered_at');
+
+        $paginator = $query->paginate((int) $request->validated('per_page', 25));
+
+        return $this->page($request, $paginator);
     }
 
     public function showRegistration(Request $request, string $registration): JsonResponse
@@ -67,7 +102,11 @@ class UserDomainOperationsController extends Controller
             ->where('public_id', $registration)
             ->where('person_id', $person->getKey())
             ->firstOrFail();
-        $owned->load(['event:id,public_id,name,starts_at,ends_at,fee_amount_minor,fee_currency', 'person:id,public_id']);
+        $owned->load([
+            'event:id,public_id,name,starts_at,ends_at,location_id,fee_amount_minor,fee_currency',
+            'event.location:id,public_id,name,locality',
+            'person:id,public_id',
+        ]);
 
         return ApiResponse::success($request, (new ProtectedCatalogRecordResource($owned))->resolve($request));
     }

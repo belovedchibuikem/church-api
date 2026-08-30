@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Admin\StoreContentItemRequest;
 use App\Http\Requests\Api\V1\Admin\StoreContentPageRequest;
+use App\Http\Requests\Api\V1\Admin\UpdateContentItemRequest;
 use App\Http\Requests\Api\V1\Admin\UpdateContentPageRequest;
 use App\Http\Resources\Api\V1\Content\ContentItemResource;
 use App\Http\Resources\Api\V1\Content\ContentPageResource;
@@ -51,7 +52,7 @@ class ContentAdministrationController extends Controller
 
         return ApiResponse::success(
             $request,
-            ContentPageResource::make($page->load('items'))->resolve($request),
+            ContentPageResource::make($this->pageWithMedia($page))->resolve($request),
             status: 201,
         );
     }
@@ -84,7 +85,7 @@ class ContentAdministrationController extends Controller
 
         return ApiResponse::success(
             $request,
-            ContentPageResource::make($target->fresh()->load('items'))->resolve($request),
+            ContentPageResource::make($this->pageWithMedia($target->fresh() ?? $target))->resolve($request),
         );
     }
 
@@ -111,8 +112,75 @@ class ContentAdministrationController extends Controller
 
         return ApiResponse::success(
             $request,
-            ContentItemResource::make($item)->resolve($request),
+            ContentItemResource::make($item->load('mediaAttachments.fileAsset'))->resolve($request),
             status: 201,
         );
+    }
+
+    public function updateItem(
+        UpdateContentItemRequest $request,
+        string $page,
+        string $item,
+        ProtectedAdminContext $context,
+    ): JsonResponse {
+        $context->ensureGlobal($request);
+        $row = $this->itemOnPage($page, $item);
+        $validated = $request->validated();
+        $payload = [];
+
+        foreach (['kind', 'title', 'body', 'href', 'sort_order'] as $field) {
+            if (array_key_exists($field, $validated)) {
+                $payload[$field] = $validated[$field];
+            }
+        }
+        if (array_key_exists('meta', $validated)) {
+            $payload['meta'] = $validated['meta'];
+        }
+        if (array_key_exists('published_at', $validated)) {
+            $payload['published_at'] = $validated['published_at'];
+        }
+
+        if ($payload !== []) {
+            $row->forceFill($payload)->save();
+        }
+
+        return ApiResponse::success(
+            $request,
+            ContentItemResource::make($row->fresh()->load('mediaAttachments.fileAsset'))->resolve($request),
+        );
+    }
+
+    public function destroyItem(
+        Request $request,
+        string $page,
+        string $item,
+        ProtectedAdminContext $context,
+    ): JsonResponse {
+        $context->ensureGlobal($request);
+        $row = $this->itemOnPage($page, $item);
+        $row->mediaAttachments()->delete();
+        $row->delete();
+
+        return ApiResponse::success($request, ['removed' => true]);
+    }
+
+    private function itemOnPage(string $page, string $item): ContentItem
+    {
+        $target = ContentPage::query()->where('public_id', $page)->firstOrFail();
+
+        return ContentItem::query()
+            ->where('page_id', $target->getKey())
+            ->where('public_id', $item)
+            ->firstOrFail();
+    }
+
+    private function pageWithMedia(ContentPage $page): ContentPage
+    {
+        $page->load([
+            'items' => fn ($query) => $query->orderBy('sort_order')->orderBy('id')->with('mediaAttachments.fileAsset'),
+            'mediaAttachments.fileAsset',
+        ]);
+
+        return $page;
     }
 }

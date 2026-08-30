@@ -171,6 +171,19 @@ class BrowserAuthenticationTest extends TestCase
             ->assertHeader('Access-Control-Allow-Credentials', 'true');
     }
 
+    public function test_flutter_web_loopback_origins_are_allowed_for_mobile_login_preflight(): void
+    {
+        $origin = 'http://localhost:62155';
+
+        $this->call('OPTIONS', '/api/v1/mobile/auth/login', [], [], [], [
+            'HTTP_ORIGIN' => $origin,
+            'HTTP_ACCESS_CONTROL_REQUEST_METHOD' => 'POST',
+            'HTTP_ACCESS_CONTROL_REQUEST_HEADERS' => 'content-type,accept',
+        ])
+            ->assertNoContent()
+            ->assertHeader('Access-Control-Allow-Origin', $origin);
+    }
+
     /** @return array<string, mixed> */
     private function registrationPayload(): array
     {

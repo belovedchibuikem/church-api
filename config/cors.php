@@ -8,6 +8,17 @@ $origins = array_values(array_filter(array_map(
     )),
 )));
 
+$originPatterns = array_values(array_filter(array_map(
+    trim(...),
+    explode(',', (string) env('CORS_ALLOWED_ORIGIN_PATTERNS', '')),
+)));
+
+// Flutter web / Vite dev servers bind arbitrary loopback ports. Browsers block
+// cross-origin POSTs without a matching Access-Control-Allow-Origin header.
+$defaultOriginPatterns = [
+    '#^https?://(localhost|127\.0\.0\.1)(:\d+)?$#',
+];
+
 return [
 
     /*
@@ -22,6 +33,9 @@ return [
     |  e.g. https://familyconnect-vert.vercel.app). Unknown origins get
     |  no Access-Control-Allow-Origin header.
     |
+    | Loopback dev clients (Flutter web on Chrome, etc.) are covered by
+    | `allowed_origins_patterns` below. Override with CORS_ALLOWED_ORIGIN_PATTERNS.
+    |
     */
 
     'paths' => ['api/*'],
@@ -30,7 +44,10 @@ return [
 
     'allowed_origins' => $origins,
 
-    'allowed_origins_patterns' => [],
+    'allowed_origins_patterns' => array_values(array_unique([
+        ...$defaultOriginPatterns,
+        ...$originPatterns,
+    ])),
 
     'allowed_headers' => ['*'],
 

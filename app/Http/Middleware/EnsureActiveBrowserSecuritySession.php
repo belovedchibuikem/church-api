@@ -40,8 +40,17 @@ class EnsureActiveBrowserSecuritySession
             throw new AuthenticationException;
         }
 
-        if ($securitySession->last_seen_at->lt(now()->subMinute())) {
-            $securitySession->forceFill(['last_seen_at' => now()->utc()])->save();
+        $now = now()->utc();
+        $lifetimeMinutes = max(1, (int) config('session.lifetime'));
+        $touch = ['last_seen_at' => $now];
+
+        // Slide absolute expiry on activity so active admins stay signed in until logout.
+        if ($securitySession->expires_at !== null) {
+            $touch['expires_at'] = $now->copy()->addMinutes($lifetimeMinutes);
+        }
+
+        if ($securitySession->last_seen_at->lt($now->copy()->subMinute())) {
+            $securitySession->forceFill($touch)->save();
         }
 
         return $next($request);

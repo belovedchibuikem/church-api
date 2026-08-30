@@ -1,0 +1,96 @@
+{
+    "iso": "GH",
+    "name": "Ghana",
+    "states": {
+        "Ashanti Region": [
+            "Agogo",
+            "Bekwai",
+            "Ejura",
+            "Konongo",
+            "Kumasi",
+            "Mampong",
+            "Obuase",
+            "Tafo"
+        ],
+        "Brong-Ahafo Region": [
+            "Bechem",
+            "Berekum",
+            "Duayaw-Nkwanta",
+            "Japekrom",
+            "Kintampo",
+            "Sunyani",
+            "Techiman",
+            "Wenchi"
+        ],
+        "Central Region": [
+            "Apam",
+            "Cape Coast",
+            "Dunkwa",
+            "Elmina",
+            "Foso",
+            "Kasoa",
+            "Mumford",
+            "Saltpond",
+            "Swedru",
+            "Winneba"
+        ],
+        "Eastern Region": [
+            "Aburi",
+            "Akim Oda",
+            "Akim Swedru",
+            "Akropong",
+            "Akwatia",
+            "Asamankese",
+            "Begoro",
+            "Kibi",
+            "Koforidua",
+            "Mpraeso",
+            "Nsawam",
+            "Suhum"
+        ],
+        "Greater Accra Region": [
+            "Accra",
+            "Atsiaman",
+            "Dome",
+            "Gbawe",
+            "Medina Estates",
+            "Nungua",
+            "Tema",
+            "Teshi Old Town"
+        ],
+        "Northern Region": [
+            "Kpandae",
+            "Salaga",
+            "Savelugu",
+            "Tamale",
+            "Yendi"
+        ],
+        "Upper East Region": [
+            "Bawku",
+            "Bolgatanga",
+            "Navrongo"
+        ],
+        "Upper West Region": [
+            "Wa"
+        ],
+        "Volta Region": [
+            "Aflao",
+            "Anloga",
+            "Ho",
+            "Hohoe",
+            "Keta",
+            "Kete Krachi",
+            "Kpandu"
+        ],
+        "Western Region": [
+            "Aboso",
+            "Axim",
+            "Bibiani",
+            "Prestea",
+            "Sekondi-Takoradi",
+            "Shama Junction",
+            "Takoradi",
+            "Tarkwa"
+        ]
+    }
+}

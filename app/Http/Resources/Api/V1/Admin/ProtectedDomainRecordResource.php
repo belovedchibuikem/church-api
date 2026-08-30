@@ -193,6 +193,7 @@ class ProtectedDomainRecordResource extends JsonResource
             'church_id' => $this->church?->public_id,
             'church_name' => $this->church?->name,
             'home_church_id' => $this->homeChurch?->public_id,
+            'home_church_name' => $this->homeChurch?->name,
             'status' => $this->status->value,
             'joined_at' => $this->joined_at?->utc()->toIso8601String(),
             'ended_at' => $this->ended_at?->utc()->toIso8601String(),

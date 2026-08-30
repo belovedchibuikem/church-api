@@ -11,6 +11,7 @@ use App\Http\Requests\Api\V1\Admin\CompleteFollowUpTaskRequest;
 use App\Http\Requests\Api\V1\Admin\CreateAdminHomeChurchApplicationRequest;
 use App\Http\Requests\Api\V1\Admin\CreateChurchRequest;
 use App\Http\Requests\Api\V1\Admin\EndChurchMembershipRequest;
+use App\Http\Requests\Api\V1\Admin\UpdateChurchRequest;
 use App\Http\Requests\Api\V1\Admin\ListProtectedDomainRecordsRequest;
 use App\Http\Requests\Api\V1\Admin\RegisterFirstTimerRequest;
 use App\Http\Requests\Api\V1\Admin\StartChurchMembershipRequest;
@@ -36,7 +37,9 @@ use App\Support\Authorization\ScopeReference;
 use App\Support\Church\CompleteFollowUpTaskAction;
 use App\Support\Church\CreateChurchAction;
 use App\Support\Church\CreateHomeChurchApplicationAction;
+use App\Support\Church\DeleteChurchAction;
 use App\Support\Church\EndChurchMembershipAction;
+use App\Support\Church\UpdateChurchAction;
 use App\Support\Church\HomeChurchApplicationData;
 use App\Support\Church\RegisterFirstTimerAction;
 use App\Support\Church\StartChurchMembershipAction;
@@ -68,6 +71,38 @@ class ChurchOperationsController extends Controller
         $church->load(['location:id,public_id,name', 'administrativeUnit:id,public_id,name']);
 
         return ApiResponse::success($request, (new ProtectedDomainRecordResource($church))->resolve($request), status: 201);
+    }
+
+    public function updateChurch(UpdateChurchRequest $request, string $church, UpdateChurchAction $action, ProtectedAdminContext $context): JsonResponse
+    {
+        $target = Church::query()->where('public_id', $church)->firstOrFail();
+        $context->ensureContains($request, $target->scopeReference());
+        $location = Location::query()->where('public_id', $request->validated('location_id'))->firstOrFail();
+        $unit = AdministrativeUnit::query()->where('public_id', $request->validated('administrative_unit_id'))->firstOrFail();
+        $context->ensureContains($request, new ScopeReference('administrative_unit', $unit->public_id));
+        $updated = $this->execute(fn (): Church => $action->handle(
+            $target,
+            (string) $request->validated('name'),
+            $location,
+            $unit,
+            $context->actor($request),
+        ));
+        $updated->load(['location:id,public_id,name', 'administrativeUnit:id,public_id,name']);
+
+        return ApiResponse::success($request, (new ProtectedDomainRecordResource($updated))->resolve($request));
+    }
+
+    public function destroyChurch(Request $request, string $church, DeleteChurchAction $action, ProtectedAdminContext $context): JsonResponse
+    {
+        $target = Church::query()->where('public_id', $church)->firstOrFail();
+        $context->ensureContains($request, $target->scopeReference());
+        $this->execute(function () use ($action, $target, $context, $request): true {
+            $action->handle($target, $context->actor($request));
+
+            return true;
+        });
+
+        return ApiResponse::success($request, ['id' => $church, 'deleted' => true]);
     }
 
     public function homeChurches(ListProtectedDomainRecordsRequest $request, ProtectedDomainCatalogQuery $catalog, ProtectedAdminContext $context): JsonResponse

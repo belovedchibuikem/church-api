@@ -373,6 +373,10 @@
             "method": "POST",
             "path": "/api/v1/auth/register"
         },
+        "mobileRegister": {
+            "method": "POST",
+            "path": "/api/v1/mobile/auth/register"
+        },
         "mobileLogin": {
             "method": "POST",
             "path": "/api/v1/mobile/auth/login"

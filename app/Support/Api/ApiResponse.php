@@ -8,12 +8,12 @@ use Illuminate\Http\Request;
 class ApiResponse
 {
     /**
-     * @param  array<string, mixed>  $data
+     * @param  array<string, mixed>|list<mixed>|null  $data
      * @param  array<string, mixed>  $meta
      */
     public static function success(
         Request $request,
-        array $data,
+        array|null $data,
         array $meta = [],
         int $status = 200,
     ): JsonResponse {

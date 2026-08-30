@@ -2,11 +2,13 @@
 
 namespace App\Support\Security;
 
+use App\Identity\UserAccountStatus;
 use App\Models\User;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class AuthenticateMobileLoginAction
 {
@@ -27,22 +29,39 @@ class AuthenticateMobileLoginAction
                 ->lockForUpdate()
                 ->first();
 
+            $passwordHash = $user?->getAuthPassword();
+            $credentialsMatch = is_string($passwordHash)
+                && $passwordHash !== ''
+                && Hash::check($password, $passwordHash);
+
+            if ($user === null || ! $credentialsMatch) {
+                throw new AuthenticationException;
+            }
+
             if (
-                $user === null
+                $user->account_status !== UserAccountStatus::Active
                 || $user->isSuspended()
-                || $user->email_verified_at === null
-                || ! Hash::check($password, $user->password)
+                || $user->suspended_at !== null
             ) {
                 throw new AuthenticationException;
             }
 
+            if ($user->email_verified_at === null) {
+                throw ValidationException::withMessages([
+                    'email' => [
+                        'Verify your email address before using the mobile app. '
+                        .'Open the verification link sent to your inbox, then try again.',
+                    ],
+                ]);
+            }
+
             $device = $this->registerDevice->handle($user, $deviceData, $user);
+            // Null security-session expiry keeps the device signed in until logout;
+            // access/refresh token TTLs still rotate via MobileCredentialIssuer.
             $securitySession = $this->recordSecuritySession->handle(
                 user: $user,
                 device: $device,
-                expiresAt: now()->utc()->addSeconds(
-                    min(max((int) config('api.mobile.refresh_ttl_seconds'), 3600), 2_592_000),
-                ),
+                expiresAt: null,
                 actor: $user,
             );
 

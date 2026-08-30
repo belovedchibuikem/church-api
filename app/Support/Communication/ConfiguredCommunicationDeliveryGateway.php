@@ -75,6 +75,19 @@ class ConfiguredCommunicationDeliveryGateway implements CommunicationDeliveryGat
             return new CommunicationDeliveryResult(CommunicationDeliveryStatus::Failed, 'destination_missing');
         }
 
+        if ($configuration->email_provider === 'smtp') {
+            config([
+                'mail.default' => 'smtp',
+                'mail.mailers.smtp.host' => (string) $configuration->email_smtp_host,
+                'mail.mailers.smtp.port' => (int) $configuration->email_smtp_port,
+                'mail.mailers.smtp.username' => (string) $configuration->email_smtp_username,
+                'mail.mailers.smtp.password' => (string) $configuration->email_api_key,
+                'mail.mailers.smtp.encryption' => $configuration->email_smtp_encryption === 'none'
+                    ? null
+                    : ($configuration->email_smtp_encryption ?: 'tls'),
+            ]);
+        }
+
         Mail::raw((string) $template->body, function ($message) use ($configuration, $address, $template): void {
             $message->to($address)
                 ->from((string) $configuration->email_sender_address, (string) ($configuration->email_sender_name ?: 'Family House Connect'))

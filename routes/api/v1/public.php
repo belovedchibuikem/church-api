@@ -10,6 +10,8 @@ use App\Http\Controllers\Api\V1\Public\NativePaymentWebhookController;
 use App\Http\Controllers\Api\V1\Public\PublicBrandingController;
 use App\Http\Controllers\Api\V1\Public\PublicCrusadeController;
 use App\Http\Controllers\Api\V1\Public\PublicEventController;
+use App\Http\Controllers\Api\V1\Public\PublicGeographyController;
+use App\Http\Controllers\Api\V1\Public\PublicLivestreamController;
 use App\Http\Controllers\Api\V1\Public\PublicMapsController;
 use App\Http\Controllers\Api\V1\Public\PublicMediaController;
 use App\Http\Controllers\Api\V1\Public\PublicMissionLocationController;
@@ -22,6 +24,17 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', ApiStatusController::class)->name('status');
 Route::get('/health', HealthController::class)->name('health');
 Route::get('/health/readiness', ReadinessController::class)->name('health.readiness');
+
+Route::prefix('geography')
+    ->name('geography.')
+    ->middleware('throttle:public-catalogue')
+    ->group(function (): void {
+        Route::get('/countries', [PublicGeographyController::class, 'countries'])->name('countries.index');
+        Route::get('/countries/{country}', [PublicGeographyController::class, 'country'])->name('countries.show');
+        Route::get('/countries/{country}/states', [PublicGeographyController::class, 'states'])->name('countries.states');
+        Route::get('/countries/{country}/states/{state}/localities', [PublicGeographyController::class, 'localities'])
+            ->name('countries.states.localities');
+    });
 
 Route::controller(ChurchController::class)
     ->prefix('churches')
@@ -57,6 +70,16 @@ Route::controller(PublicEventController::class)
     ->group(function (): void {
         Route::get('/', 'index')->name('index');
         Route::get('/{event}', 'show')->whereUlid('event')->name('show');
+    });
+
+Route::prefix('livestreams')
+    ->name('livestreams.')
+    ->middleware('throttle:public-catalogue')
+    ->group(function (): void {
+        Route::get('/current', [PublicLivestreamController::class, 'current'])->name('current');
+        Route::get('/{livestream}', [PublicLivestreamController::class, 'show'])
+            ->whereUlid('livestream')
+            ->name('show');
     });
 
 Route::get('/kca/certificates/verify', VerifyKcaCertificateController::class)

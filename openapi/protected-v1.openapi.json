@@ -5939,6 +5939,57 @@
                 }
             }
         },
+        "/api/v1/mobile/auth/register": {
+            "post": {
+                "operationId": "mobileRegister",
+                "tags": [
+                    "Mobile identity"
+                ],
+                "parameters": [
+                    {
+                        "name": "X-Correlation-ID",
+                        "in": "header",
+                        "required": false,
+                        "schema": {
+                            "$ref": "#/components/schemas/CorrelationId"
+                        }
+                    }
+                ],
+                "security": [],
+                "responses": {
+                    "201": {
+                        "description": "Successful response.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SuccessEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "default": {
+                        "description": "Normalized API error.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                },
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/JsonObject"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/mobile/auth/login": {
             "post": {
                 "operationId": "mobileLogin",

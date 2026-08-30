@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\V1\Admin\EventOperationsController;
 use App\Http\Controllers\Api\V1\Admin\FileOperationsController;
 use App\Http\Controllers\Api\V1\Admin\FinanceOperationsController;
 use App\Http\Controllers\Api\V1\Admin\KcaOperationsController;
+use App\Http\Controllers\Api\V1\Admin\LivestreamOperationsController;
 use App\Http\Controllers\Api\V1\Admin\MapsProviderController;
 use App\Http\Controllers\Api\V1\Admin\MediaOperationsController;
 use App\Http\Controllers\Api\V1\Admin\MissionOperationsController;
@@ -336,6 +337,8 @@ Route::prefix('platform')->name('platform.')->group(function (): void {
 Route::prefix('church')->name('church.')->controller(ChurchOperationsController::class)->group(function (): void {
     Route::get('/churches', 'churches')->middleware(RequirePermissionAndScope::class.':church.churches.view')->name('churches.index');
     Route::post('/churches', 'storeChurch')->middleware(RequirePermissionAndScope::class.':church.churches.manage')->name('churches.store');
+    Route::put('/churches/{church}', 'updateChurch')->whereUlid('church')->middleware(RequirePermissionAndScope::class.':church.churches.manage')->name('churches.update');
+    Route::delete('/churches/{church}', 'destroyChurch')->whereUlid('church')->middleware(RequirePermissionAndScope::class.':church.churches.manage')->name('churches.destroy');
     Route::get('/home-churches', 'homeChurches')->middleware(RequirePermissionAndScope::class.':church.home_churches.view')->name('home_churches.index');
     Route::get('/home-church-applications', 'applications')->middleware(RequirePermissionAndScope::class.':church.home_church_applications.review')->name('home_church_applications.index');
     Route::post('/home-church-applications', 'storeApplication')->middleware(RequirePermissionAndScope::class.':church.home_church_applications.manage')->name('home_church_applications.store');
@@ -371,6 +374,10 @@ Route::prefix('kca')->name('kca.')->controller(KcaOperationsController::class)->
     Route::post('/years/{year}/cohorts', 'storeCohort')->whereUlid('year')->middleware(RequirePermissionAndScope::class.':kca.cohorts.manage')->name('years.cohorts.store');
     Route::post('/modules', 'storeModule')->middleware(RequirePermissionAndScope::class.':kca.modules.manage')->name('modules.store');
     Route::post('/modules/{module}/lessons', 'storeLesson')->whereUlid('module')->middleware(RequirePermissionAndScope::class.':kca.lessons.manage')->name('modules.lessons.store');
+    Route::post('/lecturer-assignments', 'storeLecturerAssignment')->middleware(RequirePermissionAndScope::class.':kca.modules.manage')->name('lecturer_assignments.store');
+    Route::delete('/lecturer-assignments/{assignment}', 'destroyLecturerAssignment')->whereUlid('assignment')->middleware(RequirePermissionAndScope::class.':kca.modules.manage')->name('lecturer_assignments.destroy');
+    Route::post('/mentor-assignments', 'storeMentorAssignment')->middleware(RequirePermissionAndScope::class.':kca.enrollments.manage')->name('mentor_assignments.store');
+    Route::delete('/mentor-assignments/{assignment}', 'destroyMentorAssignment')->whereUlid('assignment')->middleware(RequirePermissionAndScope::class.':kca.enrollments.manage')->name('mentor_assignments.destroy');
     Route::post('/enrollments/{enrollment}/attendance', 'recordAttendance')->whereUlid('enrollment')->middleware(RequirePermissionAndScope::class.':kca.attendance.record')->name('enrollments.attendance.store');
     Route::post('/applications/{application}/transitions', 'transitionApplication')->whereUlid('application')->middleware(RequirePermissionAndScope::class.':kca.applications.transition')->name('applications.transitions.store');
     Route::post('/applications/{application}/enrollments', 'enroll')->whereUlid('application')->middleware(RequirePermissionAndScope::class.':kca.enrollments.manage')->name('applications.enrollments.store');
@@ -412,6 +419,10 @@ Route::prefix('communications')->name('communications.')->controller(Communicati
     Route::post('/recipients/{recipient}/deliveries', 'attemptDelivery')->whereUlid('recipient')->middleware(RequirePermissionAndScope::class.':communications.deliveries.attempt')->name('recipients.deliveries.store');
     Route::post('/recipients/{recipient}/notifications', 'createNotification')->whereUlid('recipient')->middleware(RequirePermissionAndScope::class.':communications.notifications.create')->name('recipients.notifications.store');
 });
+
+Route::put('/livestreams/current', [LivestreamOperationsController::class, 'upsert'])
+    ->middleware(RequirePermissionAndScope::class.':platform.communications.manage')
+    ->name('livestreams.current.upsert');
 
 Route::prefix('reporting')->name('reporting.')->controller(ReportingOperationsController::class)->group(function (): void {
     Route::post('/alert-rules', 'storeRule')->middleware(RequirePermissionAndScope::class.':reporting.alert_rules.manage')->name('alert_rules.store');
@@ -461,4 +472,14 @@ Route::prefix('content')->name('content.')->group(function (): void {
         ->whereUlid('page')
         ->middleware(RequirePermissionAndScope::class.':platform.configuration.manage')
         ->name('pages.items.store');
+    Route::put('/pages/{page}/items/{item}', [ContentAdministrationController::class, 'updateItem'])
+        ->whereUlid('page')
+        ->whereUlid('item')
+        ->middleware(RequirePermissionAndScope::class.':platform.configuration.manage')
+        ->name('pages.items.update');
+    Route::delete('/pages/{page}/items/{item}', [ContentAdministrationController::class, 'destroyItem'])
+        ->whereUlid('page')
+        ->whereUlid('item')
+        ->middleware(RequirePermissionAndScope::class.':platform.configuration.manage')
+        ->name('pages.items.destroy');
 });

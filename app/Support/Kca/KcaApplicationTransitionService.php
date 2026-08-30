@@ -10,6 +10,7 @@ class KcaApplicationTransitionService
     public function assertCanTransition(KcaApplicationState $from, KcaApplicationState $to): void
     {
         $allowed = match ($from) {
+            KcaApplicationState::Draft => [KcaApplicationState::Received],
             KcaApplicationState::Received => [KcaApplicationState::Reviewed],
             KcaApplicationState::Reviewed => [
                 KcaApplicationState::Accepted,

@@ -37,6 +37,17 @@ class ProvisionAuthorizationBundlesAction
                 }
             }
 
+            $superRole = Role::query()->firstOrCreate(
+                ['code' => AuthorizationBundleCatalog::SUPER_ADMINISTRATOR_ROLE],
+                ['name' => 'Super administrator'],
+            );
+            $roles++;
+
+            foreach ($this->catalog->permissionCodes() as $permissionCode) {
+                $grant = $this->grantPermission->handle($superRole, $permissions->get($permissionCode));
+                $grants += $grant->wasRecentlyCreated ? 1 : 0;
+            }
+
             return [
                 'roles' => $roles,
                 'permissions' => $permissions->count(),

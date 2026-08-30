@@ -17,6 +17,7 @@ use App\Support\Api\ApiResponse;
 use App\Support\Audit\AuditEventData;
 use App\Support\Audit\RecordAuditEventAction;
 use App\Support\Church\StartChurchMembershipAction;
+use App\Support\Identity\PersonDisplayName;
 use DomainException;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -61,6 +62,91 @@ class UserChurchOperationsController extends Controller
             ->paginate((int) $request->validated('per_page', 25));
 
         return $this->page($request, $paginator);
+    }
+
+    public function homeChurches(ListUserRecordsRequest $request): JsonResponse
+    {
+        $person = $this->requirePerson($this->actor($request));
+        $membershipHomeIds = ChurchMembership::query()
+            ->where('person_id', $person->getKey())
+            ->whereNotNull('home_church_id')
+            ->pluck('home_church_id');
+
+        $ledHomeIds = HomeChurch::query()
+            ->where('leader_person_id', $person->getKey())
+            ->pluck('id');
+
+        $paginator = HomeChurch::query()
+            ->with(['church:id,public_id,name', 'leader:id,public_id'])
+            ->whereIn('id', $membershipHomeIds->merge($ledHomeIds)->unique()->filter()->values())
+            ->orderBy('name')
+            ->paginate((int) $request->validated('per_page', 25));
+
+        $rows = $paginator->getCollection()->map(static function (HomeChurch $home): array {
+            return [
+                'id' => $home->public_id,
+                'name' => $home->name,
+                'status' => $home->status?->value ?? (string) $home->status,
+                'church_id' => $home->church?->public_id,
+                'church_name' => $home->church?->name,
+                'leader_person_id' => $home->leader?->public_id,
+                'membership_status' => null,
+            ];
+        })->values()->all();
+
+        return ApiResponse::success($request, $rows, [
+            'pagination' => [
+                'current_page' => $paginator->currentPage(),
+                'per_page' => $paginator->perPage(),
+                'last_page' => $paginator->lastPage(),
+                'total' => $paginator->total(),
+            ],
+        ]);
+    }
+
+    public function churchMembers(ListUserRecordsRequest $request, string $church): JsonResponse
+    {
+        $caller = $this->requirePerson($this->actor($request));
+        $target = Church::query()->where('public_id', $church)->firstOrFail();
+
+        $callerMembership = ChurchMembership::query()
+            ->where('person_id', $caller->getKey())
+            ->where('church_id', $target->getKey())
+            ->where('status', ChurchMembershipStatus::Active)
+            ->first();
+
+        if ($callerMembership === null) {
+            abort(404);
+        }
+
+        $paginator = ChurchMembership::query()
+            ->with([
+                'person:id,public_id',
+                'person.profile:id,person_id,given_name,middle_name,family_name,preferred_name,country',
+                'person.user:id,person_id,name,email',
+            ])
+            ->where('church_id', $target->getKey())
+            ->where('status', ChurchMembershipStatus::Active)
+            ->latest('joined_at')
+            ->paginate((int) $request->validated('per_page', 25));
+
+        $rows = $paginator->getCollection()->map(static fn (ChurchMembership $membership): array => [
+            'id' => $membership->public_id,
+            'person_id' => $membership->person?->public_id,
+            'person_name' => PersonDisplayName::of($membership->person),
+            'status' => $membership->status->value,
+            'joined_at' => $membership->joined_at?->utc()->toIso8601String(),
+            'is_leader' => false,
+        ])->values()->all();
+
+        return ApiResponse::success($request, $rows, [
+            'pagination' => [
+                'current_page' => $paginator->currentPage(),
+                'per_page' => $paginator->perPage(),
+                'last_page' => $paginator->lastPage(),
+                'total' => $paginator->total(),
+            ],
+        ]);
     }
 
     public function showHomeChurch(Request $request, string $homeChurch): JsonResponse

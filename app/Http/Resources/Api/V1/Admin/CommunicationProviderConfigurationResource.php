@@ -20,6 +20,13 @@ class CommunicationProviderConfigurationResource extends JsonResource
                 'sender_name' => $this->email_sender_name,
                 'sender_address' => $this->email_sender_address,
                 'credentials_configured' => $this->channelConfigured('email'),
+                'smtp' => [
+                    'host' => $this->email_smtp_host,
+                    'port' => $this->email_smtp_port,
+                    'username' => $this->email_smtp_username,
+                    'encryption' => $this->email_smtp_encryption ?? 'tls',
+                    'password_configured' => filled($this->email_api_key),
+                ],
             ],
             'sms' => [
                 'provider' => $this->sms_provider,

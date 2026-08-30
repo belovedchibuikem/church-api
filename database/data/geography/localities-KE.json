@@ -1,0 +1,214 @@
+{
+    "iso": "KE",
+    "name": "Kenya",
+    "states": {
+        "Baringo County": [
+            "Baringo",
+            "Eldama Ravine",
+            "Kabarnet"
+        ],
+        "Bomet County": [
+            "Sotik",
+            "Sotik Post"
+        ],
+        "Bungoma County": [
+            "Bungoma",
+            "Malikisi",
+            "Webuye"
+        ],
+        "Busia County": [
+            "Busia",
+            "Luanda",
+            "Lugulu",
+            "Malaba",
+            "Nambare",
+            "Port Victoria"
+        ],
+        "Central Province": [],
+        "Coast Province": [],
+        "Eastern Province": [],
+        "Elgeyo-Marakwet County": [],
+        "Embu County": [
+            "Embu"
+        ],
+        "Garissa County": [
+            "Garissa"
+        ],
+        "Homa Bay County": [
+            "Homa Bay",
+            "Oyugis",
+            "Rachuonyo District"
+        ],
+        "Isiolo County": [
+            "Isiolo"
+        ],
+        "Kajiado County": [
+            "Kajiado",
+            "Magadi",
+            "Ngong"
+        ],
+        "Kakamega County": [
+            "Butere",
+            "Kakamega",
+            "Mumias"
+        ],
+        "Kericho County": [
+            "Kericho",
+            "Kipkelion",
+            "Litein",
+            "Londiani"
+        ],
+        "Kiambu County": [
+            "Kiambu",
+            "Kikuyu",
+            "Limuru"
+        ],
+        "Kilifi County": [
+            "Iten",
+            "Kapsowar",
+            "Kilifi",
+            "Malindi",
+            "Mariakani",
+            "Takaungu"
+        ],
+        "Kirinyaga County": [
+            "Kerugoya",
+            "Sagana"
+        ],
+        "Kisii County": [
+            "Kisii",
+            "Ogembo"
+        ],
+        "Kisumu County": [
+            "Ahero",
+            "Kisumu",
+            "Muhoroni"
+        ],
+        "Kitui County": [
+            "Kitui",
+            "Mwingi"
+        ],
+        "Kwale County": [
+            "Gazi",
+            "Kinango",
+            "Kwale",
+            "Sawa Sawa",
+            "Shimoni"
+        ],
+        "Laikipia County": [
+            "Nanyuki",
+            "Nyahururu",
+            "Rumuruti"
+        ],
+        "Lamu County": [
+            "Lamu",
+            "Witu"
+        ],
+        "Machakos County": [
+            "Athi River",
+            "Kangundo",
+            "Konza",
+            "Machakos"
+        ],
+        "Makueni County": [
+            "Makueni Boma",
+            "Mtito Andei",
+            "Wote"
+        ],
+        "Mandera County": [
+            "Mandera"
+        ],
+        "Marsabit County": [
+            "Marsabit",
+            "Moyale"
+        ],
+        "Meru County": [
+            "Maua",
+            "Meru"
+        ],
+        "Migori County": [
+            "Kihancha",
+            "Migori"
+        ],
+        "Mombasa County": [
+            "Mombasa"
+        ],
+        "Muranga County": [
+            "Kangema",
+            "Karuri",
+            "Maragua",
+            "Murang’a"
+        ],
+        "Nairobi": [
+            "Nairobi",
+            "Pumwani",
+            "Thika"
+        ],
+        "Nakuru District": [
+            "Kijabe",
+            "Molo",
+            "Naivasha",
+            "Nakuru",
+            "Rongai"
+        ],
+        "Nandi District": [
+            "Kapsabet",
+            "Nandi Hills"
+        ],
+        "Narok County": [
+            "Narok"
+        ],
+        "North Eastern Province": [],
+        "Nyamira District": [
+            "Keroka",
+            "Nyamira"
+        ],
+        "Nyandarua County": [
+            "Ol Kalou"
+        ],
+        "Nyanza Province": [],
+        "Nyeri County": [
+            "Naro Moru",
+            "Nyeri",
+            "Othaya"
+        ],
+        "Rift Valley Province": [],
+        "Samburu County": [
+            "Maralal"
+        ],
+        "Siaya County": [
+            "Bondo",
+            "Siaya",
+            "Yala"
+        ],
+        "Taita–Taveta County": [],
+        "Tana River County": [
+            "Hola",
+            "Kipini"
+        ],
+        "Tharaka Nithi County": [
+            "Chuka"
+        ],
+        "Trans-Nzoia District": [
+            "Kitale"
+        ],
+        "Turkana County": [
+            "Lodwar"
+        ],
+        "Uasin Gishu District": [
+            "Eldoret"
+        ],
+        "Vihiga District": [],
+        "Wajir County": [
+            "Wajir"
+        ],
+        "West Pokot County": [
+            "Chepareria",
+            "Kapenguria",
+            "Taveta",
+            "Voi",
+            "Wundanyi"
+        ],
+        "Western Province": []
+    }
+}

@@ -16,8 +16,11 @@ use App\Http\Controllers\Api\V1\User\ProfileController;
 use App\Http\Controllers\Api\V1\User\SecuritySessionController;
 use App\Http\Controllers\Api\V1\User\SyncController;
 use App\Http\Controllers\Api\V1\User\UserAuthorizationController;
+use App\Http\Controllers\Api\V1\User\UserLivestreamController;
+use App\Http\Controllers\Api\V1\User\UserChurchCommunityController;
 use App\Http\Controllers\Api\V1\User\UserChurchOperationsController;
 use App\Http\Controllers\Api\V1\User\UserDomainOperationsController;
+use App\Http\Controllers\Api\V1\User\UserKcaCommunityController;
 use App\Http\Middleware\EnsureRecentMfa;
 use Illuminate\Support\Facades\Route;
 
@@ -48,6 +51,7 @@ Route::get('/prayers', [PrayerRequestController::class, 'index'])->name('prayers
 Route::post('/prayers', [PrayerRequestController::class, 'store'])->name('prayers.store');
 
 Route::prefix('kca')->name('kca.')->group(function (): void {
+    Route::get('/applications/current', [KcaApplicationController::class, 'showCurrent'])->name('applications.current');
     Route::post('/applications', [KcaApplicationController::class, 'store'])->name('applications.store');
     Route::get('/dashboard', [KcaCurriculumController::class, 'dashboard'])->name('dashboard');
     Route::get('/modules', [KcaCurriculumController::class, 'modules'])->name('modules.index');
@@ -57,6 +61,14 @@ Route::prefix('kca')->name('kca.')->group(function (): void {
     Route::get('/assignments', [KcaCurriculumController::class, 'assignments'])->name('assignments.index');
     Route::get('/mentor', [KcaCurriculumController::class, 'mentor'])->name('mentor.show');
     Route::get('/attendance', [KcaCurriculumController::class, 'attendance'])->name('attendance.index');
+    Route::get('/directory', [UserKcaCommunityController::class, 'directory'])->name('directory.index');
+    Route::post('/directory/{person}/follow', [UserKcaCommunityController::class, 'follow'])
+        ->whereUlid('person')
+        ->name('directory.follow');
+    Route::delete('/directory/{person}/follow', [UserKcaCommunityController::class, 'unfollow'])
+        ->whereUlid('person')
+        ->name('directory.unfollow');
+    Route::get('/following', [UserKcaCommunityController::class, 'following'])->name('following.index');
 });
 
 Route::get('/needs', [PastoralNeedController::class, 'index'])->name('needs.index');
@@ -75,13 +87,41 @@ Route::get('/sync/checkpoint', [SyncController::class, 'checkpoint'])->name('syn
 Route::put('/sync/checkpoint', [SyncController::class, 'updateCheckpoint'])->name('sync.checkpoint.update');
 Route::get('/sync/changes', [SyncController::class, 'changes'])->name('sync.changes.index');
 
+Route::get('/events/registrations', [UserDomainOperationsController::class, 'listRegistrations'])
+    ->name('events.registrations.index');
 Route::get('/events/registrations/{registration}', [UserDomainOperationsController::class, 'showRegistration'])
     ->whereUlid('registration')
     ->name('events.registrations.show');
 Route::get('/memberships', [UserChurchOperationsController::class, 'memberships'])->name('memberships.index');
+Route::get('/home-churches', [UserChurchOperationsController::class, 'homeChurches'])->name('home-churches.index');
+Route::get('/churches/{church}/members', [UserChurchOperationsController::class, 'churchMembers'])
+    ->whereUlid('church')
+    ->name('churches.members.index');
 Route::get('/home-churches/{homeChurch}', [UserChurchOperationsController::class, 'showHomeChurch'])
     ->whereUlid('homeChurch')
     ->name('home-churches.show');
+
+Route::get('/livestreams/{livestream}/comments', [UserLivestreamController::class, 'comments'])
+    ->whereUlid('livestream')
+    ->name('livestreams.comments.index');
+Route::post('/livestreams/{livestream}/comments', [UserLivestreamController::class, 'storeComment'])
+    ->whereUlid('livestream')
+    ->name('livestreams.comments.store');
+Route::post('/livestreams/{livestream}/reactions', [UserLivestreamController::class, 'react'])
+    ->whereUlid('livestream')
+    ->name('livestreams.reactions.store');
+Route::get('/groups', [UserChurchCommunityController::class, 'listGroups'])->name('groups.index');
+Route::get('/groups/{group}', [UserChurchCommunityController::class, 'showGroup'])
+    ->whereUlid('group')
+    ->name('groups.show');
+Route::post('/groups/{group}/join', [UserChurchCommunityController::class, 'joinGroup'])
+    ->whereUlid('group')
+    ->name('groups.join');
+Route::post('/groups/{group}/leave', [UserChurchCommunityController::class, 'leaveGroup'])
+    ->whereUlid('group')
+    ->name('groups.leave');
+Route::get('/announcements', [UserChurchCommunityController::class, 'listAnnouncements'])->name('announcements.index');
+Route::get('/documents', [UserChurchCommunityController::class, 'listDocuments'])->name('documents.index');
 Route::get('/files', [UserDomainOperationsController::class, 'files'])->name('files.index');
 Route::get('/files/{file}', [UserDomainOperationsController::class, 'stream'])
     ->whereUlid('file')

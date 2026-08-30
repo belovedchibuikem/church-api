@@ -328,6 +328,9 @@ final class FamilyHouseProtectedApiClient {
   Future<JsonMap> registerBrowserUser({JsonMap body = const {}, ProtectedRequestOptions options = const ProtectedRequestOptions()}) =>
       _request('POST', '/api/v1/auth/register', options, body: body);
 
+  Future<JsonMap> mobileRegister({JsonMap body = const {}, ProtectedRequestOptions options = const ProtectedRequestOptions()}) =>
+      _request('POST', '/api/v1/mobile/auth/register', options, body: body);
+
   Future<JsonMap> mobileLogin({JsonMap body = const {}, ProtectedRequestOptions options = const ProtectedRequestOptions()}) =>
       _request('POST', '/api/v1/mobile/auth/login', options, body: body);
 

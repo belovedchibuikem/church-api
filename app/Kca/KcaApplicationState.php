@@ -4,6 +4,7 @@ namespace App\Kca;
 
 enum KcaApplicationState: string
 {
+    case Draft = 'draft';
     case Received = 'received';
     case Reviewed = 'reviewed';
     case Accepted = 'accepted';
@@ -18,6 +19,7 @@ enum KcaApplicationState: string
             self::ProvisionallyAccepted,
             self::Deferred,
             self::NotAccepted => true,
+            self::Draft,
             self::Received,
             self::Reviewed => false,
         };

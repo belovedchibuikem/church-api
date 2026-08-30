@@ -23,9 +23,10 @@ class StartBrowserSessionAction
         $request->session()->regenerate();
 
         try {
+            // Null expiry = persist until explicit logout; Laravel cookie idle uses SESSION_LIFETIME.
             $securitySession = $this->recordSecuritySession->handle(
                 $user,
-                expiresAt: now()->addMinutes((int) config('session.lifetime')),
+                expiresAt: null,
                 actor: $user,
             );
             $request->session()->put('security_session_id', $securitySession->public_id);

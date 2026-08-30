@@ -179,6 +179,15 @@ class AppServiceProvider extends ServiceProvider
             ];
         });
 
+        RateLimiter::for('mobile-registration', function (Request $request): array {
+            return $this->browserIdentityLimits(
+                $request,
+                'mobile-registration',
+                (int) config('api.rate_limits.mobile_registration_per_hour'),
+                true,
+            );
+        });
+
         RateLimiter::for('mobile-refresh', function (Request $request): Limit {
             $refreshHash = hash_hmac(
                 'sha256',

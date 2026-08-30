@@ -5,9 +5,13 @@ use App\Http\Controllers\Api\V1\Auth\MfaTotpEnrollmentController;
 use App\Http\Controllers\Api\V1\Auth\MobileLoginController;
 use App\Http\Controllers\Api\V1\Auth\MobileLogoutController;
 use App\Http\Controllers\Api\V1\Auth\MobileRefreshController;
+use App\Http\Controllers\Api\V1\Auth\MobileRegisterController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('mobile/auth')->name('mobile.auth.')->group(function (): void {
+    Route::post('/register', MobileRegisterController::class)
+        ->middleware('throttle:mobile-registration')
+        ->name('register');
     Route::post('/login', MobileLoginController::class)
         ->middleware('throttle:mobile-login')
         ->name('login');
