@@ -25,11 +25,13 @@ class ListAdministrativeUnitsRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'filter' => ['sometimes', 'array:search,country_id,level_id,parent_id'],
+            'filter' => ['sometimes', 'array:search,country_id,level_id,parent_id,root,nested'],
             'filter.search' => ['sometimes', 'string', 'max:100'],
             'filter.country_id' => ['sometimes', 'string', Rule::exists('countries', 'public_id')],
             'filter.level_id' => ['sometimes', 'string', Rule::exists('administrative_levels', 'public_id')],
             'filter.parent_id' => ['sometimes', 'string', Rule::exists('administrative_units', 'public_id')],
+            'filter.root' => ['sometimes'],
+            'filter.nested' => ['sometimes'],
             'sort' => ['sometimes', Rule::in(['name', '-name', 'created_at', '-created_at'])],
             'page' => ['sometimes', 'integer', 'min:1'],
             'per_page' => ['sometimes', 'integer', 'between:1,100'],

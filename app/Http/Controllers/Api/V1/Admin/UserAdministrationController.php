@@ -5,20 +5,27 @@ namespace App\Http\Controllers\Api\V1\Admin;
 use App\Exceptions\UserAccountStateConflictException;
 use App\Http\Controllers\Controller;
 use App\Http\Middleware\RequirePermissionAndScope;
+use App\Http\Requests\Api\V1\Admin\CreateAdminUserRequest;
 use App\Http\Requests\Api\V1\Admin\ListUsersRequest;
 use App\Http\Requests\Api\V1\Admin\ReactivateUserRequest;
 use App\Http\Requests\Api\V1\Admin\ShowUserRequest;
 use App\Http\Requests\Api\V1\Admin\SuspendUserRequest;
+use App\Http\Requests\Api\V1\Admin\UpdateAdminUserRequest;
 use App\Http\Resources\Api\V1\Admin\UserResource;
 use App\Models\User;
 use App\Queries\Admin\ListScopedUsersQuery;
 use App\Services\Admin\AdministerUserAccountService;
 use App\Support\Api\ApiResponse;
 use App\Support\Authorization\ScopeReference;
+use App\Support\Identity\ProvisionAdminUserAction;
+use App\Support\Identity\RequestAdminUserPasswordResetAction;
+use App\Support\Identity\UpdateAdminUserAction;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Http\JsonResponse;
+use InvalidArgumentException;
 use LogicException;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
+use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
 
 class UserAdministrationController extends Controller
 {
@@ -42,6 +49,51 @@ class UserAdministrationController extends Controller
     public function show(ShowUserRequest $request, string $user, ListScopedUsersQuery $users): JsonResponse
     {
         $target = $users->findOrFail($this->actor($request), $this->scope($request), $user);
+
+        return ApiResponse::success($request, (new UserResource($target))->resolve($request));
+    }
+
+    public function store(CreateAdminUserRequest $request, ProvisionAdminUserAction $provision): JsonResponse
+    {
+        try {
+            $user = $provision->handle(
+                $this->actor($request),
+                $this->scope($request),
+                [
+                    'email' => (string) $request->validated('email'),
+                    'profile' => $request->validated('profile'),
+                ],
+                $request->validated('role_id'),
+            );
+        } catch (InvalidArgumentException $exception) {
+            throw new UnprocessableEntityHttpException(previous: $exception);
+        }
+
+        return ApiResponse::success($request, (new UserResource($user))->resolve($request), status: 201);
+    }
+
+    public function update(UpdateAdminUserRequest $request, string $user, UpdateAdminUserAction $update): JsonResponse
+    {
+        try {
+            $target = $update->handle(
+                $this->actor($request),
+                $this->scope($request),
+                $user,
+                $request->validated(),
+            );
+        } catch (InvalidArgumentException $exception) {
+            throw new UnprocessableEntityHttpException(previous: $exception);
+        }
+
+        return ApiResponse::success($request, (new UserResource($target))->resolve($request));
+    }
+
+    public function requestPasswordReset(
+        ShowUserRequest $request,
+        string $user,
+        RequestAdminUserPasswordResetAction $reset,
+    ): JsonResponse {
+        $target = $reset->handle($this->actor($request), $this->scope($request), $user);
 
         return ApiResponse::success($request, (new UserResource($target))->resolve($request));
     }
@@ -75,8 +127,9 @@ class UserAdministrationController extends Controller
         return ApiResponse::success($request, (new UserResource($target))->resolve($request));
     }
 
-    private function actor(ListUsersRequest|ShowUserRequest|SuspendUserRequest|ReactivateUserRequest $request): User
-    {
+    private function actor(
+        ListUsersRequest|ShowUserRequest|SuspendUserRequest|ReactivateUserRequest|CreateAdminUserRequest|UpdateAdminUserRequest $request,
+    ): User {
         $actor = $request->user();
 
         if (! $actor instanceof User) {
@@ -86,8 +139,9 @@ class UserAdministrationController extends Controller
         return $actor;
     }
 
-    private function scope(ListUsersRequest|ShowUserRequest|SuspendUserRequest|ReactivateUserRequest $request): ScopeReference
-    {
+    private function scope(
+        ListUsersRequest|ShowUserRequest|SuspendUserRequest|ReactivateUserRequest|CreateAdminUserRequest|UpdateAdminUserRequest $request,
+    ): ScopeReference {
         $scope = $request->attributes->get(RequirePermissionAndScope::SCOPE_ATTRIBUTE);
 
         if (! $scope instanceof ScopeReference) {

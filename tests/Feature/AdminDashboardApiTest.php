@@ -2,8 +2,15 @@
 
 namespace Tests\Feature;
 
+use App\Communication\CommunicationChannel;
+use App\Communication\CommunicationDeliveryStatus;
 use App\Models\Church;
 use App\Models\ChurchMembership;
+use App\Models\CommunicationBroadcast;
+use App\Models\CommunicationDeliveryAttempt;
+use App\Models\CommunicationRecipient;
+use App\Models\CommunicationTemplate;
+use App\Models\Country;
 use App\Models\Crusade;
 use App\Models\HomeChurch;
 use App\Models\KcaApplication;
@@ -70,8 +77,10 @@ class AdminDashboardApiTest extends TestCase
         $this->withHeaders($this->headers($scope))
             ->getJson('/api/v1/admin/dashboards/church')
             ->assertOk()
-            ->assertJsonPath('data.metrics.0.label', 'Total Members')
-            ->assertJsonPath('data.metrics.0.value', '2');
+            ->assertJsonPath('data.metrics.0.label', 'Churches')
+            ->assertJsonPath('data.metrics.0.value', '1')
+            ->assertJsonPath('data.metrics.1.label', 'Total Members')
+            ->assertJsonPath('data.metrics.1.value', '2');
     }
 
     public function test_kca_and_mission_dashboards_return_domain_metrics(): void
@@ -119,6 +128,166 @@ class AdminDashboardApiTest extends TestCase
             ->assertNotFound();
     }
 
+    public function test_unauthenticated_dashboard_request_returns_401(): void
+    {
+        $this->withHeaders($this->headers())
+            ->getJson('/api/v1/admin/dashboards/global')
+            ->assertUnauthorized();
+    }
+
+    public function test_authenticated_without_permission_returns_403(): void
+    {
+        $actor = $this->actorWithPermissions(['identity.users.view']);
+        $this->authenticate($actor);
+
+        $this->withHeaders($this->headers())
+            ->getJson('/api/v1/admin/dashboards/church')
+            ->assertForbidden()
+            ->assertJsonPath('error.code', 'AUTH_PERMISSION_DENIED');
+    }
+
+    public function test_empty_scope_returns_zero_metrics_not_placeholders(): void
+    {
+        $church = Church::factory()->create();
+        ChurchMembership::factory()->for($church)->count(3)->create(['status' => 'active']);
+
+        $emptyChurch = Church::factory()->create();
+        $scope = new ScopeReference('church', $emptyChurch->public_id);
+        $actor = $this->actorWithPermissions(['church.churches.view'], $scope);
+        $this->authenticate($actor);
+
+        $this->withHeaders($this->headers($scope))
+            ->getJson('/api/v1/admin/dashboards/church')
+            ->assertOk()
+            ->assertJsonPath('data.metrics.0.label', 'Churches')
+            ->assertJsonPath('data.metrics.0.value', '1')
+            ->assertJsonPath('data.metrics.1.label', 'Total Members')
+            ->assertJsonPath('data.metrics.1.value', '0')
+            ->assertJsonPath('data.period.preset', 'last_6_months');
+    }
+
+    public function test_date_preset_is_echoed_and_filters_series(): void
+    {
+        Church::factory()->create(['created_at' => now()->subMonths(8)]);
+        Church::factory()->create(['created_at' => now()->subDays(3)]);
+
+        $actor = $this->actorWithPermissions(['identity.users.view']);
+        $this->authenticate($actor);
+
+        $this->withHeaders($this->headers())
+            ->getJson('/api/v1/admin/dashboards/global?preset=last_30_days')
+            ->assertOk()
+            ->assertJsonPath('data.period.preset', 'last_30_days')
+            ->assertJsonPath('data.currency', 'NGN')
+            ->assertJsonPath('data.scope.type', 'global');
+    }
+
+    public function test_kca_dashboard_is_scoped_to_church_memberships(): void
+    {
+        $church = Church::factory()->create();
+        $other = Church::factory()->create();
+        $member = ChurchMembership::factory()->for($church)->create(['status' => 'active']);
+        ChurchMembership::factory()->for($other)->create(['status' => 'active']);
+        KcaApplication::factory()->create(['person_id' => $member->person_id]);
+        KcaApplication::factory()->create();
+
+        $scope = new ScopeReference('church', $church->public_id);
+        $actor = $this->actorWithPermissions(['kca.applications.view'], $scope);
+        $this->authenticate($actor);
+
+        $this->withHeaders($this->headers($scope))
+            ->getJson('/api/v1/admin/dashboards/kca')
+            ->assertOk()
+            ->assertJsonPath('data.metrics.0.label', 'Applications')
+            ->assertJsonPath('data.metrics.0.value', '1');
+    }
+
+    public function test_communications_dashboard_uses_campaign_titles_and_channel_mix(): void
+    {
+        $template = CommunicationTemplate::factory()->create([
+            'subject' => 'Sunday Service Reminder',
+            'channel' => CommunicationChannel::Email,
+        ]);
+        $broadcast = CommunicationBroadcast::factory()->create([
+            'communication_template_id' => $template->getKey(),
+            'channel' => CommunicationChannel::Email,
+            'purpose' => 'communications.ministry_updates',
+        ]);
+        $recipient = CommunicationRecipient::factory()->create([
+            'communication_broadcast_id' => $broadcast->getKey(),
+        ]);
+        CommunicationDeliveryAttempt::factory()->create([
+            'communication_recipient_id' => $recipient->getKey(),
+            'channel' => CommunicationChannel::Email,
+            'status' => CommunicationDeliveryStatus::Succeeded,
+        ]);
+
+        $actor = $this->actorWithPermissions(['communications.templates.view']);
+        $this->authenticate($actor);
+
+        $this->withHeaders($this->headers())
+            ->getJson('/api/v1/admin/dashboards/communications')
+            ->assertOk()
+            ->assertJsonPath('data.metrics.0.label', 'Messages Sent')
+            ->assertJsonPath('data.metrics.1.label', 'Delivered')
+            ->assertJsonPath('data.breakdown.0.label', 'Email')
+            ->assertJsonPath('data.recent_rows.0.Campaign', 'Sunday Service Reminder')
+            ->assertJsonMissing(['data.breakdown.0.label' => 'communications.ministry_updates']);
+    }
+
+    public function test_reports_dashboard_counts_countries_with_churches_not_the_country_table(): void
+    {
+        Country::factory()->count(4)->create();
+        Church::factory()->count(2)->create();
+        ChurchMembership::factory()->count(3)->create(['status' => 'active']);
+
+        $expectedCountries = (int) Church::query()
+            ->join('administrative_units', 'administrative_units.id', '=', 'churches.administrative_unit_id')
+            ->join('countries', 'countries.id', '=', 'administrative_units.country_id')
+            ->distinct()
+            ->count('countries.id');
+        $allCountries = Country::query()->count();
+
+        $this->assertGreaterThan($expectedCountries, $allCountries);
+
+        $actor = $this->actorWithPermissions(['reporting.alert_rules.view']);
+        $this->authenticate($actor);
+
+        $this->withHeaders($this->headers())
+            ->getJson('/api/v1/admin/dashboards/reports')
+            ->assertOk()
+            ->assertJsonPath('data.metrics.0.label', 'Total People')
+            ->assertJsonPath('data.metrics.1.label', 'Active Churches')
+            ->assertJsonPath('data.metrics.2.label', 'Home Churches')
+            ->assertJsonPath('data.metrics.3.label', 'Countries')
+            ->assertJsonPath('data.metrics.3.value', number_format($expectedCountries))
+            ->assertJsonPath('data.donut.label', 'People');
+    }
+
+    public function test_remaining_dashboard_modules_return_live_structures(): void
+    {
+        $actor = $this->actorWithPermissions([
+            'organization.countries.view',
+            'church.home_churches.view',
+            'finance.payment_intents.view',
+            'communications.templates.view',
+            'reporting.alert_rules.view',
+            'security.audit.view',
+            'safeguarding.incidents.report',
+        ]);
+        $this->authenticate($actor);
+        $headers = $this->headers();
+
+        foreach (['geography', 'home-churches', 'finance', 'communications', 'reports', 'security', 'safeguarding'] as $module) {
+            $this->withHeaders($headers)
+                ->getJson('/api/v1/admin/dashboards/'.$module)
+                ->assertOk()
+                ->assertJsonStructure([
+                    'data' => ['metrics', 'series', 'period', 'currency', 'scope'],
+                ]);
+        }
+    }
+
     /** @param array<int, string> $permissionCodes */
     private function actorWithPermissions(array $permissionCodes, ?ScopeReference $scope = null): User
     {
@@ -148,7 +317,7 @@ class AdminDashboardApiTest extends TestCase
         ]);
     }
 
-  /** @return array<string, string> */
+    /** @return array<string, string> */
     private function headers(?ScopeReference $scope = null): array
     {
         $scope ??= new ScopeReference('global', 'platform');

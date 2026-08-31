@@ -32,6 +32,9 @@ class HomeChurchApplicationControllerTest extends TestCase
             ->assertJsonMissingPath('data.applicant_id');
         $application = HomeChurchApplication::query()->sole();
         $this->assertSame('leader@example.test', $application->contact_email);
+        $this->assertSame('Mensah Ama', $application->residence_family_name);
+        $this->assertSame('Family House Home Church @ Mensah Ama Residence', $application->proposed_name);
+        $this->assertCount(2, $application->meeting_schedules ?? []);
         $this->assertSame(1, Person::query()->count());
         $this->assertSame(1, AuditEvent::query()->where('action', 'home_church.application.created')->count());
         $this->assertNotSame('home-church-public-001', $application->public_idempotency_scope_hash);
@@ -66,7 +69,7 @@ class HomeChurchApplicationControllerTest extends TestCase
             ->postJson('/api/v1/home-church-applications', $payload)
             ->assertCreated();
 
-        $payload['proposed_name'] = 'Different Home Church';
+        $payload['residence_family_name'] = 'Different Family';
         $response = $this->withHeader('Idempotency-Key', 'home-church-public-003')
             ->postJson('/api/v1/home-church-applications', $payload);
 
@@ -144,9 +147,14 @@ class HomeChurchApplicationControllerTest extends TestCase
                 'preferred_name' => 'Ama',
             ],
             'proposed_name' => 'Grace Street Home Church',
+            'residence_family_name' => 'Mensah Ama',
             'expected_participants' => 12,
             'meeting_day' => 'saturday',
             'meeting_time' => '17:30',
+            'meeting_schedules' => [
+                ['day' => 'saturday', 'time' => '17:30', 'activity' => 'Fellowship'],
+                ['day' => 'wednesday', 'time' => '18:00', 'activity' => 'Midweek service'],
+            ],
             'contact_email' => 'leader@example.test',
             'contact_phone' => '+233 20 123 4567',
             'guidelines_agreed' => true,

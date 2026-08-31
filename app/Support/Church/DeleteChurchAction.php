@@ -18,14 +18,20 @@ class DeleteChurchAction
         DB::transaction(function () use ($church, $actor): void {
             $lockedChurch = Church::query()->lockForUpdate()->findOrFail($church->getKey());
 
-            if (
-                $lockedChurch->homeChurches()->exists()
-                || $lockedChurch->homeChurchApplications()->exists()
-                || $lockedChurch->memberships()->exists()
-                || $lockedChurch->firstTimers()->exists()
-            ) {
+            $homeChurches = $lockedChurch->homeChurches()->count();
+            $applications = $lockedChurch->homeChurchApplications()->count();
+            $memberships = $lockedChurch->memberships()->count();
+            $firstTimers = $lockedChurch->firstTimers()->count();
+            if ($homeChurches > 0 || $applications > 0 || $memberships > 0 || $firstTimers > 0) {
                 throw new InvalidArgumentException(
-                    'This church cannot be deleted while home churches, applications, memberships, or first-timers are linked to it.',
+                    sprintf(
+                        'Church "%s" cannot be deleted while it has %d home churches, %d applications, %d memberships, and %d first-timers. Reassign or archive those records first.',
+                        $lockedChurch->name,
+                        $homeChurches,
+                        $applications,
+                        $memberships,
+                        $firstTimers,
+                    ),
                 );
             }
 

@@ -10,6 +10,7 @@ use App\Models\HomeChurch;
 use App\Models\MinistryEvent;
 use App\Models\Person;
 use App\Models\PressPublication;
+use App\Models\SafeguardingIncident;
 use Illuminate\Database\Eloquent\Model;
 use InvalidArgumentException;
 
@@ -25,6 +26,7 @@ final class MediaAttachableType
         'content_item' => ContentItem::class,
         'person' => Person::class,
         'press_publication' => PressPublication::class,
+        'safeguarding_incident' => SafeguardingIncident::class,
     ];
 
     public static function classFor(string $alias): string

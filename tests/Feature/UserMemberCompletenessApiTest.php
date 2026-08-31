@@ -90,6 +90,100 @@ class UserMemberCompletenessApiTest extends TestCase
             ->assertStatus(422);
     }
 
+    public function test_joining_another_church_requires_confirmation_then_migrates(): void
+    {
+        $user = User::factory()->withPerson()->create();
+        $this->authenticate($user, recentMfa: true);
+        $first = Church::factory()->create(['name' => 'First Assembly']);
+        $second = Church::factory()->create(['name' => 'Second Assembly']);
+        ChurchMembership::factory()->create([
+            'person_id' => $user->person->getKey(),
+            'church_id' => $first->getKey(),
+            'home_church_id' => null,
+        ]);
+
+        $this->postJson("/api/v1/user/churches/{$second->public_id}/memberships")
+            ->assertStatus(409)
+            ->assertJsonPath('error.code', 'MEMBERSHIP_TRANSFER_REQUIRED')
+            ->assertJsonPath('error.details.kind', 'conventional')
+            ->assertJsonPath('error.details.from_id', $first->public_id);
+
+        $this->postJson("/api/v1/user/churches/{$second->public_id}/memberships", [
+            'confirm_transfer' => true,
+        ])->assertCreated()
+            ->assertJsonPath('data.church_id', $second->public_id)
+            ->assertJsonPath('data.status', 'active');
+
+        $this->assertSame(
+            1,
+            ChurchMembership::query()
+                ->where('person_id', $user->person->getKey())
+                ->where('church_id', $first->getKey())
+                ->where('status', ChurchMembershipStatus::Ended)
+                ->count(),
+        );
+        $this->assertSame(
+            1,
+            ChurchMembership::query()
+                ->where('person_id', $user->person->getKey())
+                ->where('church_id', $second->getKey())
+                ->where('active_marker', 1)
+                ->count(),
+        );
+    }
+
+    public function test_member_can_belong_to_a_conventional_church_and_a_home_church(): void
+    {
+        $user = User::factory()->withPerson()->create();
+        $this->authenticate($user, recentMfa: true);
+        $church = Church::factory()->create();
+        $homeParent = Church::factory()->create();
+        $homeChurch = HomeChurch::factory()->for($homeParent)->create();
+        ChurchMembership::factory()->create([
+            'person_id' => $user->person->getKey(),
+            'church_id' => $church->getKey(),
+            'home_church_id' => null,
+        ]);
+
+        $this->postJson("/api/v1/user/home-churches/{$homeChurch->public_id}/memberships")
+            ->assertCreated()
+            ->assertJsonPath('data.home_church_id', $homeChurch->public_id)
+            ->assertJsonPath('data.church_id', $homeParent->public_id);
+
+        $this->assertSame(
+            2,
+            ChurchMembership::query()
+                ->where('person_id', $user->person->getKey())
+                ->where('active_marker', 1)
+                ->count(),
+        );
+    }
+
+    public function test_switching_home_church_requires_confirmation(): void
+    {
+        $user = User::factory()->withPerson()->create();
+        $this->authenticate($user, recentMfa: true);
+        $firstParent = Church::factory()->create();
+        $secondParent = Church::factory()->create();
+        $firstHome = HomeChurch::factory()->for($firstParent)->create(['name' => 'Alpha Home']);
+        $secondHome = HomeChurch::factory()->for($secondParent)->create(['name' => 'Beta Home']);
+        ChurchMembership::factory()->create([
+            'person_id' => $user->person->getKey(),
+            'church_id' => $firstParent->getKey(),
+            'home_church_id' => $firstHome->getKey(),
+        ]);
+
+        $this->postJson("/api/v1/user/home-churches/{$secondHome->public_id}/memberships")
+            ->assertStatus(409)
+            ->assertJsonPath('error.code', 'MEMBERSHIP_TRANSFER_REQUIRED')
+            ->assertJsonPath('error.details.kind', 'home_church');
+
+        $this->postJson("/api/v1/user/home-churches/{$secondHome->public_id}/memberships", [
+            'confirm_transfer' => true,
+        ])->assertCreated()
+            ->assertJsonPath('data.home_church_id', $secondHome->public_id);
+    }
+
     public function test_membership_and_report_mutations_require_recent_mfa(): void
     {
         $member = User::factory()->withPerson()->create();

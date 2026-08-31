@@ -14,7 +14,7 @@ class CreateKcaModuleAction
 {
     public function __construct(private RecordAuditEventAction $recordAuditEvent) {}
 
-    public function handle(string $code, string $title, int $sequence, User $actor): KcaModule
+    public function handle(string $code, string $title, int $sequence, int $durationDays, User $actor): KcaModule
     {
         $normalizedCode = Str::squish($code);
         $normalizedTitle = Str::squish($title);
@@ -30,8 +30,11 @@ class CreateKcaModuleAction
         if ($sequence < 1 || $sequence > 65535) {
             throw new InvalidArgumentException('KCA module sequences must be between 1 and 65535.');
         }
+        if ($durationDays < 1 || $durationDays > 365) {
+            throw new InvalidArgumentException('KCA module duration_days must be between 1 and 365.');
+        }
 
-        return DB::transaction(function () use ($normalizedCode, $normalizedTitle, $sequence, $actor): KcaModule {
+        return DB::transaction(function () use ($normalizedCode, $normalizedTitle, $sequence, $durationDays, $actor): KcaModule {
             if (KcaModule::query()->where('code', $normalizedCode)->lockForUpdate()->exists()) {
                 throw new InvalidArgumentException('A KCA module with this code already exists.');
             }
@@ -40,6 +43,7 @@ class CreateKcaModuleAction
                 'code' => $normalizedCode,
                 'title' => $normalizedTitle,
                 'sequence' => $sequence,
+                'duration_days' => $durationDays,
             ]);
 
             $this->recordAuditEvent->handle(new AuditEventData(
@@ -50,6 +54,7 @@ class CreateKcaModuleAction
                 metadata: [
                     'code' => $normalizedCode,
                     'sequence' => $sequence,
+                    'duration_days' => $durationDays,
                 ],
             ));
 

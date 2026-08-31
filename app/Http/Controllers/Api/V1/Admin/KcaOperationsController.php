@@ -8,13 +8,14 @@ use App\Http\Requests\Api\V1\Admin\CreateKcaCohortRequest;
 use App\Http\Requests\Api\V1\Admin\CreateKcaLecturerAssignmentRequest;
 use App\Http\Requests\Api\V1\Admin\CreateKcaLessonRequest;
 use App\Http\Requests\Api\V1\Admin\CreateKcaMentorAssignmentRequest;
+use App\Http\Requests\Api\V1\Admin\CreateKcaModulePrerequisiteRequest;
 use App\Http\Requests\Api\V1\Admin\CreateKcaModuleRequest;
 use App\Http\Requests\Api\V1\Admin\CreateKcaYearRequest;
 use App\Http\Requests\Api\V1\Admin\EnrollKcaStudentRequest;
 use App\Http\Requests\Api\V1\Admin\IssueKcaCertificateRequest;
 use App\Http\Requests\Api\V1\Admin\RecordKcaAttendanceRequest;
-use App\Http\Requests\Api\V1\Admin\RevokeKcaCertificateRequest;
 use App\Http\Requests\Api\V1\Admin\ReviewKcaEvidenceRequest;
+use App\Http\Requests\Api\V1\Admin\RevokeKcaCertificateRequest;
 use App\Http\Requests\Api\V1\Admin\SubmitKcaEvidenceRequest;
 use App\Http\Requests\Api\V1\Admin\TransitionKcaApplicationRequest;
 use App\Http\Requests\Api\V1\Admin\TransitionKcaAssignmentRequest;
@@ -32,14 +33,17 @@ use App\Models\KcaCohort;
 use App\Models\KcaEnrollment;
 use App\Models\KcaEvidenceReview;
 use App\Models\KcaEvidenceSubmission;
+use App\Models\KcaLeadershipRecommendation;
 use App\Models\KcaLecturerAssignment;
 use App\Models\KcaLesson;
 use App\Models\KcaMentorAssignment;
 use App\Models\KcaModule;
+use App\Models\KcaModulePrerequisite;
 use App\Models\KcaYear;
 use App\Models\Person;
 use App\Services\Admin\ProtectedAdminContext;
 use App\Support\Api\ApiResponse;
+use App\Support\Identity\PersonDisplayName;
 use App\Support\Kca\CreateKcaCohortAction;
 use App\Support\Kca\CreateKcaLecturerAssignmentAction;
 use App\Support\Kca\CreateKcaLessonAction;
@@ -48,16 +52,19 @@ use App\Support\Kca\CreateKcaModuleAction;
 use App\Support\Kca\CreateKcaYearAction;
 use App\Support\Kca\EnrollKcaStudentAction;
 use App\Support\Kca\IssueKcaCertificateAction;
+use App\Support\Kca\MapKcaModuleDaysAction;
+use App\Support\Kca\PublishKcaModuleAction;
 use App\Support\Kca\RecordKcaAttendanceAction;
-use App\Support\Kca\RevokeKcaCertificateAction;
 use App\Support\Kca\ReviewKcaEvidenceAction;
+use App\Support\Kca\RevokeKcaCertificateAction;
 use App\Support\Kca\SubmitKcaEvidenceAction;
 use App\Support\Kca\TransitionKcaApplicationAction;
 use App\Support\Kca\TransitionKcaAssignmentAction;
-use App\Support\Identity\PersonDisplayName;
+use App\Support\Kca\VerifyKcaLeadershipRecommendationAction;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class KcaOperationsController extends Controller
 {
@@ -93,6 +100,24 @@ class KcaOperationsController extends Controller
         $enrollment->load(['application:id,public_id', 'person:id,public_id', 'year:id,public_id', 'cohort:id,public_id']);
 
         return ApiResponse::success($request, (new ProtectedCatalogRecordResource($enrollment))->resolve($request), status: 201);
+    }
+
+    public function verifyRecommendation(Request $request, string $recommendation, VerifyKcaLeadershipRecommendationAction $action, ProtectedAdminContext $context): JsonResponse
+    {
+        $context->ensureGlobal($request);
+        $target = KcaLeadershipRecommendation::query()->where('public_id', $recommendation)->firstOrFail();
+        $updated = $action->handle($target, $context->actor($request));
+        $updated->load(['application:id,public_id']);
+
+        return ApiResponse::success($request, [
+            'id' => $updated->public_id,
+            'application_id' => $updated->application?->public_id,
+            'status' => $updated->status,
+            'recommender_name' => $updated->recommender_name,
+            'recommender_email' => $updated->recommender_email,
+            'submitted_at' => $updated->submitted_at?->utc()->toIso8601String(),
+            'verified_at' => $updated->verified_at?->utc()->toIso8601String(),
+        ]);
     }
 
     public function transitionAssignment(TransitionKcaAssignmentRequest $request, string $assignment, TransitionKcaAssignmentAction $action, ProtectedAdminContext $context): JsonResponse
@@ -205,6 +230,7 @@ class KcaOperationsController extends Controller
             CarbonImmutable::parse((string) $request->validated('starts_on')),
             CarbonImmutable::parse((string) $request->validated('ends_on')),
             $context->actor($request),
+            (string) ($request->validated('timezone') ?? 'UTC'),
         ));
         $cohort->load(['year:id,public_id']);
 
@@ -218,10 +244,38 @@ class KcaOperationsController extends Controller
             (string) $request->validated('code'),
             (string) $request->validated('title'),
             (int) $request->validated('sequence'),
+            (int) $request->validated('duration_days'),
             $context->actor($request),
         ));
 
         return ApiResponse::success($request, (new ProtectedCatalogRecordResource($module))->resolve($request), status: 201);
+    }
+
+    public function mapModuleDays(Request $request, string $module, MapKcaModuleDaysAction $action, ProtectedAdminContext $context): JsonResponse
+    {
+        $context->ensureGlobal($request);
+        $data = $request->validate([
+            'day_indexes' => ['nullable', 'array'],
+            'day_indexes.*' => ['integer', 'min:1', 'max:365'],
+        ]);
+        $target = KcaModule::query()->where('public_id', $module)->firstOrFail();
+        $updated = $this->execute(fn (): KcaModule => $action->handle(
+            $target,
+            isset($data['day_indexes']) ? array_map('intval', $data['day_indexes']) : null,
+            $context->actor($request),
+        ));
+        $updated->load(['lessons']);
+
+        return ApiResponse::success($request, (new ProtectedCatalogRecordResource($updated))->resolve($request));
+    }
+
+    public function publishModule(Request $request, string $module, PublishKcaModuleAction $action, ProtectedAdminContext $context): JsonResponse
+    {
+        $context->ensureGlobal($request);
+        $target = KcaModule::query()->where('public_id', $module)->firstOrFail();
+        $updated = $this->execute(fn (): KcaModule => $action->handle($target, $context->actor($request)));
+
+        return ApiResponse::success($request, (new ProtectedCatalogRecordResource($updated))->resolve($request));
     }
 
     public function storeLesson(CreateKcaLessonRequest $request, string $module, CreateKcaLessonAction $action, ProtectedAdminContext $context): JsonResponse
@@ -234,10 +288,42 @@ class KcaOperationsController extends Controller
             (string) $request->validated('title'),
             (int) $request->validated('sequence'),
             $context->actor($request),
+            [
+                'summary' => $request->validated('summary'),
+                'body' => $request->validated('body'),
+                'content_url' => $request->validated('content_url'),
+                'estimated_minutes' => $request->validated('estimated_minutes'),
+                'lesson_type' => $request->validated('lesson_type') ?? 'text',
+                'day_index' => $request->validated('day_index'),
+                'requires_acknowledgement' => $request->boolean('requires_acknowledgement', true),
+            ],
         ));
         $lesson->load(['module:id,public_id']);
 
         return ApiResponse::success($request, (new ProtectedCatalogRecordResource($lesson))->resolve($request), status: 201);
+    }
+
+    public function storePrerequisite(CreateKcaModulePrerequisiteRequest $request, string $module, ProtectedAdminContext $context): JsonResponse
+    {
+        $context->ensureGlobal($request);
+        $target = KcaModule::query()->where('public_id', $module)->firstOrFail();
+        $prerequisiteModule = KcaModule::query()->where('public_id', $request->validated('prerequisite_module_id'))->firstOrFail();
+        if ($target->is($prerequisiteModule)) {
+            throw ValidationException::withMessages([
+                'prerequisite_module_id' => ['A module cannot be a prerequisite of itself.'],
+            ]);
+        }
+        $prerequisite = $this->execute(fn (): KcaModulePrerequisite => KcaModulePrerequisite::query()->create([
+            'kca_module_id' => $target->getKey(),
+            'prerequisite_module_id' => $prerequisiteModule->getKey(),
+            'requirement' => (string) $request->validated('requirement'),
+        ]));
+        $prerequisite->load([
+            'module:id,public_id,title,code',
+            'prerequisiteModule:id,public_id,title,code',
+        ]);
+
+        return ApiResponse::success($request, (new ProtectedCatalogRecordResource($prerequisite))->resolve($request), status: 201);
     }
 
     public function recordAttendance(RecordKcaAttendanceRequest $request, string $enrollment, RecordKcaAttendanceAction $action, ProtectedAdminContext $context): JsonResponse
@@ -320,5 +406,18 @@ class KcaOperationsController extends Controller
         });
 
         return ApiResponse::success($request, ['id' => $assignment, 'deleted' => true]);
+    }
+
+    public function destroyPrerequisite(Request $request, string $prerequisite, ProtectedAdminContext $context): JsonResponse
+    {
+        $context->ensureGlobal($request);
+        $target = KcaModulePrerequisite::query()->where('public_id', $prerequisite)->firstOrFail();
+        $this->execute(function () use ($target): true {
+            $target->delete();
+
+            return true;
+        });
+
+        return ApiResponse::success($request, ['id' => $prerequisite, 'deleted' => true]);
     }
 }

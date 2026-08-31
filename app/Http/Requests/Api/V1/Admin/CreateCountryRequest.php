@@ -25,6 +25,11 @@ class CreateCountryRequest extends FormRequest
         return [
             'iso_code' => ['required', 'string', 'size:2', 'alpha:ascii'],
             'name' => ['required', 'string', 'max:191'],
+            'local_name' => ['sometimes', 'nullable', 'string', 'max:191'],
+            'calling_code' => ['sometimes', 'nullable', 'string', 'max:8', 'regex:/^\+?[0-9]{1,4}$/'],
+            'currency_code' => ['sometimes', 'nullable', 'string', 'size:3', 'alpha:ascii'],
+            'default_timezone' => ['sometimes', 'nullable', 'timezone:all'],
+            'locale' => ['sometimes', 'nullable', 'string', 'max:12', 'regex:/^[a-z]{2}(-[A-Z]{2})?$/'],
         ];
     }
 }

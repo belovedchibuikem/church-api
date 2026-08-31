@@ -4,6 +4,7 @@ namespace App\Http\Resources\Api\V1\Admin;
 
 use App\Models\AlertOccurrence;
 use App\Models\AlertRule;
+use App\Models\ChildProfile;
 use App\Models\CommunicationAudience;
 use App\Models\CommunicationBroadcast;
 use App\Models\CommunicationDeliveryAttempt;
@@ -28,6 +29,7 @@ use App\Models\KcaLecturerAssignment;
 use App\Models\KcaLesson;
 use App\Models\KcaMentorAssignment;
 use App\Models\KcaModule;
+use App\Models\KcaModulePrerequisite;
 use App\Models\KcaYear;
 use App\Models\MinistryEvent;
 use App\Models\PaymentDispute;
@@ -36,10 +38,15 @@ use App\Models\PaymentReceipt;
 use App\Models\PaymentReconciliation;
 use App\Models\PaymentRefund;
 use App\Models\PaymentTransaction;
+use App\Models\PressAuthor;
 use App\Models\PressPublication;
+use App\Models\PressPublicationAsset;
 use App\Models\PressPublicationContributor;
+use App\Models\PressPublicationReview;
 use App\Models\PressTranslation;
 use App\Models\SafeguardingIncident;
+use App\Press\PressContributorRole;
+use App\Support\Communication\CommunicationCopy;
 use App\Support\Identity\PersonDisplayName;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -68,6 +75,8 @@ class ProtectedCatalogRecordResource extends JsonResource
                     ?? data_get($this->application_data, 'year_name'),
                 'received_at' => $this->received_at?->utc()->toIso8601String(),
                 'reviewed_at' => $this->reviewed_at?->utc()->toIso8601String(),
+                'recommendation_id' => $this->leadershipRecommendation?->public_id,
+                'recommendation_status' => $this->leadershipRecommendation?->status,
             ],
             $this->resource instanceof KcaEnrollment => [
                 'id' => $this->public_id,
@@ -141,14 +150,33 @@ class ProtectedCatalogRecordResource extends JsonResource
                 'code' => $this->code,
                 'title' => $this->title,
                 'sequence' => $this->sequence,
+                'duration_days' => $this->duration_days,
                 'is_active' => $this->is_active,
+                'published_at' => $this->published_at?->utc()->toIso8601String(),
             ],
             $this->resource instanceof KcaLesson => [
                 'id' => $this->public_id,
                 'module_id' => $this->module?->public_id,
+                'module_title' => $this->module?->title,
                 'code' => $this->code,
                 'title' => $this->title,
+                'summary' => $this->summary,
+                'body' => $this->body,
+                'content_url' => $this->content_url,
+                'estimated_minutes' => $this->estimated_minutes,
                 'sequence' => $this->sequence,
+                'day_index' => $this->day_index,
+                'lesson_type' => $this->lesson_type,
+                'status' => 'Active',
+            ],
+            $this->resource instanceof KcaModulePrerequisite => [
+                'id' => $this->public_id,
+                'module_id' => $this->module?->public_id,
+                'module_title' => $this->module?->title,
+                'prerequisite_module_id' => $this->prerequisiteModule?->public_id,
+                'prerequisite_module_title' => $this->prerequisiteModule?->title,
+                'requirement' => $this->requirement->value,
+                'status' => 'Active',
             ],
             $this->resource instanceof KcaLecturerAssignment => [
                 'id' => $this->public_id,
@@ -189,17 +217,62 @@ class ProtectedCatalogRecordResource extends JsonResource
                 'language_code' => $this->language_code,
                 'category' => $this->category,
                 'format' => $this->format->value,
+                'publication_type' => $this->publicationType()->value,
+                'type' => $this->publicationType()->value,
                 'availability' => $this->availability->value,
+                'visibility' => $this->visibilityEnum()->value,
                 'status' => $this->status->value,
+                'allowed_transitions' => $this->status->allowedTargetValues(),
                 'isbn' => $this->isbn,
+                'publisher_name' => $this->publisher_name,
+                'author_name' => PersonDisplayName::of(
+                    $this->relationLoaded('contributors')
+                        ? $this->contributors->firstWhere('role', PressContributorRole::Author)?->person
+                            ?? $this->contributors->first()?->person
+                        : null,
+                ) ?: '—',
                 'published_at' => $this->published_at?->utc()->toIso8601String(),
+                'created_at' => $this->created_at?->utc()->toIso8601String(),
+                'updated_at' => $this->updated_at?->utc()->toIso8601String(),
+            ],
+            $this->resource instanceof PressPublicationAsset => [
+                'id' => $this->public_id,
+                'publication_id' => $this->publication?->public_id,
+                'title' => $this->publication?->title,
+                'name' => $this->label ?? $this->asset_format->value,
+                'type' => $this->asset_format->value,
+                'status' => $this->processing_status->value,
+                'updated_at' => $this->updated_at?->utc()->toIso8601String(),
+            ],
+            $this->resource instanceof PressPublicationReview => [
+                'id' => $this->public_id,
+                'publication_id' => $this->publication?->public_id,
+                'title' => $this->publication?->title,
+                'name' => $this->publication?->title,
+                'stage' => $this->stage->value,
+                'status' => $this->decision->value,
+                'person_name' => PersonDisplayName::of($this->reviewer),
+                'updated_at' => $this->decided_at?->utc()->toIso8601String(),
+            ],
+            $this->resource instanceof PressAuthor => [
+                'id' => $this->public_id,
+                'person_id' => $this->person?->public_id,
+                'name' => $this->display_name,
+                'person_name' => $this->display_name,
+                'status' => $this->status,
+                'updated_at' => $this->updated_at?->utc()->toIso8601String(),
             ],
             $this->resource instanceof PressPublicationContributor => [
                 'id' => $this->public_id,
                 'publication_id' => $this->publication?->public_id,
+                'title' => $this->publication?->title,
                 'person_id' => $this->person?->public_id,
                 'person_name' => PersonDisplayName::of($this->person),
+                'name' => PersonDisplayName::of($this->person),
                 'role' => $this->role->value,
+                'type' => $this->role->value,
+                'status' => 'active',
+                'updated_at' => $this->updated_at?->utc()->toIso8601String(),
             ],
             $this->resource instanceof PressTranslation => [
                 'id' => $this->public_id,
@@ -261,48 +334,86 @@ class ProtectedCatalogRecordResource extends JsonResource
                 'id' => $this->public_id,
                 'payer_person_id' => $this->payer?->public_id,
                 'payer_name' => PersonDisplayName::of($this->payer),
+                'donor_name' => PersonDisplayName::of($this->payer),
                 'purpose_code' => $this->purpose_code,
+                'category' => $this->purpose_code,
                 'amount_minor' => $this->amount_minor,
+                'amount' => $this->formatMoneyMinor((int) $this->amount_minor, (string) $this->currency),
                 'currency' => $this->currency,
                 'status' => $this->status->value,
+                'proof_file_asset_id' => $this->proofFileAsset?->public_id,
                 'succeeded_at' => $this->succeeded_at?->utc()->toIso8601String(),
+                'created_at' => $this->created_at?->utc()->toIso8601String(),
             ],
             $this->resource instanceof PaymentTransaction => [
                 'id' => $this->public_id,
                 'payment_intent_id' => $this->intent?->public_id,
                 'provider_code' => $this->provider_code,
+                'channel' => $this->provider_code,
                 'amount_minor' => $this->amount_minor,
+                'amount' => $this->formatMoneyMinor((int) $this->amount_minor, (string) $this->currency),
                 'currency' => $this->currency,
+                'purpose_code' => $this->intent?->purpose_code,
+                'category' => $this->intent?->purpose_code,
+                'payer_name' => PersonDisplayName::of($this->intent?->payer),
+                'donor_name' => PersonDisplayName::of($this->intent?->payer),
+                'status' => $this->intent?->status?->value ?? 'recorded',
+                'reconciliation_status' => $this->reconciliation?->status?->value,
+                'receipt_number' => $this->receipt?->receipt_number,
                 'occurred_at' => $this->occurred_at?->utc()->toIso8601String(),
             ],
             $this->resource instanceof PaymentReconciliation => [
                 'id' => $this->public_id,
                 'payment_transaction_id' => $this->transaction?->public_id,
+                'channel' => $this->transaction?->provider_code,
+                'amount' => $this->formatMoneyMinor(
+                    (int) ($this->transaction?->amount_minor ?? 0),
+                    (string) ($this->transaction?->currency ?? 'NGN'),
+                ),
+                'donor_name' => PersonDisplayName::of($this->transaction?->intent?->payer),
+                'category' => $this->transaction?->intent?->purpose_code,
                 'status' => $this->status->value,
                 'reason_code' => $this->reason_code,
+                'reason' => $this->reason_code,
                 'reconciled_at' => $this->reconciled_at?->utc()->toIso8601String(),
             ],
             $this->resource instanceof PaymentReceipt => [
                 'id' => $this->public_id,
                 'payment_transaction_id' => $this->transaction?->public_id,
                 'receipt_number' => $this->receipt_number,
+                'donor_name' => PersonDisplayName::of($this->transaction?->intent?->payer),
+                'category' => $this->transaction?->intent?->purpose_code,
+                'amount' => $this->formatMoneyMinor(
+                    (int) ($this->transaction?->amount_minor ?? 0),
+                    (string) ($this->transaction?->currency ?? 'NGN'),
+                ),
+                'status' => 'issued',
                 'issued_at' => $this->issued_at?->utc()->toIso8601String(),
             ],
             $this->resource instanceof PaymentRefund => [
                 'id' => $this->public_id,
                 'payment_transaction_id' => $this->transaction?->public_id,
-                'amount_minor' => $this->amount_minor,
-                'currency' => $this->currency,
+                'donor_name' => PersonDisplayName::of($this->transaction?->intent?->payer),
+                'reason' => $this->reason_code,
                 'reason_code' => $this->reason_code,
+                'amount_minor' => $this->amount_minor,
+                'amount' => $this->formatMoneyMinor((int) $this->amount_minor, (string) $this->currency),
+                'currency' => $this->currency,
                 'status' => $this->status->value,
                 'requested_at' => $this->requested_at?->utc()->toIso8601String(),
             ],
             $this->resource instanceof PaymentDispute => [
                 'id' => $this->public_id,
                 'payment_transaction_id' => $this->transaction?->public_id,
-                'status' => $this->status->value,
+                'donor_name' => PersonDisplayName::of($this->transaction?->intent?->payer),
+                'reason' => $this->reason_code,
                 'reason_code' => $this->reason_code,
                 'amount_minor' => $this->amount_minor,
+                'amount' => $this->formatMoneyMinor(
+                    (int) ($this->amount_minor ?? $this->transaction?->amount_minor ?? 0),
+                    (string) ($this->transaction?->currency ?? 'NGN'),
+                ),
+                'status' => $this->status->value,
                 'occurred_at' => $this->occurred_at?->utc()->toIso8601String(),
             ],
             $this->resource instanceof CommunicationTemplate => [
@@ -311,36 +422,71 @@ class ProtectedCatalogRecordResource extends JsonResource
                 'channel' => $this->channel->value,
                 'locale' => $this->locale,
                 'subject' => $this->subject,
+                'title' => $this->subject,
+                'message' => $this->subject,
+                'created_at' => $this->created_at?->utc()->toIso8601String(),
             ],
             $this->resource instanceof CommunicationAudience => [
                 'id' => $this->public_id,
                 'code' => $this->code,
                 'name' => $this->name,
+                'title' => $this->name,
+                'status' => 'active',
+                'created_at' => $this->created_at?->utc()->toIso8601String(),
+                'updated_at' => $this->updated_at?->utc()->toIso8601String(),
             ],
             $this->resource instanceof CommunicationBroadcast => [
                 'id' => $this->public_id,
                 'template_id' => $this->template?->public_id,
                 'audience_id' => $this->audience?->public_id,
+                'title' => CommunicationCopy::campaignTitle(
+                    $this->template?->subject,
+                    (string) $this->purpose,
+                ),
+                'message' => CommunicationCopy::campaignTitle(
+                    $this->template?->subject,
+                    (string) $this->purpose,
+                ),
+                'subject' => $this->template?->subject,
                 'kind' => $this->kind->value,
                 'channel' => $this->channel->value,
                 'purpose' => $this->purpose,
+                'purpose_label' => CommunicationCopy::purposeLabel((string) $this->purpose),
+                'audience' => $this->audience?->name ?? $this->audience?->code,
                 'status' => $this->status->value,
                 'scheduled_at' => $this->scheduled_at?->utc()->toIso8601String(),
                 'prepared_at' => $this->prepared_at?->utc()->toIso8601String(),
+                'created_at' => $this->created_at?->utc()->toIso8601String(),
             ],
             $this->resource instanceof CommunicationDeliveryAttempt => [
                 'id' => $this->public_id,
                 'recipient_id' => $this->recipient?->public_id,
+                'title' => CommunicationCopy::campaignTitle(
+                    $this->recipient?->broadcast?->template?->subject,
+                    (string) ($this->recipient?->broadcast?->purpose ?? ''),
+                ),
+                'message' => CommunicationCopy::campaignTitle(
+                    $this->recipient?->broadcast?->template?->subject,
+                    (string) ($this->recipient?->broadcast?->purpose ?? $this->result_code ?? ''),
+                ),
+                'audience' => $this->recipient?->broadcast?->audience?->name
+                    ?? $this->recipient?->broadcast?->audience?->code,
                 'channel' => $this->channel->value,
                 'status' => $this->status->value,
                 'result_code' => $this->result_code,
                 'attempted_at' => $this->attempted_at?->utc()->toIso8601String(),
+                'created_at' => $this->created_at?->utc()->toIso8601String(),
             ],
             $this->resource instanceof CommunicationNotification => [
                 'id' => $this->public_id,
                 'person_id' => $this->person?->public_id,
                 'person_name' => PersonDisplayName::of($this->person),
                 'user_id' => $this->user?->public_id,
+                'title' => PersonDisplayName::of($this->person) ?: 'Notification',
+                'name' => PersonDisplayName::of($this->person) ?: 'Notification',
+                'message' => PersonDisplayName::of($this->person) ?: 'In-app notification',
+                'detail' => $this->read_at ? 'read' : 'unread',
+                'status' => $this->read_at ? 'read' : 'unread',
                 'read_at' => $this->read_at?->utc()->toIso8601String(),
                 'created_at' => $this->created_at?->utc()->toIso8601String(),
             ],
@@ -348,16 +494,26 @@ class ProtectedCatalogRecordResource extends JsonResource
                 'id' => $this->public_id,
                 'code' => $this->code,
                 'title' => $this->title,
+                'name' => $this->title,
                 'condition_type' => $this->condition_type,
+                'type' => $this->condition_type,
                 'severity' => $this->severity->value,
                 'scope_type' => $this->scope_type,
                 'scope_key' => $this->scope_key,
                 'is_active' => $this->is_active,
+                'status' => $this->is_active ? 'active' : 'inactive',
+                'created_at' => $this->created_at?->utc()->toIso8601String(),
+                'updated_at' => $this->updated_at?->utc()->toIso8601String(),
             ],
             $this->resource instanceof AlertOccurrence => [
                 'id' => $this->public_id,
                 'alert_rule_id' => $this->rule?->public_id,
+                'title' => $this->rule?->title ?? $this->condition_reference_type,
+                'name' => $this->rule?->title ?? $this->condition_reference_type,
+                'message' => $this->rule?->title ?? $this->condition_reference_type,
                 'condition_reference_type' => $this->condition_reference_type,
+                'type' => $this->condition_reference_type,
+                'detail' => $this->status->value,
                 'scope_type' => $this->scope_type,
                 'scope_key' => $this->scope_key,
                 'status' => $this->status->value,
@@ -394,23 +550,62 @@ class ProtectedCatalogRecordResource extends JsonResource
             ],
             $this->resource instanceof SafeguardingIncident => [
                 'id' => $this->public_id,
+                'reference_code' => $this->reference_code,
+                'name' => PersonDisplayName::of($this->subject) ?: $this->concern_type,
                 'concern_type' => $this->concern_type,
+                'type' => $this->concern_type,
                 'severity' => $this->severity->value,
                 'status' => $this->status->value,
                 'subject_person_id' => $this->subject?->public_id,
                 'subject_name' => PersonDisplayName::of($this->subject),
                 'occurred_at' => $this->occurred_at?->utc()->toIso8601String(),
+                'updated_at' => $this->updated_at?->utc()->toIso8601String(),
+            ],
+            $this->resource instanceof ChildProfile => [
+                'id' => $this->public_id,
+                'person_id' => $this->person?->public_id,
+                'name' => PersonDisplayName::of($this->person),
+                'person_name' => PersonDisplayName::of($this->person),
+                'minor_status' => $this->minor_status->value,
+                'status' => $this->minor_status->value,
+                'direct_communication_restricted' => $this->direct_communication_restricted,
+                'media_use_restricted' => $this->media_use_restricted,
+                'type' => implode(', ', array_filter([
+                    $this->direct_communication_restricted ? 'communication restricted' : null,
+                    $this->media_use_restricted ? 'media restricted' : null,
+                ])) ?: 'open',
+                'updated_at' => $this->updated_at?->utc()->toIso8601String(),
             ],
             $this->resource instanceof GuardianRelationship => [
                 'id' => $this->public_id,
+                'name' => PersonDisplayName::of($this->child)
+                    ?: PersonDisplayName::of($this->guardian)
+                    ?: $this->relationship_type,
                 'guardian_person_id' => $this->guardian?->public_id,
                 'guardian_name' => PersonDisplayName::of($this->guardian),
                 'child_person_id' => $this->child?->public_id,
                 'child_name' => PersonDisplayName::of($this->child),
                 'relationship_type' => $this->relationship_type,
+                'type' => $this->relationship_type,
                 'status' => $this->status->value,
+                'created_at' => $this->created_at?->utc()->toIso8601String(),
+                'updated_at' => $this->updated_at?->utc()->toIso8601String(),
             ],
             default => throw new LogicException('Unsupported protected catalog resource.'),
+        };
+    }
+
+    private function formatMoneyMinor(int $amountMinor, string $currency): string
+    {
+        $major = number_format($amountMinor / 100, 2);
+        $code = strtoupper($currency !== '' ? $currency : 'NGN');
+
+        return match ($code) {
+            'NGN' => '₦'.$major,
+            'USD' => '$'.$major,
+            'GBP' => '£'.$major,
+            'EUR' => '€'.$major,
+            default => $code.' '.$major,
         };
     }
 }

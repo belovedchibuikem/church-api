@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['code', 'title', 'sequence', 'is_active'])]
+#[Fillable(['code', 'title', 'sequence', 'duration_days', 'is_active'])]
 class KcaModule extends Model
 {
     /** @use HasFactory<KcaModuleFactory> */
@@ -44,6 +44,6 @@ class KcaModule extends Model
 
     protected function casts(): array
     {
-        return ['sequence' => 'integer', 'is_active' => 'boolean'];
+        return ['sequence' => 'integer', 'duration_days' => 'integer', 'is_active' => 'boolean', 'published_at' => 'immutable_datetime'];
     }
 }

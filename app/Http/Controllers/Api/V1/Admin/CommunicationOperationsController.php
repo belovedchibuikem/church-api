@@ -92,7 +92,7 @@ class CommunicationOperationsController extends Controller
             $context->actor($request),
             $request->validated('scheduled_at') === null ? null : CarbonImmutable::parse((string) $request->validated('scheduled_at')),
         ));
-        $broadcast->load(['template:id,public_id', 'audience:id,public_id']);
+        $broadcast->load(['template:id,public_id,code,subject', 'audience:id,public_id,code,name']);
 
         return ApiResponse::success($request, (new ProtectedCatalogRecordResource($broadcast))->resolve($request), status: 201);
     }
@@ -102,7 +102,7 @@ class CommunicationOperationsController extends Controller
         $context->ensureGlobal($request);
         $target = CommunicationBroadcast::query()->where('public_id', $broadcast)->firstOrFail();
         $updated = $this->execute(fn (): CommunicationBroadcast => $action->handle($target, $context->actor($request)));
-        $updated->load(['template:id,public_id', 'audience:id,public_id']);
+        $updated->load(['template:id,public_id,code,subject', 'audience:id,public_id,code,name']);
 
         return ApiResponse::success($request, (new ProtectedCatalogRecordResource($updated))->resolve($request));
     }

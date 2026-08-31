@@ -16,16 +16,20 @@ class CreateCountryAction
         private RecordAuditEventAction $recordAuditEvent,
     ) {}
 
-    public function handle(string $isoCode, string $name, ?User $actor = null): Country
+    /**
+     * @param  array<string, mixed>  $profile
+     */
+    public function handle(string $isoCode, string $name, ?User $actor = null, array $profile = []): Country
     {
         $countryCode = new IsoCountryCode($isoCode);
         $normalizedName = Str::squish($name);
+        $profile = CountryProfile::normalize($profile);
 
         if ($normalizedName === '' || Str::length($normalizedName) > 191) {
             throw new InvalidArgumentException('Country names must contain between 1 and 191 characters.');
         }
 
-        return DB::transaction(function () use ($countryCode, $normalizedName, $actor): Country {
+        return DB::transaction(function () use ($countryCode, $normalizedName, $actor, $profile): Country {
             $existingCountry = Country::query()
                 ->where('iso_code', $countryCode->value)
                 ->lockForUpdate()
@@ -42,6 +46,7 @@ class CreateCountryAction
             $country = Country::query()->create([
                 'iso_code' => $countryCode->value,
                 'name' => $normalizedName,
+                ...CountryProfile::persistable($profile),
             ]);
 
             $this->recordAuditEvent->handle(new AuditEventData(

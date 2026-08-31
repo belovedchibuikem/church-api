@@ -3,9 +3,12 @@
 namespace App\Finance\Actions;
 
 use App\Exceptions\PaymentGovernanceDeniedException;
+use App\Files\FileAssetStatus;
 use App\Finance\Contracts\PaymentGateway;
 use App\Finance\Contracts\PaymentGovernancePolicy;
+use App\Finance\GivingPurpose;
 use App\Finance\PaymentIntentStatus;
+use App\Models\FileAsset;
 use App\Models\PaymentIntent;
 use App\Models\Person;
 use App\Models\User;
@@ -31,7 +34,9 @@ class CreateGivingIntentAction
         int $amountMinor,
         string $currency,
         string $idempotencyKey,
+        string $purposeCode,
         ?User $actor = null,
+        ?FileAsset $proof = null,
     ): array {
         $key = trim($idempotencyKey);
         if (Str::length($key) < 8 || Str::length($key) > 191) {
@@ -39,8 +44,15 @@ class CreateGivingIntentAction
         }
 
         $currency = strtoupper(trim($currency));
+        $purposeCode = strtolower(trim($purposeCode));
+        if (! GivingPurpose::isMemberGiving($purposeCode)) {
+            throw new InvalidArgumentException('Choose Tithe or Offering (or another giving purpose). Tithe and Offering are separate gifts.');
+        }
         if ($amountMinor < 1 || ! preg_match('/\A[A-Z]{3}\z/', $currency)) {
             throw new InvalidArgumentException('A valid amount_minor and ISO currency are required.');
+        }
+        if ($proof !== null) {
+            $this->assertOwnedProof($proof, $payer);
         }
 
         $scopeHash = hash_hmac(
@@ -49,12 +61,12 @@ class CreateGivingIntentAction
             (string) config('app.key'),
         );
 
-        return DB::transaction(function () use ($payer, $amountMinor, $currency, $actor, $scopeHash): array {
-            if (! $this->governance->allowsPaymentIntent('giving', $currency, $payer)) {
+        return DB::transaction(function () use ($payer, $amountMinor, $currency, $purposeCode, $actor, $proof, $scopeHash): array {
+            if (! $this->governance->allowsPaymentIntent($purposeCode, $currency, $payer)) {
                 throw new PaymentGovernanceDeniedException('Payment governance has not enabled giving payment intents.');
             }
 
-            $fingerprint = hash('sha256', "giving|{$payer->public_id}|{$amountMinor}|{$currency}");
+            $fingerprint = hash('sha256', "{$purposeCode}|{$payer->public_id}|{$amountMinor}|{$currency}");
             $retry = PaymentIntent::query()->lockForUpdate()->where('idempotency_scope_hash', $scopeHash)->first();
 
             if ($retry !== null) {
@@ -75,12 +87,13 @@ class CreateGivingIntentAction
             $intent->forceFill([
                 'payer_person_id' => $payer->getKey(),
                 'event_registration_id' => null,
-                'purpose_code' => 'giving',
+                'purpose_code' => $purposeCode,
                 'amount_minor' => $amountMinor,
                 'currency' => $currency,
                 'status' => PaymentIntentStatus::PendingProvider,
                 'idempotency_scope_hash' => $scopeHash,
                 'payload_fingerprint' => $fingerprint,
+                'proof_file_asset_id' => $proof?->getKey(),
             ])->save();
 
             $this->recordAuditEvent->handle(new AuditEventData(
@@ -91,7 +104,7 @@ class CreateGivingIntentAction
                 scopeType: 'person',
                 scopeId: $payer->public_id,
                 metadata: [
-                    'purpose_code' => 'giving',
+                    'purpose_code' => $purposeCode,
                     'amount_minor' => $amountMinor,
                     'currency' => $currency,
                     'provider_code' => $this->gateway->providerCode(),
@@ -106,5 +119,18 @@ class CreateGivingIntentAction
                 'provider_code' => $this->gateway->providerCode(),
             ];
         }, attempts: 3);
+    }
+
+    private function assertOwnedProof(FileAsset $proof, Person $payer): void
+    {
+        if ((int) $proof->owner_person_id !== (int) $payer->getKey()) {
+            throw new InvalidArgumentException('Payment receipt must be uploaded by the giver.');
+        }
+        if ($proof->purpose !== GivingPurpose::PROOF_FILE_PURPOSE) {
+            throw new InvalidArgumentException('Upload a payment receipt (purpose payment.proof).');
+        }
+        if ($proof->status === FileAssetStatus::Rejected || $proof->deleted_at !== null) {
+            throw new InvalidArgumentException('The uploaded payment receipt was rejected. Upload a new file.');
+        }
     }
 }

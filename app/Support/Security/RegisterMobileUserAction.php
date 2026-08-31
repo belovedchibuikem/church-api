@@ -67,11 +67,14 @@ class RegisterMobileUserAction
             $this->grantMemberAccess($lockedUser);
 
             $device = $this->registerDevice->handle($lockedUser, $deviceData, $lockedUser);
+            $network = ClientNetworkContext::fromRequest();
             $securitySession = $this->recordSecuritySession->handle(
                 user: $lockedUser,
                 device: $device,
-                expiresAt: null,
+                expiresAt: MobileCredentialTtl::sessionExpiresAt(),
                 actor: $lockedUser,
+                ipAddress: $network['ip'],
+                countryCode: $network['country'],
             );
 
             return $this->issueCredentials->handle($lockedUser, $device, $securitySession);

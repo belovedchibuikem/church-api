@@ -59,4 +59,9 @@ class AdministrativeUnit extends Model
     {
         return $this->hasMany(Location::class);
     }
+
+    public function churches(): HasMany
+    {
+        return $this->hasMany(Church::class);
+    }
 }

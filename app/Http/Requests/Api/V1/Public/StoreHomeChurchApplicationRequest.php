@@ -14,17 +14,12 @@ use Illuminate\Validation\Validator;
 
 class StoreHomeChurchApplicationRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     */
     public function authorize(): bool
     {
         return true;
     }
 
     /**
-     * Get the validation rules that apply to the request.
-     *
      * @return array<string, array<int, mixed>>
      */
     public function rules(): array
@@ -52,10 +47,15 @@ class StoreHomeChurchApplicationRequest extends FormRequest
             'applicant.middle_name' => ['nullable', 'string', 'max:100'],
             'applicant.family_name' => ['required', 'string', 'max:100'],
             'applicant.preferred_name' => ['nullable', 'string', 'max:100'],
-            'proposed_name' => ['required', 'string', 'max:191'],
+            'residence_family_name' => ['nullable', 'string', 'max:100'],
+            'proposed_name' => ['nullable', 'string', 'max:191'],
             'expected_participants' => ['required', 'integer', 'min:1', 'max:65535'],
-            'meeting_day' => ['required', Rule::enum(MeetingDay::class)],
-            'meeting_time' => ['required', 'date_format:H:i'],
+            'meeting_day' => ['required_without:meeting_schedules', 'nullable', Rule::enum(MeetingDay::class)],
+            'meeting_time' => ['required_without:meeting_schedules', 'nullable', 'date_format:H:i'],
+            'meeting_schedules' => ['nullable', 'array', 'min:1'],
+            'meeting_schedules.*.day' => ['required', Rule::enum(MeetingDay::class)],
+            'meeting_schedules.*.time' => ['required', 'date_format:H:i'],
+            'meeting_schedules.*.activity' => ['nullable', 'string', 'max:80'],
             'contact_email' => ['required', 'string', 'email:rfc', 'max:254'],
             'contact_phone' => ['required', 'string', 'max:32', 'regex:/\A\+?[0-9][0-9 ()-]{4,29}[0-9]\z/'],
             'guidelines_agreed' => ['required', 'accepted'],
@@ -81,10 +81,12 @@ class StoreHomeChurchApplicationRequest extends FormRequest
                 'location_id',
                 'administrative_unit_id',
                 'applicant',
+                'residence_family_name',
                 'proposed_name',
                 'expected_participants',
                 'meeting_day',
                 'meeting_time',
+                'meeting_schedules',
                 'contact_email',
                 'contact_phone',
                 'guidelines_agreed',
@@ -94,6 +96,15 @@ class StoreHomeChurchApplicationRequest extends FormRequest
 
             if ($unsupported !== []) {
                 $validator->errors()->add('request', 'The request contains unsupported fields.');
+            }
+
+            $residence = trim((string) $this->input('residence_family_name', ''));
+            $proposed = trim((string) $this->input('proposed_name', ''));
+            if ($residence === '' && $proposed === '') {
+                $validator->errors()->add(
+                    'residence_family_name',
+                    'Enter the family name that will appear on the home church.',
+                );
             }
 
             $headerKey = $this->header('Idempotency-Key');
@@ -114,6 +125,11 @@ class StoreHomeChurchApplicationRequest extends FormRequest
     {
         /** @var array{given_name: string, middle_name?: string|null, family_name: string, preferred_name?: string|null} $applicant */
         $applicant = $this->validated('applicant');
+        $schedules = $this->validated('meeting_schedules') ?? null;
+        $meetingDay = $this->validated('meeting_day')
+            ?? (is_array($schedules) ? ($schedules[0]['day'] ?? MeetingDay::Sunday->value) : MeetingDay::Sunday->value);
+        $meetingTime = $this->validated('meeting_time')
+            ?? (is_array($schedules) ? ($schedules[0]['time'] ?? '18:00') : '18:00');
 
         return new PublicHomeChurchApplicationData(
             churchPublicId: (string) $this->validated('church_id'),
@@ -123,13 +139,15 @@ class StoreHomeChurchApplicationRequest extends FormRequest
             middleName: $applicant['middle_name'] ?? null,
             familyName: $applicant['family_name'],
             preferredName: $applicant['preferred_name'] ?? null,
-            proposedName: (string) $this->validated('proposed_name'),
+            proposedName: (string) ($this->validated('proposed_name') ?? ''),
             expectedParticipants: (int) $this->validated('expected_participants'),
-            meetingDay: MeetingDay::from((string) $this->validated('meeting_day')),
-            meetingTime: (string) $this->validated('meeting_time'),
+            meetingDay: MeetingDay::from((string) $meetingDay),
+            meetingTime: (string) $meetingTime,
             contactEmail: (string) $this->validated('contact_email'),
             contactPhone: (string) $this->validated('contact_phone'),
             idempotencyKey: (string) $this->validated('idempotency_key'),
+            residenceFamilyName: $this->validated('residence_family_name'),
+            meetingSchedules: is_array($schedules) ? $schedules : null,
         );
     }
 }

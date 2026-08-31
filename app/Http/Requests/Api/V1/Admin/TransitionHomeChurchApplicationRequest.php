@@ -27,6 +27,8 @@ class TransitionHomeChurchApplicationRequest extends FormRequest
         return [
             'status' => ['required', Rule::enum(HomeChurchApplicationStatus::class)],
             'reason_code' => ['required', 'string', 'max:100', 'regex:/\A[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*\z/'],
+            'notes' => ['sometimes', 'nullable', 'string', 'max:2000'],
+            'expected_status' => ['sometimes', 'nullable', Rule::enum(HomeChurchApplicationStatus::class)],
         ];
     }
 }

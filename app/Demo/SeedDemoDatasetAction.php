@@ -7,12 +7,14 @@ use App\Church\HomeChurchApplicationStatus;
 use App\Church\HomeChurchStatus;
 use App\Communication\CommunicationBroadcastStatus;
 use App\Communication\CommunicationChannel;
+use App\Communication\CommunicationDeliveryStatus;
 use App\Communication\CommunicationKind;
 use App\Events\EventRegistrationStatus;
 use App\Files\FileAssetClassification;
 use App\Files\FileAssetStatus;
 use App\Files\MalwareScanStatus;
 use App\Finance\PaymentIntentStatus;
+use App\Finance\PaymentReconciliationStatus;
 use App\Kca\KcaApplicationState;
 use App\Kca\KcaAssignmentState;
 use App\Kca\KcaAttendanceStatus;
@@ -23,24 +25,32 @@ use App\Models\AdministrativeUnit;
 use App\Models\AlertRule;
 use App\Models\Church;
 use App\Models\ChurchAnnouncement;
+use App\Models\ChurchDepartment;
 use App\Models\ChurchDocument;
 use App\Models\ChurchGroup;
 use App\Models\ChurchGroupMembership;
 use App\Models\ChurchMembership;
+use App\Models\ChurchRoleAssignment;
 use App\Models\CommunicationAudience;
 use App\Models\CommunicationBroadcast;
+use App\Models\CommunicationDeliveryAttempt;
+use App\Models\CommunicationRecipient;
 use App\Models\CommunicationTemplate;
 use App\Models\ContentItem;
 use App\Models\ContentPage;
+use App\Models\Convert;
+use App\Models\CounsellingCase;
 use App\Models\Country;
 use App\Models\Crusade;
 use App\Models\DemoDataset;
+use App\Models\EvangelismActivity;
 use App\Models\EventRegistration;
 use App\Models\FileAsset;
 use App\Models\FirstTimer;
 use App\Models\FollowUpTask;
 use App\Models\HomeChurch;
 use App\Models\HomeChurchApplication;
+use App\Models\HomeChurchAttendanceRecord;
 use App\Models\KcaApplication;
 use App\Models\KcaAssignment;
 use App\Models\KcaAttendance;
@@ -57,13 +67,17 @@ use App\Models\MissionSoulJourney;
 use App\Models\PastoralNeed;
 use App\Models\PaymentIntent;
 use App\Models\PaymentReceipt;
+use App\Models\PaymentReconciliation;
 use App\Models\PaymentTransaction;
 use App\Models\Person;
 use App\Models\PersonProfile;
 use App\Models\PrayerRequest;
 use App\Models\PressPublication;
+use App\Models\PressPublicationContributor;
 use App\Models\Role;
+use App\Models\Testimony;
 use App\Models\User;
+use App\Press\PressContributorRole;
 use App\Press\PressPublicationAvailability;
 use App\Press\PressPublicationFormat;
 use App\Press\PressPublicationStatus;
@@ -71,12 +85,12 @@ use App\Reporting\AlertSeverity;
 use App\Storage\StorageProvider;
 use App\Support\Authorization\AssignRoleToUserAction;
 use App\Support\Authorization\AssignScopeToRoleAssignmentAction;
-use App\Support\Identity\PersonDisplayName;
-use App\Support\Livestream\UpsertLivestreamAction;
 use App\Support\Authorization\AuthorizationBundleCatalog;
 use App\Support\Authorization\ProvisionAuthorizationBundlesAction;
 use App\Support\Authorization\ScopeReference;
+use App\Support\Identity\PersonDisplayName;
 use App\Support\Kca\KcaCertificateCodeHasher;
+use App\Support\Livestream\UpsertLivestreamAction;
 use Database\Seeders\ContentPagesSeeder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
@@ -150,13 +164,14 @@ class SeedDemoDatasetAction
             $this->memberships($churches, $homeChurches, array_merge([$admin->person, $pastor->person, $student->person], $leaders, $members));
             $this->churchCommunity($churches, $pastor->person, array_merge([$student->person], array_slice($members, 0, 6)));
             $this->firstTimersAndFollowUps($churches[0], $homeChurches[0], $members, $pastor->person);
+            $this->ministryExtras($churches[0], $homeChurches[0], $members, $pastor->person, $leaders);
             $this->homeChurchApplications($churches[0], $members);
             $events = $this->events($countries['ng']['locations']['ikeja'], $palette);
             $this->eventRegistrations($events, array_merge([$student->person, $pastor->person], array_slice($members, 0, 8)));
             $crusades = $this->crusades($countries, $palette);
             $this->souls($crusades[0], $churches[0], array_slice($members, 0, 8));
             $this->kca($admin, $student, $members, $palette);
-            $this->press($palette);
+            $this->press($palette, array_merge([$pastor->person, $admin->person], array_slice($members, 0, 4)));
             $this->pastoralCare(array_merge([$student->person], $members));
             $this->finance(array_merge([$student->person, $pastor->person], array_slice($members, 0, 6)));
             $this->communications($admin);
@@ -453,6 +468,97 @@ class SeedDemoDatasetAction
 
     /**
      * @param  list<Person>  $members
+     * @param  list<Person>  $leaders
+     */
+    private function ministryExtras(Church $church, HomeChurch $homeChurch, array $members, Person $pastor, array $leaders): void
+    {
+        foreach (array_slice($members, 0, 4) as $index => $person) {
+            if ($person->profile) {
+                $person->profile->forceFill(['phone' => '+23480000'.str_pad((string) (1000 + $index), 4, '0', STR_PAD_LEFT)])->save();
+            }
+            $convert = Convert::query()->create([
+                'person_id' => $person->getKey(),
+                'church_id' => $church->getKey(),
+                'home_church_id' => $index < 2 ? $homeChurch->getKey() : null,
+                'converted_at' => now()->subDays(14 + $index),
+                'baptized_at' => $index % 2 === 0 ? now()->subDays(7 + $index) : null,
+                'source' => ['altar_call', 'crusade', 'friend', 'online'][$index],
+                'status' => 'active',
+                'notes' => 'Demo convert record',
+            ]);
+            $this->remember($convert);
+        }
+
+        $activity = EvangelismActivity::query()->create([
+            'church_id' => $church->getKey(),
+            'title' => 'Weekend Market Outreach',
+            'activity_type' => 'outreach',
+            'souls_reached' => 48,
+            'decisions' => 6,
+            'occurred_at' => now()->subDays(3),
+            'status' => 'completed',
+            'notes' => 'Demo evangelism activity',
+        ]);
+        $this->remember($activity);
+
+        $department = ChurchDepartment::query()->create([
+            'church_id' => $church->getKey(),
+            'name' => 'Ushering',
+            'description' => 'Welcome and seating ministry',
+            'leader_person_id' => ($leaders[0] ?? $pastor)->getKey(),
+            'status' => 'active',
+        ]);
+        $this->remember($department);
+
+        foreach ([['worker', 'Usher'], ['leader', 'Department Lead'], ['disciple', 'New Disciple']] as $index => [$roleType, $title]) {
+            $person = $members[$index] ?? $pastor;
+            $assignment = ChurchRoleAssignment::query()->create([
+                'church_id' => $church->getKey(),
+                'person_id' => $person->getKey(),
+                'department_id' => $department->getKey(),
+                'role_type' => $roleType,
+                'title' => $title,
+                'status' => 'active',
+                'started_at' => now()->subMonths(1 + $index),
+            ]);
+            $this->remember($assignment);
+        }
+
+        $case = CounsellingCase::query()->create([
+            'church_id' => $church->getKey(),
+            'client_person_id' => ($members[4] ?? $pastor)->getKey(),
+            'counselor_person_id' => $pastor->getKey(),
+            'case_type' => 'family',
+            'status' => 'open',
+            'summary' => 'Demo counselling case summary',
+            'opened_at' => now()->subDays(5),
+        ]);
+        $this->remember($case);
+
+        $testimony = Testimony::query()->create([
+            'church_id' => $church->getKey(),
+            'person_id' => ($members[1] ?? $pastor)->getKey(),
+            'title' => 'Healing and restoration',
+            'body' => 'God restored my family after prayer and follow-up from the church.',
+            'status' => 'approved',
+            'submitted_at' => now()->subDays(2),
+            'published_at' => now()->subDay(),
+        ]);
+        $this->remember($testimony);
+
+        $attendance = HomeChurchAttendanceRecord::query()->create([
+            'home_church_id' => $homeChurch->getKey(),
+            'service_date' => now()->toDateString(),
+            'adults' => 18,
+            'children' => 7,
+            'first_timers' => 2,
+            'notes' => 'Demo attendance record',
+        ]);
+        $this->remember($attendance);
+    }
+
+    /**
+     * @param  list<Person>  $members
      */
     private function homeChurchApplications(Church $church, array $members): void
     {
@@ -678,7 +784,10 @@ class SeedDemoDatasetAction
     }
 
     /** @param  array<string, array{0: int, 1: int, 2: int}>  $palette */
-    private function press(array $palette): void
+    /**
+     * @param  list<Person>  $authors
+     */
+    private function press(array $palette, array $authors): void
     {
         $books = [
             ['Kingdom Leadership', 'A practical guide for leading with humility and spiritual authority.', 'Spiritual Growth', $palette['violet']],
@@ -709,7 +818,38 @@ class SeedDemoDatasetAction
             ]);
             $this->remember($publication);
             $this->attachMedia->handle($publication, $cover, MediaRole::Cover);
+
+            $author = $authors[$index % count($authors)];
+            $contributor = new PressPublicationContributor;
+            $contributor->forceFill([
+                'press_publication_id' => $publication->getKey(),
+                'person_id' => $author->getKey(),
+                'role' => PressContributorRole::Author,
+            ])->save();
+            $this->remember($contributor);
         }
+
+        $manuscript = PressPublication::factory()->create([
+            'title' => 'The Power of Covenant',
+            'subtitle' => 'Manuscript in editorial review',
+            'publisher_name' => 'Kingdom Press',
+            'language_code' => 'en',
+            'category' => 'Doctrine',
+            'description' => 'Demo manuscript for workflow screens.',
+            'format' => PressPublicationFormat::Print,
+            'availability' => PressPublicationAvailability::Unavailable,
+            'status' => PressPublicationStatus::EditorialReview,
+            'idempotency_key_hash' => hash('sha256', 'demo-press-manuscript'),
+            'request_fingerprint' => hash('sha256', 'demo-press-manuscript-fp'),
+        ]);
+        $this->remember($manuscript);
+        $manuscriptAuthor = new PressPublicationContributor;
+        $manuscriptAuthor->forceFill([
+            'press_publication_id' => $manuscript->getKey(),
+            'person_id' => ($authors[0] ?? null)?->getKey(),
+            'role' => PressContributorRole::Author,
+        ])->save();
+        $this->remember($manuscriptAuthor);
     }
 
     /** @param  list<Person>  $people */
@@ -758,7 +898,7 @@ class SeedDemoDatasetAction
     /** @param  list<Person>  $people */
     private function finance(array $people): void
     {
-        $purposes = ['tithe', 'offering', 'missions', 'projects', 'donation', 'kca'];
+        $purposes = ['tithe', 'offering', 'missions', 'projects', 'donation', 'kca', 'event_payment', 'publication'];
         $amounts = [5000000, 3000000, 10000000, 2500000, 2000000, 1500000, 7500000, 4500000];
         foreach ($amounts as $index => $amount) {
             $intent = PaymentIntent::factory()->create([
@@ -774,7 +914,7 @@ class SeedDemoDatasetAction
             $this->remember($intent);
             $transaction = PaymentTransaction::factory()->create([
                 'payment_intent_id' => $intent->getKey(),
-                'provider_code' => 'local_manual',
+                'provider_code' => ['local_manual', 'paystack', 'flutterwave'][$index % 3],
                 'amount_minor' => $amount,
                 'currency' => 'NGN',
                 'occurred_at' => now()->subDays($index),
@@ -787,27 +927,36 @@ class SeedDemoDatasetAction
                 'receipt_number' => 'FHC-RCP-'.str_pad((string) ($index + 1), 4, '0', STR_PAD_LEFT),
             ]);
             $this->remember($receipt);
+            $reconciliation = new PaymentReconciliation;
+            $reconciliation->forceFill([
+                'payment_transaction_id' => $transaction->getKey(),
+                'status' => $index === 7 ? PaymentReconciliationStatus::Mismatch : PaymentReconciliationStatus::Matched,
+                'reason_code' => $index === 7 ? 'amount_or_currency_mismatch' : 'amount_currency_matched',
+                'reconciled_at' => now()->subDays($index)->utc(),
+            ])->save();
+            $this->remember($reconciliation);
         }
     }
 
     private function communications(User $admin): void
     {
         $templates = [
-            ['communications.template.sunday-reminder', 'Sunday Service Reminder', 'Join us this Sunday at 10:00 AM WAT.'],
-            ['communications.template.kca-open', 'KCA Admissions Open', 'Applications for the new KCA cohort are open.'],
-            ['communications.template.mission-update', 'Missions Update', 'See what God is doing across Lagos, Accra, and Nairobi.'],
-            ['communications.template.youth-summit', 'Youth Summit Invite', 'Register for Youth Summit 2026.'],
+            ['communications.template.sunday-reminder', 'Sunday Service Reminder', 'Join us this Sunday at 10:00 AM WAT.', CommunicationChannel::Email, 'communications.event_reminders'],
+            ['communications.template.kca-open', 'KCA Admissions Open', 'Applications for the new KCA cohort are open.', CommunicationChannel::Email, 'communications.kca_updates'],
+            ['communications.template.mission-update', 'Missions Update', 'See what God is doing across Lagos, Accra, and Nairobi.', CommunicationChannel::WhatsApp, 'communications.missions_updates'],
+            ['communications.template.youth-summit', 'Youth Summit Invite', 'Register for Youth Summit 2026.', CommunicationChannel::Sms, 'communications.ministry_updates'],
         ];
         $templateModels = [];
-        foreach ($templates as [$code, $subject, $body]) {
+        foreach ($templates as [$code, $subject, $body, $channel, $purpose]) {
             $template = CommunicationTemplate::factory()->create([
                 'code' => $code,
                 'subject' => $subject,
                 'body' => $body,
+                'channel' => $channel,
                 'created_by_user_id' => $admin->getKey(),
             ]);
             $this->remember($template);
-            $templateModels[] = $template;
+            $templateModels[] = [$template, $channel, $purpose];
         }
         $audience = CommunicationAudience::factory()->create([
             'code' => 'audience.demo.members',
@@ -815,18 +964,48 @@ class SeedDemoDatasetAction
             'created_by_user_id' => $admin->getKey(),
         ]);
         $this->remember($audience);
-        foreach ($templateModels as $index => $template) {
+        $deliveryStatuses = [
+            CommunicationDeliveryStatus::Succeeded,
+            CommunicationDeliveryStatus::Succeeded,
+            CommunicationDeliveryStatus::Failed,
+            CommunicationDeliveryStatus::Pending,
+        ];
+        foreach ($templateModels as $index => [$template, $channel, $purpose]) {
             $broadcast = CommunicationBroadcast::factory()->create([
                 'communication_template_id' => $template->getKey(),
                 'communication_audience_id' => $audience->getKey(),
                 'kind' => CommunicationKind::Broadcast,
-                'channel' => CommunicationChannel::Email,
-                'purpose' => 'communications.ministry_updates',
-                'status' => $index === 0 ? CommunicationBroadcastStatus::Draft : CommunicationBroadcastStatus::Draft,
+                'channel' => $channel,
+                'purpose' => $purpose,
+                'status' => $index === 0 ? CommunicationBroadcastStatus::Draft : CommunicationBroadcastStatus::Prepared,
+                'prepared_at' => $index === 0 ? null : now()->subDays($index)->utc(),
                 'created_by_user_id' => $admin->getKey(),
                 'idempotency_key_hash' => hash('sha256', 'demo-broadcast-'.$index),
             ]);
             $this->remember($broadcast);
+
+            $recipientUser = User::factory()->withPerson()->create();
+            $this->remember($recipientUser);
+            $recipient = CommunicationRecipient::factory()->create([
+                'communication_broadcast_id' => $broadcast->getKey(),
+                'user_id' => $recipientUser->getKey(),
+                'person_id' => $recipientUser->person_id,
+            ]);
+            $this->remember($recipient);
+
+            $status = $deliveryStatuses[$index];
+            $attempt = CommunicationDeliveryAttempt::factory()->create([
+                'communication_recipient_id' => $recipient->getKey(),
+                'channel' => $channel,
+                'status' => $status,
+                'result_code' => match ($status) {
+                    CommunicationDeliveryStatus::Succeeded => 'accepted',
+                    CommunicationDeliveryStatus::Failed => 'provider_rejected',
+                    default => 'queued',
+                },
+                'attempted_at' => now()->subHours($index + 1),
+            ]);
+            $this->remember($attempt);
         }
     }
 

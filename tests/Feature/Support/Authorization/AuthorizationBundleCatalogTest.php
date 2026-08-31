@@ -20,8 +20,10 @@ class AuthorizationBundleCatalogTest extends TestCase
         $result = $this->app->make(ProvisionAuthorizationBundlesAction::class)->handle();
 
         $this->assertSame(9, $result['roles']);
-        $this->assertSame(124, $result['permissions']);
-        $this->assertSame(248, $result['grants']);
+        $this->assertSame(count((new AuthorizationBundleCatalog)->permissionCodes()), $result['permissions']);
+        $expectedGrants = collect(AuthorizationBundleCatalog::BUNDLES)->sum(fn (array $bundle): int => count($bundle['permissions']))
+            + count((new AuthorizationBundleCatalog)->permissionCodes());
+        $this->assertSame($expectedGrants, $result['grants']);
         $this->assertSame([
             AuthorizationBundleCatalog::CHURCH_OPERATIONS_ADMINISTRATOR_ROLE,
             AuthorizationBundleCatalog::DOMAIN_CATALOG_ADMINISTRATOR_ROLE,
@@ -33,8 +35,8 @@ class AuthorizationBundleCatalogTest extends TestCase
             AuthorizationBundleCatalog::PLATFORM_SETTINGS_ADMINISTRATOR_ROLE,
             AuthorizationBundleCatalog::SUPER_ADMINISTRATOR_ROLE,
         ], Role::query()->orderBy('code')->pluck('code')->all());
-        $this->assertSame(124, Permission::query()->count());
-        $this->assertSame(248, RolePermission::query()->count());
+        $this->assertSame(count((new AuthorizationBundleCatalog)->permissionCodes()), Permission::query()->count());
+        $this->assertSame($expectedGrants, RolePermission::query()->count());
         $this->assertSame(0, RoleAssignment::query()->count());
         $this->assertFalse(Permission::query()->where('code', 'like', '%*%')->exists());
     }
@@ -48,7 +50,9 @@ class AuthorizationBundleCatalogTest extends TestCase
 
         $this->assertSame(0, $result['grants']);
         $this->assertSame(9, Role::query()->count());
-        $this->assertSame(124, Permission::query()->count());
-        $this->assertSame(248, RolePermission::query()->count());
+        $this->assertSame(count((new AuthorizationBundleCatalog)->permissionCodes()), Permission::query()->count());
+        $expectedGrants = collect(AuthorizationBundleCatalog::BUNDLES)->sum(fn (array $bundle): int => count($bundle['permissions']))
+            + count((new AuthorizationBundleCatalog)->permissionCodes());
+        $this->assertSame($expectedGrants, RolePermission::query()->count());
     }
 }

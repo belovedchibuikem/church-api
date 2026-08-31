@@ -8,6 +8,7 @@ enum AdminDashboardModule: string
     case Geography = 'geography';
     case HomeChurches = 'home-churches';
     case Church = 'church';
+    case People = 'people';
     case Kca = 'kca';
     case Mission = 'mission';
     case Press = 'press';
@@ -15,6 +16,7 @@ enum AdminDashboardModule: string
     case Communications = 'communications';
     case Reports = 'reports';
     case Security = 'security';
+    case Safeguarding = 'safeguarding';
 
     /** Primary permission recorded on access decisions for this module. */
     public function permission(): string

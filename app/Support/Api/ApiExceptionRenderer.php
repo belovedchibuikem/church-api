@@ -2,6 +2,7 @@
 
 namespace App\Support\Api;
 
+use App\Exceptions\MembershipTransferRequiredException;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -21,6 +22,16 @@ class ApiExceptionRenderer
     {
         if (! $request->is('api/*')) {
             return null;
+        }
+
+        if ($exception instanceof MembershipTransferRequiredException) {
+            return ApiResponse::error(
+                $request,
+                'MEMBERSHIP_TRANSFER_REQUIRED',
+                $exception->getMessage(),
+                $exception->details,
+                409,
+            );
         }
 
         if ($exception instanceof ValidationException) {

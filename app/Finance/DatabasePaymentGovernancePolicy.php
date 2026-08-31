@@ -25,7 +25,7 @@ class DatabasePaymentGovernancePolicy implements PaymentGovernancePolicy
                 $configuration->allowed_currencies ?? [],
             );
 
-            return in_array($purposeCode, $purposes, true)
+            return GivingPurpose::allowedBy($purposeCode, $purposes)
                 && in_array(strtoupper($currency), $currencies, true)
                 && $payer !== null;
         }

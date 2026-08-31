@@ -10,7 +10,10 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['crusade_id', 'requester_person_id', 'requested_location_id'])]
+#[Fillable([
+    'crusade_id', 'requester_person_id', 'requested_location_id',
+    'purpose', 'expected_attendance', 'notes', 'application_data', 'idempotency_key_hash',
+])]
 class MissionInvitation extends Model
 {
     /** @use HasFactory<MissionInvitationFactory> */
@@ -46,6 +49,8 @@ class MissionInvitation extends Model
         return [
             'status' => MissionInvitationStatus::class,
             'status_changed_at' => 'immutable_datetime',
+            'application_data' => 'array',
+            'expected_attendance' => 'integer',
         ];
     }
 }

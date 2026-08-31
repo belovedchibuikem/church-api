@@ -15,6 +15,13 @@ final readonly class PressPublicationData
 
     public ?string $currencyCode;
 
+    public ?string $slug;
+
+    public ?string $summary;
+
+    /** @var array<string, mixed> */
+    public array $typeMetadata;
+
     public function __construct(
         string $title,
         string $publisherName,
@@ -31,11 +38,22 @@ final readonly class PressPublicationData
         public ?FileAsset $contentFileAsset = null,
         public ?int $priceMinor = null,
         ?string $currencyCode = null,
+        public PressPublicationType $publicationType = PressPublicationType::Book,
+        public PressPublicationVisibility $visibility = PressPublicationVisibility::Public,
+        public bool $asDraft = false,
+        public bool $featured = false,
+        ?string $slug = null,
+        ?string $summary = null,
+        array $typeMetadata = [],
     ) {
         $this->title = self::required($title, 'title');
         $this->publisherName = self::required($publisherName, 'publisher name');
         $this->languageCode = LanguageCode::normalize($languageCode);
         $this->currencyCode = $currencyCode === null ? null : strtoupper(trim($currencyCode));
+        $this->slug = $slug === null || trim($slug) === '' ? null : trim($slug);
+        $this->summary = $summary === null || trim($summary) === '' ? null : trim($summary);
+        $this->typeMetadata = $this->publicationType->normalizeMetadata($typeMetadata);
+        $this->publicationType->assertCreateRequirements($this->typeMetadata);
 
         if (($priceMinor === null) !== ($this->currencyCode === null)) {
             throw new InvalidArgumentException('Price minor units and currency must be provided together.');
@@ -70,6 +88,7 @@ final readonly class PressPublicationData
             'publisher_name' => $this->publisherName,
             'language_code' => $this->languageCode,
             'format' => $this->format->value,
+            'publication_type' => $this->publicationType->value,
             'subtitle' => $this->subtitle,
             'edition' => $this->edition,
             'publication_date' => $this->publicationDate,
@@ -77,11 +96,22 @@ final readonly class PressPublicationData
             'page_count' => $this->pageCount,
             'category' => $this->category,
             'description' => $this->description,
+            'summary' => $this->summary,
+            'slug' => $this->slug,
             'cover_file_asset_id' => $this->coverFileAsset?->getKey(),
             'content_file_asset_id' => $this->contentFileAsset?->getKey(),
             'price_minor' => $this->priceMinor,
             'currency_code' => $this->currencyCode,
+            'visibility' => $this->visibility->value,
+            'as_draft' => $this->asDraft,
+            'featured' => $this->featured,
+            'type_metadata' => $this->typeMetadata,
         ];
+    }
+
+    public function initialStatus(): PressPublicationStatus
+    {
+        return $this->asDraft ? PressPublicationStatus::Draft : PressPublicationStatus::Manuscript;
     }
 
     private static function required(string $value, string $field): string

@@ -19,6 +19,7 @@ class StartUserChurchMembershipRequest extends FormRequest
     {
         return [
             'home_church_id' => ['nullable', 'ulid', 'exists:home_churches,public_id'],
+            'confirm_transfer' => ['sometimes', 'boolean'],
         ];
     }
 }

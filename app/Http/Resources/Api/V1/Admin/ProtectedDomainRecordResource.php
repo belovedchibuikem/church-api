@@ -2,6 +2,8 @@
 
 namespace App\Http\Resources\Api\V1\Admin;
 
+use App\Mission\CrusadeStatus;
+use App\Mission\MissionInvitationStatus;
 use App\Models\Church;
 use App\Models\ChurchAnnouncement;
 use App\Models\ChurchDepartment;
@@ -21,6 +23,7 @@ use App\Models\HomeChurchAttendanceRecord;
 use App\Models\MentorAssignment;
 use App\Models\MissionInvitation;
 use App\Models\MissionSoulJourney;
+use App\Models\MissionTeamAssignment;
 use App\Models\PastoralNeed;
 use App\Models\Person;
 use App\Models\PrayerRequest;
@@ -52,6 +55,7 @@ class ProtectedDomainRecordResource extends JsonResource
             $this->resource instanceof FollowUpInteraction => $this->followUpInteraction(),
             $this->resource instanceof ChurchMembership => $this->churchMembership(),
             $this->resource instanceof MissionInvitation => $this->missionInvitation(),
+            $this->resource instanceof MissionTeamAssignment => $this->missionTeamAssignment(),
             $this->resource instanceof PrayerRequest => $this->prayerRequest(),
             $this->resource instanceof PastoralNeed => $this->pastoralNeed(),
             $this->resource instanceof Convert => $this->convert(),
@@ -88,6 +92,11 @@ class ProtectedDomainRecordResource extends JsonResource
             'timezone' => $location?->timezone,
             'administrative_unit_id' => $this->administrativeUnit?->public_id,
             'administrative_unit_name' => $this->administrativeUnit?->name,
+            'status' => $this->published_at ? 'published' : 'unpublished',
+            'home_churches_count' => (int) ($this->home_churches_count ?? 0),
+            'memberships_count' => (int) ($this->memberships_count ?? 0),
+            'first_timers_count' => (int) ($this->first_timers_count ?? 0),
+            'applications_count' => (int) ($this->home_church_applications_count ?? 0),
             'published_at' => $this->published_at?->utc()->toIso8601String(),
             'created_at' => $this->created_at?->utc()->toIso8601String(),
         ];
@@ -101,8 +110,14 @@ class ProtectedDomainRecordResource extends JsonResource
             'church_name' => $this->church?->name,
             'leader_person_id' => $this->leader?->public_id,
             'leader_name' => PersonDisplayName::of($this->leader),
+            'location_id' => $this->location?->public_id,
+            'location_name' => $this->location?->name,
+            'administrative_unit_id' => $this->administrativeUnit?->public_id,
+            'administrative_unit_name' => $this->administrativeUnit?->name,
             'name' => $this->name,
+            'meeting_schedules' => $this->meeting_schedules ?? [],
             'status' => $this->status->value,
+            'members_count' => (int) ($this->memberships_count ?? 0),
             'created_at' => $this->created_at?->utc()->toIso8601String(),
         ];
     }
@@ -111,6 +126,7 @@ class ProtectedDomainRecordResource extends JsonResource
     private function homeChurchApplication(): array
     {
         $applicant = $this->applicant;
+
         return [
             'id' => $this->public_id, 'church_id' => $this->church?->public_id,
             'church_name' => $this->church?->name,
@@ -118,10 +134,28 @@ class ProtectedDomainRecordResource extends JsonResource
             'applicant_person_id' => $applicant?->public_id ?? $this->applicant()->value('public_id'),
             'applicant_name' => PersonDisplayName::of($applicant),
             'proposed_name' => $this->proposed_name,
+            'residence_family_name' => $this->residence_family_name,
             'expected_participants' => $this->expected_participants,
-            'meeting_day' => $this->meeting_day->value, 'meeting_time' => $this->meeting_time,
+            'meeting_day' => $this->meeting_day->value,
+            'meeting_time' => $this->meeting_time,
+            'meeting_schedules' => $this->meeting_schedules ?? [],
             'status' => $this->status->value,
             'status_changed_at' => $this->status_changed_at?->utc()->toIso8601String(),
+            'location_id' => $this->location?->public_id,
+            'location_name' => $this->location?->name,
+            'administrative_unit_id' => $this->administrativeUnit?->public_id,
+            'administrative_unit_name' => $this->administrativeUnit?->name,
+            'allowed_actions' => $this->status->allowedActions(),
+            'history' => $this->whenLoaded('transitions', function () {
+                return $this->transitions->map(fn ($row) => [
+                    'id' => $row->public_id,
+                    'from_status' => $row->from_status->value,
+                    'to_status' => $row->to_status->value,
+                    'reason_code' => $row->reason_code,
+                    'notes' => $row->notes ?? null,
+                    'occurred_at' => $row->occurred_at?->utc()->toIso8601String(),
+                ])->all();
+            }),
         ];
     }
 
@@ -129,6 +163,7 @@ class ProtectedDomainRecordResource extends JsonResource
     private function firstTimer(): array
     {
         $person = $this->person;
+
         return [
             'id' => $this->public_id,
             'person_id' => $person?->public_id ?? $this->person()->value('public_id'),
@@ -149,6 +184,7 @@ class ProtectedDomainRecordResource extends JsonResource
     {
         $assignee = $this->assignedTo;
         $firstTimer = $this->firstTimer;
+
         return [
             'id' => $this->public_id, 'first_timer_id' => $firstTimer?->public_id,
             'person_name' => PersonDisplayName::of($firstTimer?->person),
@@ -166,11 +202,19 @@ class ProtectedDomainRecordResource extends JsonResource
     {
         return [
             'id' => $this->public_id, 'name' => $this->name,
+            'code' => $this->code,
+            'theme' => $this->theme,
+            'purpose' => $this->purpose,
+            'description' => $this->description,
+            'timezone' => $this->timezone,
+            'status' => $this->status instanceof CrusadeStatus ? $this->status->value : (string) $this->status,
             'location_id' => $this->location?->public_id,
             'location_name' => $this->location?->name,
             'starts_at' => $this->starts_at?->utc()->toIso8601String(),
             'ends_at' => $this->ends_at?->utc()->toIso8601String(),
             'published_at' => $this->published_at?->utc()->toIso8601String(),
+            'archived_at' => $this->archived_at?->utc()->toIso8601String(),
+            'souls_count' => (int) ($this->soul_journeys_count ?? 0),
         ];
     }
 
@@ -178,6 +222,7 @@ class ProtectedDomainRecordResource extends JsonResource
     private function missionSoulJourney(): array
     {
         $person = $this->person;
+
         return [
             'id' => $this->public_id, 'crusade_id' => $this->crusade?->public_id,
             'crusade_name' => $this->crusade?->name,
@@ -187,6 +232,8 @@ class ProtectedDomainRecordResource extends JsonResource
             'connected_church_name' => $this->connectedChurch?->name,
             'status' => $this->status->value, 'mentor_assignment_id' => $this->mentorAssignment?->public_id,
             'captured_at' => $this->captured_at?->utc()->toIso8601String(),
+            'converted_at' => $this->converted_at?->utc()->toIso8601String(),
+            'conversion_reason_code' => $this->conversion_reason_code,
             'last_follow_up_at' => $this->last_follow_up_at?->utc()->toIso8601String(),
             'follow_up_completed_at' => $this->follow_up_completed_at?->utc()->toIso8601String(),
         ];
@@ -236,6 +283,10 @@ class ProtectedDomainRecordResource extends JsonResource
     /** @return array<string, mixed> */
     private function missionInvitation(): array
     {
+        $status = $this->status instanceof MissionInvitationStatus
+            ? $this->status
+            : (MissionInvitationStatus::tryFrom((string) $this->status) ?? MissionInvitationStatus::Received);
+
         return [
             'id' => $this->public_id,
             'crusade_id' => $this->crusade?->public_id,
@@ -244,8 +295,34 @@ class ProtectedDomainRecordResource extends JsonResource
             'requester_name' => PersonDisplayName::of($this->requester),
             'requested_location_id' => $this->requestedLocation?->public_id,
             'requested_location_name' => $this->requestedLocation?->name,
-            'status' => $this->status->value,
+            'purpose' => $this->purpose,
+            'expected_attendance' => $this->expected_attendance,
+            'notes' => $this->notes,
+            'status' => $status->value,
+            'allowed_transitions' => array_map(
+                static fn (MissionInvitationStatus $item): string => $item->value,
+                $status->allowedTargets(),
+            ),
             'status_changed_at' => $this->status_changed_at?->utc()->toIso8601String(),
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function missionTeamAssignment(): array
+    {
+        $active = $this->ended_at === null || $this->ended_at->isFuture();
+
+        return [
+            'id' => $this->public_id,
+            'crusade_id' => $this->crusade?->public_id,
+            'crusade_name' => $this->crusade?->name,
+            'person_id' => $this->person?->public_id,
+            'person_name' => PersonDisplayName::of($this->person),
+            'role_code' => $this->role_code,
+            'name' => $this->role_code,
+            'assigned_at' => $this->assigned_at?->utc()->toIso8601String(),
+            'ended_at' => $this->ended_at?->utc()->toIso8601String(),
+            'status' => $active ? 'Active' : 'Ended',
         ];
     }
 
@@ -261,7 +338,6 @@ class ProtectedDomainRecordResource extends JsonResource
             'assigned_to_name' => PersonDisplayName::of($this->assignedTo),
             'assigned_at' => $this->assigned_at?->utc()->toIso8601String(),
             'subject' => $this->subject,
-            'body' => $this->body,
             'status' => $this->status,
             'created_at' => $this->created_at?->utc()->toIso8601String(),
         ];
@@ -275,7 +351,6 @@ class ProtectedDomainRecordResource extends JsonResource
             'person_id' => $this->person?->public_id,
             'person_name' => PersonDisplayName::of($this->person),
             'category' => $this->category,
-            'summary' => $this->summary,
             'status' => $this->status,
             'created_at' => $this->created_at?->utc()->toIso8601String(),
         ];
@@ -367,10 +442,8 @@ class ProtectedDomainRecordResource extends JsonResource
             'id' => $this->public_id,
             'church_id' => $this->church?->public_id,
             'church_name' => $this->church?->name,
-            'client_person_id' => $this->client?->public_id,
-            'person_name' => PersonDisplayName::of($this->client),
-            'counselor_person_id' => $this->counselor?->public_id,
-            'counselor_name' => PersonDisplayName::of($this->counselor),
+            'client_label' => 'Restricted',
+            'counselor_label' => $this->counselor ? 'Assigned' : 'Unassigned',
             'case_type' => $this->case_type,
             'status' => $this->status,
             'opened_at' => $this->opened_at?->utc()->toIso8601String(),
@@ -390,7 +463,6 @@ class ProtectedDomainRecordResource extends JsonResource
             'person_name' => PersonDisplayName::of($this->person),
             'title' => $this->title,
             'name' => $this->title,
-            'body' => $this->body,
             'status' => $this->status,
             'submitted_at' => $this->submitted_at?->utc()->toIso8601String(),
             'published_at' => $this->published_at?->utc()->toIso8601String(),
@@ -455,21 +527,58 @@ class ProtectedDomainRecordResource extends JsonResource
     private function personDirectory(): array
     {
         $membership = $this->relationLoaded('memberships') ? $this->memberships->first() : null;
+        $roles = [];
+        if ($this->relationLoaded('memberships') && $this->memberships->contains(function ($row): bool {
+            $status = $row->status instanceof \BackedEnum ? $row->status->value : (string) $row->status;
+
+            return $status === 'active';
+        })) {
+            $roles[] = 'Member';
+        }
+        if ($this->relationLoaded('firstTimers') && $this->firstTimers->isNotEmpty()) {
+            $roles[] = 'First Timer';
+        }
+        if ($this->relationLoaded('converts') && $this->converts->isNotEmpty()) {
+            $roles[] = 'Convert';
+        }
+        if ($this->relationLoaded('roleAssignments')) {
+            foreach ($this->roleAssignments as $assignment) {
+                $label = match ($assignment->role_type) {
+                    'leader' => 'Leader',
+                    'worker' => 'Worker',
+                    'disciple' => 'Disciple',
+                    default => (string) $assignment->role_type,
+                };
+                if ($label !== '' && ! in_array($label, $roles, true)) {
+                    $roles[] = $label;
+                }
+            }
+        }
+        if ($roles === []) {
+            $roles[] = $this->user ? 'Account' : 'Person';
+        }
+
+        $status = $this->archived_at ? 'archived' : ($membership?->status instanceof \BackedEnum
+            ? $membership->status->value
+            : ($membership?->status ?? ($this->user?->account_status?->value ?? $this->user?->account_status ?? 'active')));
 
         return [
             'id' => $this->public_id,
-            'name' => PersonDisplayName::of($this->resource),
-            'person_name' => PersonDisplayName::of($this->resource),
+            'name' => PersonDisplayName::of($this->resource) ?: 'Not provided',
+            'person_name' => PersonDisplayName::of($this->resource) ?: 'Not provided',
             'email' => PersonDisplayName::email($this->resource),
             'person_email' => PersonDisplayName::email($this->resource),
             'phone' => PersonDisplayName::phone($this->resource),
             'person_phone' => PersonDisplayName::phone($this->resource),
+            'preferred_name' => $this->profile?->preferred_name,
+            'given_name' => $this->profile?->given_name,
+            'family_name' => $this->profile?->family_name,
             'church_id' => $membership?->church?->public_id,
             'church_name' => $membership?->church?->name,
-            'type' => $membership ? 'Member' : 'Person',
-            'status' => $membership?->status instanceof \BackedEnum
-                ? $membership->status->value
-                : ($membership?->status ?? ($this->user ? 'Active' : 'Profile')),
+            'roles' => $roles,
+            'type' => implode(' · ', $roles),
+            'status' => $status,
+            'archived_at' => $this->archived_at?->utc()->toIso8601String(),
             'last_contact' => $membership?->joined_at?->utc()->toIso8601String() ?? $this->updated_at?->utc()->toIso8601String(),
             'created_at' => $this->created_at?->utc()->toIso8601String(),
         ];
@@ -480,15 +589,21 @@ class ProtectedDomainRecordResource extends JsonResource
     {
         return [
             'id' => $this->public_id,
+            'reference_code' => $this->reference_code,
             'concern_type' => $this->concern_type,
-            'name' => $this->concern_type,
+            'name' => $this->reference_code ?: $this->concern_type,
+            'type' => $this->concern_type,
             'severity' => $this->severity?->value ?? $this->severity,
             'status' => $this->status?->value ?? $this->status,
-            'subject_person_id' => $this->subject?->public_id,
-            'person_name' => PersonDisplayName::of($this->subject),
+            'assigned_to_user_id' => $this->assignedTo?->public_id,
+            'assigned_to_name' => $this->assignedTo?->name,
+            'reported_by_user_id' => $this->reportedBy?->public_id,
+            'reported_by_name' => $this->reportedBy?->name,
             'occurred_at' => $this->occurred_at?->utc()->toIso8601String(),
             'reported_at' => $this->reported_at?->utc()->toIso8601String(),
+            'closed_at' => $this->closed_at?->utc()->toIso8601String(),
             'created_at' => $this->created_at?->utc()->toIso8601String(),
+            'updated_at' => $this->updated_at?->utc()->toIso8601String(),
         ];
     }
 }

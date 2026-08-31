@@ -44,6 +44,11 @@ class KcaApplication extends Model
         return $this->hasOne(KcaEnrollment::class);
     }
 
+    public function leadershipRecommendation(): HasOne
+    {
+        return $this->hasOne(KcaLeadershipRecommendation::class);
+    }
+
     protected function casts(): array
     {
         return [

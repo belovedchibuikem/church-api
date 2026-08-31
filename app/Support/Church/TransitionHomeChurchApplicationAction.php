@@ -13,6 +13,7 @@ use App\Support\Audit\AuditEventData;
 use App\Support\Audit\RecordAuditEventAction;
 use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use LogicException;
@@ -28,14 +29,23 @@ class TransitionHomeChurchApplicationAction
         HomeChurchApplicationStatus $targetStatus,
         string $reasonCode,
         User $actor,
+        ?string $notes = null,
+        ?HomeChurchApplicationStatus $expectedStatus = null,
     ): HomeChurchApplication {
         $reason = new StableReasonCode($reasonCode);
+        $normalizedNotes = is_string($notes) ? trim($notes) : '';
+
+        if ($targetStatus->requiresMandatoryNotes() && $normalizedNotes === '') {
+            throw new InvalidArgumentException('A notes explanation is required for this decision.');
+        }
 
         return DB::transaction(function () use (
             $application,
             $targetStatus,
             $reason,
             $actor,
+            $normalizedNotes,
+            $expectedStatus,
         ): HomeChurchApplication {
             $lockedApplication = HomeChurchApplication::query()
                 ->lockForUpdate()
@@ -43,6 +53,12 @@ class TransitionHomeChurchApplicationAction
             $lockedActor = User::query()->lockForUpdate()->findOrFail($actor->getKey());
             $church = Church::query()->lockForUpdate()->findOrFail($lockedApplication->church_id);
             $currentStatus = $lockedApplication->status;
+
+            if ($expectedStatus !== null && $currentStatus !== $expectedStatus) {
+                throw new InvalidArgumentException(
+                    "This application was updated concurrently. Refresh and retry from {$currentStatus->value}.",
+                );
+            }
 
             if ($currentStatus === $targetStatus) {
                 if ($targetStatus === HomeChurchApplicationStatus::Active && $lockedApplication->home_church_id === null) {
@@ -66,7 +82,7 @@ class TransitionHomeChurchApplicationAction
             $lockedApplication->save();
 
             $correlationId = Context::get('correlation_id');
-            HomeChurchApplicationTransition::query()->create([
+            $transitionPayload = [
                 'home_church_application_id' => $lockedApplication->getKey(),
                 'actor_user_id' => $lockedActor->getKey(),
                 'from_status' => $currentStatus,
@@ -76,7 +92,11 @@ class TransitionHomeChurchApplicationAction
                     ? $correlationId
                     : null,
                 'occurred_at' => $occurredAt,
-            ]);
+            ];
+            if (Schema::hasColumn('home_church_application_transitions', 'notes')) {
+                $transitionPayload['notes'] = $normalizedNotes === '' ? null : $normalizedNotes;
+            }
+            HomeChurchApplicationTransition::query()->create($transitionPayload);
 
             $this->recordAuditEvent->handle(new AuditEventData(
                 action: 'home_church.application.status_changed',
@@ -89,6 +109,7 @@ class TransitionHomeChurchApplicationAction
                     'from_status' => $currentStatus->value,
                     'to_status' => $targetStatus->value,
                     'reason_code' => $reason->value,
+                    'notes' => $normalizedNotes === '' ? null : $normalizedNotes,
                 ],
             ));
 
@@ -122,6 +143,7 @@ class TransitionHomeChurchApplicationAction
                 'location_id' => $application->location_id,
                 'administrative_unit_id' => $application->administrative_unit_id,
                 'name' => $application->proposed_name,
+                'meeting_schedules' => $application->meeting_schedules,
             ]);
             $homeChurch->status = HomeChurchStatus::Active;
             $homeChurch->save();

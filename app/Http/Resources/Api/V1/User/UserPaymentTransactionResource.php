@@ -20,6 +20,11 @@ class UserPaymentTransactionResource extends JsonResource
             'receipt_id' => $this->receipt?->public_id,
             'amount_minor' => $this->amount_minor,
             'currency' => $this->currency,
+            'purpose_code' => $this->intent?->purpose_code,
+            'provider_code' => $this->provider_code,
+            'status' => $this->intent?->status instanceof \BackedEnum
+                ? $this->intent->status->value
+                : ($this->intent?->status ?? 'recorded'),
             'occurred_at' => $this->occurred_at?->toIso8601String(),
             'created_at' => $this->created_at?->toIso8601String(),
         ];

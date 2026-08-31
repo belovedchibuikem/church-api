@@ -7,6 +7,12 @@ $batchRetentionHours = max(1, (int) config('queue.retention.batch_hours'));
 $unfinishedBatchRetentionHours = max(1, (int) config('queue.retention.unfinished_batch_hours'));
 $cancelledBatchRetentionHours = max(1, (int) config('queue.retention.cancelled_batch_hours'));
 
+Schedule::command('press:apply-schedules')
+    ->name('press.schedules.apply')
+    ->everyMinute()
+    ->withoutOverlapping(5)
+    ->onOneServer();
+
 Schedule::command("queue:prune-failed --hours={$failedJobRetentionHours}")
     ->name('operations.queue.prune_failed')
     ->dailyAt('01:00')

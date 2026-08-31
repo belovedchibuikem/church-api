@@ -60,6 +60,7 @@ class MissionSoulJourney extends Model
         return [
             'status' => MissionSoulJourneyStatus::class,
             'captured_at' => 'immutable_datetime',
+            'converted_at' => 'immutable_datetime',
             'mentor_assigned_at' => 'immutable_datetime',
             'last_follow_up_at' => 'immutable_datetime',
             'follow_up_completed_at' => 'immutable_datetime',

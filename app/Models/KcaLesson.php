@@ -10,7 +10,19 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['kca_module_id', 'code', 'title', 'sequence'])]
+#[Fillable([
+    'kca_module_id',
+    'code',
+    'title',
+    'summary',
+    'body',
+    'content_url',
+    'estimated_minutes',
+    'sequence',
+    'day_index',
+    'lesson_type',
+    'requires_acknowledgement',
+])]
 class KcaLesson extends Model
 {
     /** @use HasFactory<KcaLessonFactory> */
@@ -38,6 +50,11 @@ class KcaLesson extends Model
 
     protected function casts(): array
     {
-        return ['sequence' => 'integer'];
+        return [
+            'sequence' => 'integer',
+            'day_index' => 'integer',
+            'estimated_minutes' => 'integer',
+            'requires_acknowledgement' => 'boolean',
+        ];
     }
 }

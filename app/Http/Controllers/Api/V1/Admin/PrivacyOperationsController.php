@@ -13,6 +13,7 @@ use App\Models\FileAsset;
 use App\Models\Person;
 use App\Privacy\Actions\BeginDataExportRequestAction;
 use App\Privacy\Actions\CompleteDataExportRequestAction;
+use App\Privacy\Actions\DenyPrivacyErasureAction;
 use App\Privacy\Actions\ExpireDataExportRequestAction;
 use App\Privacy\Actions\SubmitDataSubjectRequestAction;
 use App\Privacy\DataSubjectRequestType;
@@ -83,6 +84,25 @@ class PrivacyOperationsController extends Controller
         $context->ensureGlobal($request);
         $target = DataSubjectRequest::query()->where('public_id', $dataSubjectRequest)->firstOrFail();
         $updated = $this->execute(fn (): DataSubjectRequest => $action->handle($target, $context->actor($request)));
+        $updated->load(['person:id,public_id']);
+
+        return ApiResponse::success($request, (new ProtectedCatalogRecordResource($updated))->resolve($request));
+    }
+
+    public function executeErasure(Request $request, string $dataSubjectRequest, DenyPrivacyErasureAction $action, ProtectedAdminContext $context): JsonResponse
+    {
+        $context->ensureGlobal($request);
+        $target = DataSubjectRequest::query()->where('public_id', $dataSubjectRequest)->firstOrFail();
+        $this->execute(fn (): DataSubjectRequest => $action->handle($target, $context->actor($request), false));
+
+        return ApiResponse::success($request, []);
+    }
+
+    public function recordErasureDenial(Request $request, string $dataSubjectRequest, DenyPrivacyErasureAction $action, ProtectedAdminContext $context): JsonResponse
+    {
+        $context->ensureGlobal($request);
+        $target = DataSubjectRequest::query()->where('public_id', $dataSubjectRequest)->firstOrFail();
+        $updated = $this->execute(fn (): DataSubjectRequest => $action->handle($target, $context->actor($request), true));
         $updated->load(['person:id,public_id']);
 
         return ApiResponse::success($request, (new ProtectedCatalogRecordResource($updated))->resolve($request));

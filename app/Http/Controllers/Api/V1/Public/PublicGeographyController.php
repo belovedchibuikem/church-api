@@ -72,7 +72,6 @@ class PublicGeographyController extends Controller
         $query = AdministrativeUnit::query()
             ->whereBelongsTo($model)
             ->where('administrative_level_id', $stateLevel->getKey())
-            ->whereNull('parent_id')
             ->orderBy('name');
 
         if ($search !== '') {
@@ -106,9 +105,11 @@ class PublicGeographyController extends Controller
             ->whereBelongsTo($model)
             ->where('administrative_level_id', $stateLevel->getKey())
             ->where(function ($builder) use ($state): void {
+                $normalized = $this->normalizeUnitName($state);
                 $builder->where('public_id', $state)
                     ->orWhere('reference_code', strtoupper($state))
-                    ->orWhereRaw('LOWER(name) = ?', [mb_strtolower($state)]);
+                    ->orWhereRaw('LOWER(name) = ?', [mb_strtolower(trim($state))])
+                    ->orWhereRaw('LOWER(name) = ?', [$normalized]);
             })
             ->firstOrFail();
 
@@ -172,28 +173,35 @@ class PublicGeographyController extends Controller
 
     private function firstLevel(Country $country): AdministrativeLevel
     {
-        $level = AdministrativeLevel::query()
-            ->whereBelongsTo($country)
-            ->orderBy('sort_order')
-            ->first();
-
-        if ($level === null) {
-            throw ValidationException::withMessages([
-                'country' => ['This country has no administrative levels configured.'],
-            ]);
-        }
-
-        return $level;
-    }
-
-    private function secondLevel(Country $country): AdministrativeLevel
-    {
         $levels = AdministrativeLevel::query()
             ->whereBelongsTo($country)
             ->orderBy('sort_order')
             ->get();
 
-        $level = $levels->skip(1)->first() ?? $levels->first();
+        foreach ($levels as $level) {
+            $hasUnits = AdministrativeUnit::query()
+                ->whereBelongsTo($country)
+                ->where('administrative_level_id', $level->getKey())
+                ->exists();
+            if ($hasUnits) {
+                return $level;
+            }
+        }
+
+        throw ValidationException::withMessages([
+            'country' => ['This country has no administrative levels configured.'],
+        ]);
+    }
+
+    private function secondLevel(Country $country): AdministrativeLevel
+    {
+        $stateLevel = $this->firstLevel($country);
+        $level = AdministrativeLevel::query()
+            ->whereBelongsTo($country)
+            ->whereKeyNot($stateLevel->getKey())
+            ->orderBy('sort_order')
+            ->first();
+
         if ($level === null) {
             throw ValidationException::withMessages([
                 'country' => ['This country has no locality level configured.'],
@@ -201,5 +209,17 @@ class PublicGeographyController extends Controller
         }
 
         return $level;
+    }
+
+    private function normalizeUnitName(string $name): string
+    {
+        $normalized = trim(preg_replace('/\s+/', ' ', $name) ?? $name);
+        $normalized = preg_replace(
+            '/\s+(State|Province|Region|County|Territory|District)$/i',
+            '',
+            $normalized,
+        ) ?? $normalized;
+
+        return mb_strtolower(trim($normalized));
     }
 }

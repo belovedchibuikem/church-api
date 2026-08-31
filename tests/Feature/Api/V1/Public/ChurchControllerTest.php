@@ -56,6 +56,7 @@ class ChurchControllerTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.id', $published->public_id)
             ->assertJsonPath('data.name', 'Public Assembly')
+            ->assertJsonPath('data.home_churches', [])
             ->assertJsonMissingPath('data.location.address_line_one');
 
         $this->getJson("/api/v1/churches/{$unpublished->public_id}")

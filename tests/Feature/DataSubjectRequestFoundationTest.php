@@ -2,10 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Exceptions\DataExportExecutionDeniedException;
 use App\Models\AuditEvent;
 use App\Models\DataSubjectRequest;
 use App\Models\Person;
 use App\Models\User;
+use App\Privacy\Actions\DenyPrivacyErasureAction;
 use App\Privacy\Actions\SubmitDataSubjectRequestAction;
 use App\Privacy\Contracts\DataSubjectRequestExecutionPolicy;
 use App\Privacy\DataSubjectRequestStatus;
@@ -51,5 +53,29 @@ class DataSubjectRequestFoundationTest extends TestCase
         $this->assertSame('export_execution_allowed', $exportDecision->reasonCode);
         $this->assertFalse($deletionDecision->allowed);
         $this->assertSame('retention_policy_pending', $deletionDecision->reasonCode);
+    }
+
+    public function test_deletion_erasure_is_denied_and_can_be_recorded_as_rejected(): void
+    {
+        $actor = User::factory()->create();
+        $request = $this->app->make(SubmitDataSubjectRequestAction::class)->handle(
+            Person::factory()->create(),
+            DataSubjectRequestType::Deletion,
+            'delete-1',
+            null,
+            $actor,
+        );
+        $action = $this->app->make(DenyPrivacyErasureAction::class);
+
+        try {
+            $action->handle($request, $actor, false);
+            $this->fail('Expected erasure to be denied.');
+        } catch (DataExportExecutionDeniedException $exception) {
+            $this->assertSame('retention_policy_pending', $exception->getMessage());
+        }
+
+        $denied = $action->handle($request, $actor, true);
+        $this->assertSame(DataSubjectRequestStatus::Rejected, $denied->status);
+        $this->assertSame(1, AuditEvent::query()->where('action', 'privacy.data_subject_request.erasure_denied')->count());
     }
 }

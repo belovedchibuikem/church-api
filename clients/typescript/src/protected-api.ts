@@ -240,7 +240,7 @@ export interface RegisterUserEventRegistrationInput { idempotency_key?: string; 
 export interface RecordUserEventFeedbackInput { rating: number; registration_id: string; }
 export interface SubmitUserDataSubjectRequestInput { request_type: string; notes?: string | null; }
 export interface StoreUserFileAssetInput { purpose: string; classification: string; [key: string]: JsonValue; }
-export interface StartUserChurchMembershipInput { home_church_id?: string | null; }
+export interface StartUserChurchMembershipInput { home_church_id?: string | null; confirm_transfer?: boolean; }
 export interface SubmitUserHomeChurchReportInput { summary: string; period_code?: string | null; }
 export interface UserHomeChurchReportSubmission { id: string; status: 'submitted'; submitted_at: string; }
 

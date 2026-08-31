@@ -22,6 +22,7 @@ class CreateKcaCohortRequest extends FormRequest
             'name' => ['required', 'string', 'max:150'],
             'starts_on' => ['required', 'date'],
             'ends_on' => ['required', 'date', 'after_or_equal:starts_on'],
+            'timezone' => ['sometimes', 'nullable', 'string', 'max:64'],
         ];
     }
 }

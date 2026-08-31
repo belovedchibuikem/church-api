@@ -58,4 +58,20 @@ class NotificationController extends Controller
             NotificationResource::make($owned->fresh(['recipient.broadcast.template']))->resolve($request),
         );
     }
+
+    public function markAllRead(Request $request): JsonResponse
+    {
+        $user = $this->actor($request);
+        $person = $this->person($request);
+
+        CommunicationNotification::query()
+            ->whereNull('read_at')
+            ->where(function ($query) use ($user, $person): void {
+                $query->where('user_id', $user->getKey())
+                    ->orWhere('person_id', $person->getKey());
+            })
+            ->update(['read_at' => now()]);
+
+        return $this->index($request);
+    }
 }

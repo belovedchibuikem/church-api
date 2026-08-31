@@ -3,8 +3,11 @@
 namespace App\Finance\Actions;
 
 use App\Exceptions\PaymentGovernanceDeniedException;
+use App\Files\FileAssetStatus;
 use App\Finance\Contracts\PaymentGovernancePolicy;
+use App\Finance\GivingPurpose;
 use App\Finance\PaymentIntentStatus;
+use App\Models\FileAsset;
 use App\Models\PaymentIntent;
 use App\Models\PaymentReceipt;
 use App\Models\PaymentTransaction;
@@ -27,9 +30,9 @@ class CompleteLocalGivingAction
     /**
      * @return array{intent: PaymentIntent, transaction: PaymentTransaction, receipt: PaymentReceipt}
      */
-    public function handle(PaymentIntent $intent, Person $payer, User $actor): array
+    public function handle(PaymentIntent $intent, Person $payer, User $actor, FileAsset $proof): array
     {
-        if ($intent->purpose_code !== 'giving') {
+        if (! GivingPurpose::isMemberGiving((string) $intent->purpose_code)) {
             throw new InvalidArgumentException('Only giving intents can be completed via the local gateway.');
         }
 
@@ -41,11 +44,13 @@ class CompleteLocalGivingAction
             throw new LogicException('Local giving completion requires PAYMENT_GATEWAY=local_manual.');
         }
 
-        if (! $this->governance->allowsPaymentIntent('giving', (string) $intent->currency, $payer)) {
+        $this->assertOwnedProof($proof, $payer);
+
+        if (! $this->governance->allowsPaymentIntent((string) $intent->purpose_code, (string) $intent->currency, $payer)) {
             throw new PaymentGovernanceDeniedException('Payment governance has not enabled local giving completion.');
         }
 
-        return DB::transaction(function () use ($intent, $payer, $actor): array {
+        return DB::transaction(function () use ($intent, $payer, $actor, $proof): array {
             $locked = PaymentIntent::query()->lockForUpdate()->findOrFail($intent->getKey());
 
             if ($locked->status === PaymentIntentStatus::Succeeded) {
@@ -90,6 +95,7 @@ class CompleteLocalGivingAction
             $locked->forceFill([
                 'status' => PaymentIntentStatus::Succeeded,
                 'succeeded_at' => now()->utc(),
+                'proof_file_asset_id' => $proof->getKey(),
             ])->save();
 
             $this->recordAuditEvent->handle(new AuditEventData(
@@ -106,10 +112,23 @@ class CompleteLocalGivingAction
             ));
 
             return [
-                'intent' => $locked->fresh(),
+                'intent' => $locked->fresh(['proofFileAsset']),
                 'transaction' => $transaction,
                 'receipt' => $receipt,
             ];
         }, attempts: 3);
+    }
+
+    private function assertOwnedProof(FileAsset $proof, Person $payer): void
+    {
+        if ((int) $proof->owner_person_id !== (int) $payer->getKey()) {
+            throw new InvalidArgumentException('Payment receipt must be uploaded by the giver.');
+        }
+        if ($proof->purpose !== GivingPurpose::PROOF_FILE_PURPOSE) {
+            throw new InvalidArgumentException('Upload a payment receipt before completing a manual gift.');
+        }
+        if ($proof->status === FileAssetStatus::Rejected || $proof->deleted_at !== null) {
+            throw new InvalidArgumentException('The uploaded payment receipt was rejected. Upload a new file.');
+        }
     }
 }

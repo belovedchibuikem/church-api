@@ -1261,6 +1261,7 @@ function protectedDomainSchemas(): array
             'type' => 'object',
             'properties' => [
                 'home_church_id' => ['type' => ['string', 'null']],
+                'confirm_transfer' => ['type' => 'boolean'],
             ],
             'additionalProperties' => false,
         ],

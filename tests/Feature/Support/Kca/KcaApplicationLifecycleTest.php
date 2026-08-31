@@ -74,6 +74,15 @@ class KcaApplicationLifecycleTest extends TestCase
         }
     }
 
+    public function test_received_application_can_request_information(): void
+    {
+        $application = KcaApplication::factory()->create();
+        $actor = User::factory()->create();
+        $updated = $this->app->make(TransitionKcaApplicationAction::class)
+            ->handle($application, KcaApplicationState::InformationRequired, $actor);
+        $this->assertSame(KcaApplicationState::InformationRequired, $updated->status);
+    }
+
     public function test_audit_failure_rolls_back_application_transition(): void
     {
         $application = KcaApplication::factory()->create();

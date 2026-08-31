@@ -22,6 +22,7 @@ class KcaModuleFactory extends Factory
             'code' => 'module-'.Str::lower(Str::random(12)),
             'title' => fake()->sentence(3),
             'sequence' => fake()->numberBetween(1, 5000),
+            'duration_days' => fake()->numberBetween(1, 14),
             'is_active' => true,
         ];
     }

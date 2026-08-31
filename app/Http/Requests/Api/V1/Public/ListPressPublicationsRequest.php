@@ -4,6 +4,7 @@ namespace App\Http\Requests\Api\V1\Public;
 
 use App\Press\LanguageCode;
 use App\Press\PressPublicationFormat;
+use App\Press\PressPublicationType;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -27,10 +28,11 @@ class ListPressPublicationsRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'filter' => ['sometimes', 'array:language,category,format'],
+            'filter' => ['sometimes', 'array:language,category,format,publication_type'],
             'filter.language' => ['sometimes', 'string', 'max:35', 'regex:/\A[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*\z/'],
             'filter.category' => ['sometimes', 'string', 'max:100'],
             'filter.format' => ['sometimes', Rule::enum(PressPublicationFormat::class)],
+            'filter.publication_type' => ['sometimes', Rule::enum(PressPublicationType::class)],
             'sort' => ['sometimes', 'string', Rule::in([
                 'publication_date',
                 '-publication_date',
@@ -54,7 +56,7 @@ class ListPressPublicationsRequest extends FormRequest
         }];
     }
 
-    /** @return array{language?: string, category?: string, format?: string} */
+    /** @return array{language?: string, category?: string, format?: string, publication_type?: string} */
     public function filters(): array
     {
         $validated = $this->validated();

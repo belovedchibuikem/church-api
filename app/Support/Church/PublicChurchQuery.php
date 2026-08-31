@@ -73,6 +73,9 @@ class PublicChurchQuery
                 'location.country:id,public_id,iso_code,name',
                 'location.administrativeUnit:id,public_id,name',
                 'mediaAttachments.fileAsset',
+                'homeChurches' => fn ($query) => $query
+                    ->where('status', 'active')
+                    ->select(['id', 'public_id', 'church_id', 'name', 'status', 'meeting_schedules']),
             ]);
     }
 }

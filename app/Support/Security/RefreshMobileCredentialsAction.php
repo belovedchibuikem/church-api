@@ -79,14 +79,7 @@ class RefreshMobileCredentialsAction
             $refreshToken->forceFill(['replaced_by_id' => $credentials->refreshToken->getKey()])->save();
 
             $seenAt = now()->utc();
-            $sessionTouch = ['last_seen_at' => $seenAt];
-            // Keep long-lived sessions alive while the user continues to refresh.
-            if ($securitySession->expires_at !== null) {
-                $sessionTouch['expires_at'] = $seenAt->copy()->addSeconds(
-                    min(max((int) config('api.mobile.refresh_ttl_seconds'), 3600), 7_776_000),
-                );
-            }
-            $securitySession->forceFill($sessionTouch)->save();
+            $securitySession->forceFill(['last_seen_at' => $seenAt])->save();
             $device->forceFill(['last_seen_at' => $seenAt])->save();
 
             $this->recordAuditEvent->handle(new AuditEventData(

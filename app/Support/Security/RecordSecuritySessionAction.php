@@ -26,12 +26,14 @@ class RecordSecuritySessionAction
         ?Device $device = null,
         ?DateTimeInterface $expiresAt = null,
         ?User $actor = null,
+        ?string $ipAddress = null,
+        ?string $countryCode = null,
     ): SecuritySession {
         if ($expiresAt !== null && $expiresAt <= now()) {
             throw new InvalidArgumentException('The security session expiration must be in the future.');
         }
 
-        return DB::transaction(function () use ($user, $device, $expiresAt, $actor): SecuritySession {
+        return DB::transaction(function () use ($user, $device, $expiresAt, $actor, $ipAddress, $countryCode): SecuritySession {
             $lockedUser = User::query()->lockForUpdate()->findOrFail($user->getKey());
 
             if ($lockedUser->isSuspended()) {
@@ -46,6 +48,10 @@ class RecordSecuritySessionAction
                 'started_at' => $startedAt,
                 'last_seen_at' => $startedAt,
                 'expires_at' => $expiresAt === null ? null : Carbon::instance($expiresAt)->utc(),
+                'last_ip' => $ipAddress,
+                'last_country' => $countryCode !== null && preg_match('/\A[A-Za-z]{2}\z/', $countryCode) === 1
+                    ? strtoupper($countryCode)
+                    : null,
             ]);
 
             $this->recordAuditEvent->handle(new AuditEventData(

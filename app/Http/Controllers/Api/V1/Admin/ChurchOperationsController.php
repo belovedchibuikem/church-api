@@ -2,7 +2,10 @@
 
 namespace App\Http\Controllers\Api\V1\Admin;
 
+use App\Church\FollowUpTaskStatus;
+use App\Church\FollowUpTaskType;
 use App\Church\HomeChurchApplicationStatus;
+use App\Church\HomeChurchStatus;
 use App\Church\MeetingDay;
 use App\Http\Controllers\Api\V1\Admin\Concerns\ExecutesDomainMutations;
 use App\Http\Controllers\Controller;
@@ -10,14 +13,15 @@ use App\Http\Requests\Api\V1\Admin\AssignPrayerRequestRequest;
 use App\Http\Requests\Api\V1\Admin\CompleteFollowUpTaskRequest;
 use App\Http\Requests\Api\V1\Admin\CreateAdminHomeChurchApplicationRequest;
 use App\Http\Requests\Api\V1\Admin\CreateChurchRequest;
+use App\Http\Requests\Api\V1\Admin\CreateHomeChurchRequest;
 use App\Http\Requests\Api\V1\Admin\EndChurchMembershipRequest;
-use App\Http\Requests\Api\V1\Admin\UpdateChurchRequest;
 use App\Http\Requests\Api\V1\Admin\ListProtectedDomainRecordsRequest;
 use App\Http\Requests\Api\V1\Admin\RegisterFirstTimerRequest;
-use App\Http\Requests\Api\V1\Admin\UpdateFirstTimerRequest;
 use App\Http\Requests\Api\V1\Admin\StartChurchMembershipRequest;
 use App\Http\Requests\Api\V1\Admin\TransitionHomeChurchApplicationRequest;
 use App\Http\Requests\Api\V1\Admin\TransitionPastoralRecordRequest;
+use App\Http\Requests\Api\V1\Admin\UpdateChurchRequest;
+use App\Http\Requests\Api\V1\Admin\UpdateFirstTimerRequest;
 use App\Http\Resources\Api\V1\Admin\ProtectedDomainRecordResource;
 use App\Models\AdministrativeUnit;
 use App\Models\Church;
@@ -37,16 +41,20 @@ use App\Support\Api\ApiResponse;
 use App\Support\Authorization\ScopeReference;
 use App\Support\Church\CompleteFollowUpTaskAction;
 use App\Support\Church\CreateChurchAction;
+use App\Support\Church\CreateHomeChurchAction;
 use App\Support\Church\CreateHomeChurchApplicationAction;
 use App\Support\Church\DeleteChurchAction;
 use App\Support\Church\DeleteFirstTimerAction;
 use App\Support\Church\EndChurchMembershipAction;
-use App\Support\Church\UpdateChurchAction;
-use App\Support\Church\UpdateFirstTimerAction;
 use App\Support\Church\HomeChurchApplicationData;
 use App\Support\Church\RegisterFirstTimerAction;
 use App\Support\Church\StartChurchMembershipAction;
 use App\Support\Church\TransitionHomeChurchApplicationAction;
+use App\Support\Church\UpdateChurchAction;
+use App\Support\Church\UpdateChurchStatusAction;
+use App\Support\Church\UpdateFirstTimerAction;
+use App\Support\Church\UpdateHomeChurchAction;
+use App\Support\Church\UpdateHomeChurchStatusAction;
 use App\Support\Identity\PersonDisplayName;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -63,6 +71,22 @@ class ChurchOperationsController extends Controller
     public function churches(ListProtectedDomainRecordsRequest $request, ProtectedDomainCatalogQuery $catalog, ProtectedAdminContext $context): JsonResponse
     {
         return $this->page($request, $catalog->churches($context->scope($request), $request->validated('filter', []), (int) $request->validated('per_page', 25)));
+    }
+
+    public function showChurch(Request $request, string $church, ProtectedAdminContext $context): JsonResponse
+    {
+        $target = Church::query()
+            ->with([
+                'location:id,public_id,country_id,administrative_unit_id,name,address_line_one,address_line_two,locality,postal_code,timezone',
+                'location.country:id,public_id,iso_code,name',
+                'administrativeUnit:id,public_id,name',
+            ])
+            ->withCount(['homeChurches', 'memberships', 'firstTimers', 'homeChurchApplications'])
+            ->where('public_id', $church)
+            ->firstOrFail();
+        $context->ensureContains($request, $target->scopeReference());
+
+        return ApiResponse::success($request, (new ProtectedDomainRecordResource($target))->resolve($request));
     }
 
     public function storeChurch(CreateChurchRequest $request, CreateChurchAction $action, ProtectedAdminContext $context): JsonResponse
@@ -103,6 +127,29 @@ class ChurchOperationsController extends Controller
         return ApiResponse::success($request, (new ProtectedDomainRecordResource($updated))->resolve($request));
     }
 
+    public function updateChurchStatus(Request $request, string $church, UpdateChurchStatusAction $action, ProtectedAdminContext $context): JsonResponse
+    {
+        $data = $request->validate([
+            'status' => ['required', 'string', 'in:active,published,unpublished,suspended,closed'],
+            'reason' => ['required', 'string', 'max:2000'],
+        ]);
+        $target = Church::query()->where('public_id', $church)->firstOrFail();
+        $context->ensureContains($request, $target->scopeReference());
+        $updated = $this->execute(fn (): Church => $action->handle(
+            $target,
+            $data['status'],
+            $data['reason'],
+            $context->actor($request),
+        ));
+        $updated->load([
+            'location:id,public_id,country_id,administrative_unit_id,name,address_line_one,address_line_two,locality,postal_code,timezone',
+            'location.country:id,public_id,iso_code,name',
+            'administrativeUnit:id,public_id,name',
+        ])->loadCount(['homeChurches', 'memberships', 'firstTimers', 'homeChurchApplications']);
+
+        return ApiResponse::success($request, (new ProtectedDomainRecordResource($updated))->resolve($request));
+    }
+
     public function destroyChurch(Request $request, string $church, DeleteChurchAction $action, ProtectedAdminContext $context): JsonResponse
     {
         $target = Church::query()->where('public_id', $church)->firstOrFail();
@@ -121,9 +168,104 @@ class ChurchOperationsController extends Controller
         return $this->page($request, $catalog->homeChurches($context->scope($request), $request->validated('filter', []), (int) $request->validated('per_page', 25)));
     }
 
+    public function storeHomeChurch(CreateHomeChurchRequest $request, CreateHomeChurchAction $action, ProtectedAdminContext $context): JsonResponse
+    {
+        $church = Church::query()->where('public_id', $request->validated('church_id'))->firstOrFail();
+        $context->ensureContains($request, $church->scopeReference());
+        $leader = Person::query()->where('public_id', $request->validated('leader_person_id'))->firstOrFail();
+        $location = Location::query()->where('public_id', $request->validated('location_id'))->firstOrFail();
+        $unit = AdministrativeUnit::query()->where('public_id', $request->validated('administrative_unit_id'))->firstOrFail();
+        $context->ensureContains($request, new ScopeReference('administrative_unit', $unit->public_id));
+        $homeChurch = $this->execute(fn (): HomeChurch => $action->handle(
+            $church,
+            $leader,
+            $location,
+            $unit,
+            (string) $request->validated('name'),
+            $context->actor($request),
+        ));
+        $homeChurch->load([
+            'church:id,public_id,name',
+            ...PersonDisplayName::eager('leader'),
+        ]);
+
+        return ApiResponse::success($request, (new ProtectedDomainRecordResource($homeChurch))->resolve($request), status: 201);
+    }
+
+    public function showHomeChurch(Request $request, string $homeChurch, ProtectedAdminContext $context): JsonResponse
+    {
+        $target = HomeChurch::query()
+            ->with([
+                'church:id,public_id,name',
+                'location:id,public_id,name',
+                'administrativeUnit:id,public_id,name',
+                ...PersonDisplayName::eager('leader'),
+            ])
+            ->withCount('memberships')
+            ->where('public_id', $homeChurch)
+            ->firstOrFail();
+        $context->ensureContains($request, $target->church->scopeReference());
+
+        return ApiResponse::success($request, (new ProtectedDomainRecordResource($target))->resolve($request));
+    }
+
+    public function updateHomeChurch(Request $request, string $homeChurch, UpdateHomeChurchAction $action, ProtectedAdminContext $context): JsonResponse
+    {
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:191'],
+            'leader_person_id' => ['required', 'ulid', 'exists:people,public_id'],
+        ]);
+        $target = HomeChurch::query()->with('church')->where('public_id', $homeChurch)->firstOrFail();
+        $context->ensureContains($request, $target->church->scopeReference());
+        $leader = Person::query()->where('public_id', $data['leader_person_id'])->firstOrFail();
+        $updated = $this->execute(fn (): HomeChurch => $action->handle($target, $data['name'], $leader, $context->actor($request)));
+        $updated->load(['church:id,public_id,name', 'location:id,public_id,name', 'administrativeUnit:id,public_id,name', ...PersonDisplayName::eager('leader')])
+            ->loadCount('memberships');
+
+        return ApiResponse::success($request, (new ProtectedDomainRecordResource($updated))->resolve($request));
+    }
+
+    public function updateHomeChurchStatus(Request $request, string $homeChurch, UpdateHomeChurchStatusAction $action, ProtectedAdminContext $context): JsonResponse
+    {
+        $data = $request->validate([
+            'status' => ['required', 'string', 'in:active,suspended,closed'],
+            'reason' => ['required', 'string', 'max:2000'],
+        ]);
+        $target = HomeChurch::query()->with('church')->where('public_id', $homeChurch)->firstOrFail();
+        $context->ensureContains($request, $target->church->scopeReference());
+        $updated = $this->execute(fn (): HomeChurch => $action->handle(
+            $target,
+            HomeChurchStatus::from($data['status']),
+            $data['reason'],
+            $context->actor($request),
+        ));
+        $updated->load(['church:id,public_id,name', ...PersonDisplayName::eager('leader')])->loadCount('memberships');
+
+        return ApiResponse::success($request, (new ProtectedDomainRecordResource($updated))->resolve($request));
+    }
+
     public function applications(ListProtectedDomainRecordsRequest $request, ProtectedDomainCatalogQuery $catalog, ProtectedAdminContext $context): JsonResponse
     {
         return $this->page($request, $catalog->homeChurchApplications($context->scope($request), $request->validated('filter', []), (int) $request->validated('per_page', 25)));
+    }
+
+    public function showApplication(Request $request, string $application, ProtectedAdminContext $context): JsonResponse
+    {
+        $target = HomeChurchApplication::query()
+            ->with([
+                'church:id,public_id,name',
+                'homeChurch:id,public_id,name',
+                'location:id,public_id,name',
+                'administrativeUnit:id,public_id,name',
+                'transitions' => fn ($query) => $query->orderBy('occurred_at'),
+                ...PersonDisplayName::eager('applicant'),
+            ])
+            ->where('public_id', $application)
+            ->firstOrFail();
+        $church = Church::query()->findOrFail($target->church_id);
+        $context->ensureContains($request, $church->scopeReference());
+
+        return ApiResponse::success($request, (new ProtectedDomainRecordResource($target))->resolve($request));
     }
 
     public function transitionApplication(TransitionHomeChurchApplicationRequest $request, string $application, TransitionHomeChurchApplicationAction $action, ProtectedAdminContext $context): JsonResponse
@@ -136,8 +278,19 @@ class ChurchOperationsController extends Controller
             HomeChurchApplicationStatus::from((string) $request->validated('status')),
             (string) $request->validated('reason_code'),
             $context->actor($request),
+            $request->validated('notes'),
+            $request->validated('expected_status')
+                ? HomeChurchApplicationStatus::from((string) $request->validated('expected_status'))
+                : null,
         ));
-        $updated->load(['church:id,public_id,name', 'homeChurch:id,public_id,name', ...PersonDisplayName::eager('applicant')]);
+        $updated->load([
+            'church:id,public_id,name',
+            'homeChurch:id,public_id,name',
+            'location:id,public_id,name',
+            'administrativeUnit:id,public_id,name',
+            'transitions' => fn ($query) => $query->orderBy('occurred_at'),
+            ...PersonDisplayName::eager('applicant'),
+        ]);
 
         return ApiResponse::success($request, (new ProtectedDomainRecordResource($updated))->resolve($request));
     }
@@ -210,6 +363,39 @@ class ChurchOperationsController extends Controller
         return $this->page($request, $catalog->followUpTasks($context->scope($request), $request->validated('filter', []), (int) $request->validated('per_page', 25)));
     }
 
+    public function storeFollowUpTask(Request $request, ProtectedAdminContext $context): JsonResponse
+    {
+        $data = $request->validate([
+            'first_timer_id' => ['required', 'ulid', 'exists:first_timers,public_id'],
+            'assigned_to_person_id' => ['nullable', 'ulid', 'exists:people,public_id'],
+            'due_at' => ['nullable', 'date'],
+        ]);
+        $firstTimer = FirstTimer::query()->with('church')->where('public_id', $data['first_timer_id'])->firstOrFail();
+        $context->ensureContains($request, $firstTimer->church->scopeReference());
+        $assignee = isset($data['assigned_to_person_id'])
+            ? Person::query()->where('public_id', $data['assigned_to_person_id'])->firstOrFail()
+            : null;
+        $task = $this->execute(function () use ($firstTimer, $assignee, $data): FollowUpTask {
+            $record = new FollowUpTask([
+                'first_timer_id' => $firstTimer->getKey(),
+                'assigned_to_person_id' => $assignee?->getKey(),
+                'type' => FollowUpTaskType::FirstTimerContact,
+                'due_at' => isset($data['due_at']) ? CarbonImmutable::parse($data['due_at']) : now()->utc()->addDays(3),
+            ]);
+            $record->status = FollowUpTaskStatus::Pending;
+            $record->save();
+
+            return $record;
+        });
+        $task->load([
+            'firstTimer.church:id,public_id,name',
+            ...PersonDisplayName::eager('firstTimer.person'),
+            ...PersonDisplayName::eager('assignedTo'),
+        ]);
+
+        return ApiResponse::success($request, (new ProtectedDomainRecordResource($task))->resolve($request), status: 201);
+    }
+
     public function completeFollowUpTask(CompleteFollowUpTaskRequest $request, string $task, CompleteFollowUpTaskAction $action, ProtectedAdminContext $context): JsonResponse
     {
         $target = FollowUpTask::query()->with('firstTimer.church')->where('public_id', $task)->firstOrFail();
@@ -229,18 +415,25 @@ class ChurchOperationsController extends Controller
     {
         $church = Church::query()->where('public_id', $request->validated('church_id'))->firstOrFail();
         $context->ensureContains($request, $church->scopeReference());
+        $schedules = $request->validated('meeting_schedules');
+        $meetingDay = $request->validated('meeting_day')
+            ?? (is_array($schedules) ? ($schedules[0]['day'] ?? MeetingDay::Sunday->value) : MeetingDay::Sunday->value);
+        $meetingTime = $request->validated('meeting_time')
+            ?? (is_array($schedules) ? ($schedules[0]['time'] ?? '18:00') : '18:00');
         $application = $this->execute(fn (): HomeChurchApplication => $action->handle(new HomeChurchApplicationData(
             applicant: Person::query()->where('public_id', $request->validated('applicant_person_id'))->firstOrFail(),
             church: $church,
             location: Location::query()->where('public_id', $request->validated('location_id'))->firstOrFail(),
             administrativeUnit: AdministrativeUnit::query()->where('public_id', $request->validated('administrative_unit_id'))->firstOrFail(),
-            proposedName: (string) $request->validated('proposed_name'),
+            proposedName: (string) ($request->validated('proposed_name') ?? ''),
             expectedParticipants: (int) $request->validated('expected_participants'),
-            meetingDay: MeetingDay::from((string) $request->validated('meeting_day')),
-            meetingTime: (string) $request->validated('meeting_time'),
+            meetingDay: MeetingDay::from((string) $meetingDay),
+            meetingTime: (string) $meetingTime,
             contactEmail: (string) $request->validated('contact_email'),
             contactPhone: (string) $request->validated('contact_phone'),
             guidelinesAgreedAt: CarbonImmutable::parse((string) $request->validated('guidelines_agreed_at')),
+            residenceFamilyName: $request->validated('residence_family_name'),
+            meetingSchedules: is_array($schedules) ? $schedules : null,
         ), $context->actor($request)));
         $application->load(['church:id,public_id,name', 'homeChurch:id,public_id,name', ...PersonDisplayName::eager('applicant')]);
 
@@ -283,6 +476,28 @@ class ChurchOperationsController extends Controller
     public function prayerRequests(ListProtectedDomainRecordsRequest $request, ProtectedDomainCatalogQuery $catalog, ProtectedAdminContext $context): JsonResponse
     {
         return $this->page($request, $catalog->prayerRequests($context->scope($request), $request->validated('filter', []), (int) $request->validated('per_page', 25)));
+    }
+
+    public function storePrayerRequest(Request $request, ProtectedAdminContext $context): JsonResponse
+    {
+        $data = $request->validate([
+            'person_id' => ['required', 'ulid', 'exists:people,public_id'],
+            'subject' => ['required', 'string', 'max:191'],
+            'body' => ['required', 'string', 'max:5000'],
+        ]);
+        $person = Person::query()->with(['memberships.church', 'firstTimers.church'])->where('public_id', $data['person_id'])->firstOrFail();
+        $this->ensurePersonInChurchScope($request, $context, $person);
+        $prayer = $this->execute(fn (): PrayerRequest => tap(new PrayerRequest, function (PrayerRequest $record) use ($person, $data): void {
+            $record->forceFill([
+                'person_id' => $person->getKey(),
+                'subject' => $data['subject'],
+                'body' => $data['body'],
+                'status' => 'open',
+            ])->save();
+        }));
+        $prayer->load(PersonDisplayName::eager());
+
+        return ApiResponse::success($request, (new ProtectedDomainRecordResource($prayer))->resolve($request), status: 201);
     }
 
     public function transitionPrayerRequest(TransitionPastoralRecordRequest $request, string $prayer, ProtectedAdminContext $context): JsonResponse
@@ -341,6 +556,28 @@ class ChurchOperationsController extends Controller
     public function pastoralNeeds(ListProtectedDomainRecordsRequest $request, ProtectedDomainCatalogQuery $catalog, ProtectedAdminContext $context): JsonResponse
     {
         return $this->page($request, $catalog->pastoralNeeds($context->scope($request), $request->validated('filter', []), (int) $request->validated('per_page', 25)));
+    }
+
+    public function storePastoralNeed(Request $request, ProtectedAdminContext $context): JsonResponse
+    {
+        $data = $request->validate([
+            'person_id' => ['required', 'ulid', 'exists:people,public_id'],
+            'category' => ['required', 'string', 'max:100'],
+            'summary' => ['required', 'string', 'max:2000'],
+        ]);
+        $person = Person::query()->where('public_id', $data['person_id'])->firstOrFail();
+        $this->ensurePersonInChurchScope($request, $context, $person);
+        $need = $this->execute(fn (): PastoralNeed => tap(new PastoralNeed, function (PastoralNeed $record) use ($person, $data): void {
+            $record->forceFill([
+                'person_id' => $person->getKey(),
+                'category' => $data['category'],
+                'summary' => $data['summary'],
+                'status' => 'open',
+            ])->save();
+        }));
+        $need->load(PersonDisplayName::eager());
+
+        return ApiResponse::success($request, (new ProtectedDomainRecordResource($need))->resolve($request), status: 201);
     }
 
     public function transitionPastoralNeed(TransitionPastoralRecordRequest $request, string $need, ProtectedAdminContext $context): JsonResponse

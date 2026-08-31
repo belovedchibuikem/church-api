@@ -68,15 +68,20 @@ class PublicPressCatalogueApiTest extends TestCase
             'edition',
             'format',
             'id',
+            'image_url',
             'isbn',
             'isbn_type',
             'language',
             'page_count',
             'publication_date',
+            'publication_type',
             'published_at',
             'publisher',
+            'slug',
             'subtitle',
+            'summary',
             'title',
+            'type_metadata',
         ], $this->sortedKeys($response->json('data.0')));
     }
 

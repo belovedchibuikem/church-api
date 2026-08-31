@@ -69,6 +69,11 @@ class SubmitPublicHomeChurchApplicationAction
                     contactEmail: $data->contactEmail,
                     contactPhone: $data->contactPhone,
                     guidelinesAgreedAt: now()->utc(),
+                    residenceFamilyName: $data->residenceFamilyName,
+                    meetingSchedules: array_map(
+                        static fn ($slot): array => $slot->toArray(),
+                        $data->meetingSchedules,
+                    ),
                 ));
                 $application->forceFill([
                     'public_idempotency_scope_hash' => $scopeHash,

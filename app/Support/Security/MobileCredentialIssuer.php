@@ -24,9 +24,8 @@ class MobileCredentialIssuer
         $plainAccessToken = $this->randomCredential();
         $plainRefreshToken = $this->randomCredential();
         $now = now()->utc();
-        // Access tokens stay short-lived; refresh keeps the session until logout.
-        $accessTtl = min(max((int) config('api.mobile.access_ttl_seconds'), 60), 3600);
-        $refreshTtl = min(max((int) config('api.mobile.refresh_ttl_seconds'), 3600), 7_776_000);
+        $accessTtl = MobileCredentialTtl::accessSeconds();
+        $refreshTtl = MobileCredentialTtl::sessionSeconds();
         $accessExpiresAt = $now->copy()->addSeconds($accessTtl);
         $refreshExpiresAt = $now->copy()->addSeconds($refreshTtl);
 

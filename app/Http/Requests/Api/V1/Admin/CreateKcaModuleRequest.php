@@ -21,6 +21,7 @@ class CreateKcaModuleRequest extends FormRequest
             'code' => ['required', 'string', 'max:50'],
             'title' => ['required', 'string', 'max:191'],
             'sequence' => ['required', 'integer', 'min:1', 'max:65535'],
+            'duration_days' => ['required', 'integer', 'min:1', 'max:365'],
         ];
     }
 }

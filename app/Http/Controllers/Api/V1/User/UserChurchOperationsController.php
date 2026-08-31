@@ -3,7 +3,10 @@
 namespace App\Http\Controllers\Api\V1\User;
 
 use App\Church\ChurchMembershipStatus;
+use App\Church\MembershipJoinIntent;
+use App\Exceptions\MembershipTransferRequiredException;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\V1\User\JoinUserHomeChurchMembershipRequest;
 use App\Http\Requests\Api\V1\User\ListUserRecordsRequest;
 use App\Http\Requests\Api\V1\User\StartUserChurchMembershipRequest;
 use App\Http\Requests\Api\V1\User\SubmitHomeChurchReportRequest;
@@ -46,6 +49,31 @@ class UserChurchOperationsController extends Controller
             $homeChurch,
             null,
             $user,
+            $homeChurch === null ? MembershipJoinIntent::Conventional : MembershipJoinIntent::HomeChurch,
+            (bool) $request->boolean('confirm_transfer'),
+        ));
+        $membership->load(['person:id,public_id', 'church:id,public_id,name', 'homeChurch:id,public_id,name']);
+
+        return ApiResponse::success($request, (new ProtectedDomainRecordResource($membership))->resolve($request), status: 201);
+    }
+
+    public function joinHomeChurch(
+        JoinUserHomeChurchMembershipRequest $request,
+        string $homeChurch,
+        StartChurchMembershipAction $action,
+    ): JsonResponse {
+        $user = $this->actor($request);
+        $person = $this->requirePerson($user);
+        $target = HomeChurch::query()->where('public_id', $homeChurch)->firstOrFail();
+        $parent = Church::query()->findOrFail($target->church_id);
+        $membership = $this->execute(fn (): ChurchMembership => $action->handle(
+            $person,
+            $parent,
+            $target,
+            null,
+            $user,
+            MembershipJoinIntent::HomeChurch,
+            (bool) $request->boolean('confirm_transfer'),
         ));
         $membership->load(['person:id,public_id', 'church:id,public_id,name', 'homeChurch:id,public_id,name']);
 
@@ -234,6 +262,8 @@ class UserChurchOperationsController extends Controller
     {
         try {
             return $operation();
+        } catch (MembershipTransferRequiredException $exception) {
+            throw $exception;
         } catch (InvalidArgumentException|LogicException|DomainException $exception) {
             throw new UnprocessableEntityHttpException(previous: $exception);
         }

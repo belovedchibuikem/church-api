@@ -43,8 +43,21 @@ class TransitionPressPublicationAction
                 throw new DomainException("Publication cannot transition from {$from->value} to {$to->value}.");
             }
 
-            if ($to === PressPublicationStatus::Published && $lockedPublication->isbn === null) {
-                throw new DomainException('A publication must have a valid ISBN before publication.');
+            if ($to === PressPublicationStatus::PublicationApproval
+                && $from === PressPublicationStatus::Design
+                && $lockedPublication->requiresIsbnToPublish()
+                && $lockedPublication->isbn === null) {
+                throw new DomainException('Books must receive an ISBN before publication approval.');
+            }
+
+            if ($to === PressPublicationStatus::Published) {
+                if ($lockedPublication->requiresIsbnToPublish() && $lockedPublication->isbn === null) {
+                    throw new DomainException('A publication must have a valid ISBN before publication.');
+                }
+
+                if ($lockedPublication->hasUnreadyRequiredAssets()) {
+                    throw new DomainException('Required digital assets must be ready before publication.');
+                }
             }
 
             $now = now()->utc();
@@ -53,11 +66,23 @@ class TransitionPressPublicationAction
 
             if ($to === PressPublicationStatus::Published) {
                 $lockedPublication->published_at = $now;
+                $lockedPublication->scheduled_publish_at = null;
             }
 
             if ($to === PressPublicationStatus::Distribution) {
                 $lockedPublication->distributed_at = $now;
                 $lockedPublication->availability = PressPublicationAvailability::Available;
+            }
+
+            if ($to === PressPublicationStatus::Unpublished) {
+                $lockedPublication->unpublished_at = $now;
+                $lockedPublication->availability = PressPublicationAvailability::Unavailable;
+                $lockedPublication->scheduled_unpublish_at = null;
+            }
+
+            if ($to === PressPublicationStatus::Archived) {
+                $lockedPublication->archived_at = $now;
+                $lockedPublication->availability = PressPublicationAvailability::Unavailable;
             }
 
             $lockedPublication->save();

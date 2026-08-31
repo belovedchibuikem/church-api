@@ -23,6 +23,7 @@ class CrusadeFactory extends Factory
             'starts_at' => now()->addMonth(),
             'ends_at' => now()->addMonth()->addDays(2),
             'published_at' => null,
+            'status' => 'draft',
         ];
     }
 

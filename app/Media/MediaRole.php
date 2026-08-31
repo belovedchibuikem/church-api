@@ -9,4 +9,5 @@ enum MediaRole: string
     case Thumbnail = 'thumbnail';
     case Avatar = 'avatar';
     case Logo = 'logo';
+    case Document = 'document';
 }

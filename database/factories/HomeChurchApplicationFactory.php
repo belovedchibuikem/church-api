@@ -43,6 +43,9 @@ class HomeChurchApplicationFactory extends Factory
             'expected_participants' => fake()->numberBetween(4, 20),
             'meeting_day' => fake()->randomElement(MeetingDay::cases()),
             'meeting_time' => '18:00:00',
+            'meeting_schedules' => [
+                ['day' => 'sunday', 'time' => '18:00', 'activity' => 'Main service'],
+            ],
             'contact_email' => fake()->safeEmail(),
             'contact_phone' => '+234'.fake()->numerify('##########'),
             'guidelines_agreed_at' => now(),

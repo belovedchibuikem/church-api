@@ -24,6 +24,11 @@ class KcaLessonFactory extends Factory
             'code' => 'lesson-'.Str::lower(Str::random(12)),
             'title' => fake()->sentence(4),
             'sequence' => fake()->numberBetween(1, 5000),
+            'day_index' => 1,
+            'lesson_type' => 'text',
+            'requires_acknowledgement' => true,
+            'summary' => 'Published lesson summary.',
+            'body' => 'Read this lesson, then acknowledge completion.',
         ];
     }
 }

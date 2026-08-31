@@ -42,6 +42,9 @@ class UserPaymentIntentResource extends JsonResource
             'status' => $this->status instanceof \BackedEnum ? $this->status->value : $this->status,
             'provider_code' => $this->providerCode,
             'client_payload' => $this->clientPayload,
+            'proof_file_asset_id' => $this->relationLoaded('proofFileAsset')
+                ? $this->proofFileAsset?->public_id
+                : null,
             'transaction_id' => $latestTransaction?->public_id,
             'receipt_id' => $latestTransaction?->receipt?->public_id,
             'created_at' => $this->created_at?->toIso8601String(),

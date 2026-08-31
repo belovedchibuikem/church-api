@@ -195,7 +195,8 @@ class ContentPagesSeeder extends Seeder
                 'summary' => 'Sow into church, missions, and Kingdom training.',
                 'body' => 'Tithes, offerings, missions, and project gifts all flow through Family House Connect.',
                 'items' => [
-                    ['kind' => 'card', 'title' => 'Tithe & Offering', 'body' => 'Honour God with the first fruits of your increase.', 'href' => '/give'],
+                    ['kind' => 'card', 'title' => 'Tithe', 'body' => 'Honour God with the first fruits of your increase.', 'href' => '/give'],
+                    ['kind' => 'card', 'title' => 'Offering', 'body' => 'Sow into local church work as its own gift.', 'href' => '/give'],
                     ['kind' => 'card', 'title' => 'Missions', 'body' => 'Send crusade teams and care for field workers.', 'href' => '/give?fund=missions'],
                     ['kind' => 'card', 'title' => 'Projects', 'body' => 'Help finish church buildings and community wells.', 'href' => '/mission/projects'],
                 ],

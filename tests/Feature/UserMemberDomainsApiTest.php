@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\SecuritySession;
 use App\Models\User;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class UserMemberDomainsApiTest extends TestCase
@@ -44,7 +45,7 @@ class UserMemberDomainsApiTest extends TestCase
     public function test_giving_intent_is_denied_by_default_governance(): void
     {
         config()->set('finance.governance_mode', 'deny');
-        \Illuminate\Support\Facades\DB::table('payment_provider_configurations')->update(['is_active' => false]);
+        DB::table('payment_provider_configurations')->update(['is_active' => false]);
 
         $user = User::factory()->withPerson()->create();
         $this->authenticate($user, recentMfa: true);
@@ -52,6 +53,7 @@ class UserMemberDomainsApiTest extends TestCase
         $this->postJson('/api/v1/user/payments/giving-intents', [
             'amount_minor' => 5000,
             'currency' => 'NGN',
+            'purpose_code' => 'tithe',
         ], [
             'Idempotency-Key' => 'giving-test-key-001',
         ])->assertStatus(422)

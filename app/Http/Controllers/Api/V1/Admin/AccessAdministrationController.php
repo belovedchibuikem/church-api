@@ -13,14 +13,17 @@ use App\Models\RoleAssignment;
 use App\Models\RolePermission;
 use App\Models\ScopeAssignment;
 use App\Models\User;
+use App\Queries\User\ListUserCapabilitiesQuery;
 use App\Services\Admin\ProtectedAdminContext;
 use App\Support\Api\ApiResponse;
 use App\Support\Authorization\AssignRoleToUserAction;
 use App\Support\Authorization\AssignScopeToRoleAssignmentAction;
+use App\Support\Authorization\AuthorizationBundleCatalog;
 use App\Support\Authorization\GrantPermissionToRoleAction;
 use App\Support\Authorization\ScopeReference;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
 class AccessAdministrationController extends Controller
 {
@@ -31,6 +34,9 @@ class AccessAdministrationController extends Controller
         $context->ensureGlobal($request);
         $target = User::query()->where('public_id', $user)->firstOrFail();
         $role = Role::query()->where('public_id', $request->validated('role_id'))->firstOrFail();
+        if ($role->code === AuthorizationBundleCatalog::SUPER_ADMINISTRATOR_ROLE) {
+            $this->assertActorHoldsSuperAdministrator($context->actor($request));
+        }
         $assignment = $this->execute(fn (): RoleAssignment => $action->handle(
             $target,
             $role,
@@ -67,11 +73,15 @@ class AccessAdministrationController extends Controller
         ], status: 201);
     }
 
-    public function grantPermission(GrantPermissionToRoleRequest $request, string $role, GrantPermissionToRoleAction $action, ProtectedAdminContext $context): JsonResponse
+    public function grantPermission(GrantPermissionToRoleRequest $request, string $role, GrantPermissionToRoleAction $action, ProtectedAdminContext $context, ListUserCapabilitiesQuery $capabilities): JsonResponse
     {
         $context->ensureGlobal($request);
         $target = Role::query()->where('public_id', $role)->firstOrFail();
         $permission = Permission::query()->where('public_id', $request->validated('permission_id'))->firstOrFail();
+        $held = $capabilities->handle($context->actor($request))['permissions'];
+        if (! in_array($permission->code, $held, true)) {
+            throw new AccessDeniedHttpException('Cannot grant a permission you do not hold.');
+        }
         $grant = $this->execute(fn (): RolePermission => $action->handle($target, $permission, $context->actor($request)));
         $grant->load(['role:id,public_id,code', 'permission:id,public_id,code']);
 
@@ -81,5 +91,16 @@ class AccessAdministrationController extends Controller
             'permission_id' => $grant->permission?->public_id,
             'permission_code' => $grant->permission?->code,
         ], status: 201);
+    }
+
+    private function assertActorHoldsSuperAdministrator(User $actor): void
+    {
+        $holds = $actor->roleAssignments()
+            ->active()
+            ->whereHas('role', fn ($query) => $query->where('code', AuthorizationBundleCatalog::SUPER_ADMINISTRATOR_ROLE))
+            ->exists();
+        if (! $holds) {
+            throw new AccessDeniedHttpException('Only a super-administrator may assign that role.');
+        }
     }
 }

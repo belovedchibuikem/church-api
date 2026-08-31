@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Models\SecuritySession;
 use App\Models\User;
+use App\Support\Security\ClientNetworkContext;
 use Closure;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Http\Request;
@@ -42,7 +43,14 @@ class EnsureActiveBrowserSecuritySession
 
         $now = now()->utc();
         $lifetimeMinutes = max(1, (int) config('session.lifetime'));
+        $network = ClientNetworkContext::fromRequest($request);
         $touch = ['last_seen_at' => $now];
+        if ($network['ip'] !== null) {
+            $touch['last_ip'] = $network['ip'];
+        }
+        if ($network['country'] !== null) {
+            $touch['last_country'] = $network['country'];
+        }
 
         // Slide absolute expiry on activity so active admins stay signed in until logout.
         if ($securitySession->expires_at !== null) {

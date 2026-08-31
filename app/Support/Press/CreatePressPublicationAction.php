@@ -9,7 +9,6 @@ use App\Models\User;
 use App\Press\PressIdempotency;
 use App\Press\PressPublicationAvailability;
 use App\Press\PressPublicationData;
-use App\Press\PressPublicationStatus;
 use App\Support\Audit\AuditEventData;
 use App\Support\Audit\RecordAuditEventAction;
 use DomainException;
@@ -52,8 +51,14 @@ class CreatePressPublicationAction
                     'price_minor' => $data->priceMinor,
                     'currency_code' => $data->currencyCode,
                     'format' => $data->format,
+                    'publication_type' => $data->publicationType,
+                    'slug' => $data->slug,
+                    'summary' => $data->summary,
+                    'type_metadata' => $data->typeMetadata,
+                    'visibility' => $data->visibility,
+                    'featured' => $data->featured,
                     'availability' => PressPublicationAvailability::Unavailable,
-                    'status' => PressPublicationStatus::Manuscript,
+                    'status' => $data->initialStatus(),
                     'idempotency_key_hash' => $keyHash,
                     'request_fingerprint' => $fingerprint,
                     'status_changed_at' => now()->utc(),
@@ -69,6 +74,7 @@ class CreatePressPublicationAction
                     scopeId: $publication->public_id,
                     metadata: [
                         'format' => $publication->format->value,
+                        'publication_type' => $publication->publication_type->value,
                         'language_code' => $publication->language_code,
                         'status' => $publication->status->value,
                     ],

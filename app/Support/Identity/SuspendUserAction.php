@@ -7,6 +7,7 @@ use App\Identity\UserAccountStatus;
 use App\Models\User;
 use App\Support\Audit\AuditEventData;
 use App\Support\Audit\RecordAuditEventAction;
+use App\Support\Authorization\AuthorizationBundleCatalog;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -21,6 +22,8 @@ class SuspendUserAction
 
         return DB::transaction(function () use ($user, $reason, $actor): User {
             $lockedUser = User::query()->lockForUpdate()->findOrFail($user->getKey());
+
+            $this->guardLastSuperAdministrator($lockedUser);
 
             if ($lockedUser->isSuspended()) {
                 if ($lockedUser->suspension_reason === $reason) {
@@ -48,6 +51,34 @@ class SuspendUserAction
 
             return $lockedUser;
         }, attempts: 3);
+    }
+
+    private function guardLastSuperAdministrator(User $user): void
+    {
+        $isSuper = $user->roleAssignments()
+            ->active()
+            ->whereHas('role', fn ($query) => $query->where('code', AuthorizationBundleCatalog::SUPER_ADMINISTRATOR_ROLE))
+            ->exists();
+
+        if (! $isSuper) {
+            return;
+        }
+
+        $remaining = User::query()
+            ->whereKeyNot($user->getKey())
+            ->where('account_status', UserAccountStatus::Active)
+            ->whereHas(
+                'roleAssignments',
+                fn ($query) => $query->active()->whereHas(
+                    'role',
+                    fn ($roleQuery) => $roleQuery->where('code', AuthorizationBundleCatalog::SUPER_ADMINISTRATOR_ROLE),
+                ),
+            )
+            ->count();
+
+        if ($remaining === 0) {
+            throw new UserAccountStateConflictException('The last super-administrator cannot be suspended.');
+        }
     }
 
     private function validateReason(string $reason): void

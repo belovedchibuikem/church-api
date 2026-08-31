@@ -16,6 +16,7 @@ class ListRolesQuery
         $column = ltrim($sort, '-');
 
         return Role::query()->select(['id', 'public_id', 'code', 'name'])
+            ->withCount('assignments')
             ->with(['rolePermissions' => function (HasMany $query): void {
                 $query
                     ->select(['id', 'role_id', 'permission_id'])

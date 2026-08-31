@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['iso_code', 'name'])]
+#[Fillable(['iso_code', 'name', 'local_name', 'calling_code', 'currency_code', 'default_timezone', 'locale'])]
 class Country extends Model
 {
     /** @use HasFactory<CountryFactory> */

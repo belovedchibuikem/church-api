@@ -5,6 +5,7 @@ namespace App\Press\Queries;
 use App\Models\PressPublication;
 use App\Press\PressPublicationAvailability;
 use App\Press\PressPublicationStatus;
+use App\Press\PressPublicationVisibility;
 use App\Press\PressTranslationStatus;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
@@ -13,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class PublicPressPublicationQuery
 {
     /**
-     * @param  array{language?: string, category?: string, format?: string}  $filters
+     * @param  array{language?: string, category?: string, format?: string, publication_type?: string}  $filters
      * @return LengthAwarePaginator<int, PressPublication>
      */
     public function paginate(array $filters, string $sort, int $perPage): LengthAwarePaginator
@@ -23,7 +24,8 @@ class PublicPressPublicationQuery
         $query
             ->when($filters['language'] ?? null, fn (Builder $query, string $language): Builder => $query->where('language_code', $language))
             ->when($filters['category'] ?? null, fn (Builder $query, string $category): Builder => $query->where('category', $category))
-            ->when($filters['format'] ?? null, fn (Builder $query, string $format): Builder => $query->where('format', $format));
+            ->when($filters['format'] ?? null, fn (Builder $query, string $format): Builder => $query->where('format', $format))
+            ->when($filters['publication_type'] ?? null, fn (Builder $query, string $type): Builder => $query->where('publication_type', $type));
 
         $this->applySort($query, $sort);
 
@@ -71,6 +73,11 @@ class PublicPressPublicationQuery
                 'category',
                 'description',
                 'format',
+                'publication_type',
+                'summary',
+                'slug',
+                'type_metadata',
+                'visibility',
                 'availability',
                 'isbn',
                 'isbn_type',
@@ -83,6 +90,8 @@ class PublicPressPublicationQuery
                 PressPublicationStatus::Distribution->value,
             ])
             ->where('availability', PressPublicationAvailability::Available->value)
+            ->where('visibility', PressPublicationVisibility::Public->value)
+            ->whereNull('archived_at')
             ->whereNotNull('published_at');
     }
 

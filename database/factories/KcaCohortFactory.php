@@ -25,6 +25,7 @@ class KcaCohortFactory extends Factory
             'name' => fake()->words(2, true).' Cohort',
             'starts_on' => now()->startOfYear(),
             'ends_on' => now()->endOfYear(),
+            'timezone' => 'UTC',
         ];
     }
 }

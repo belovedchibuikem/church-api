@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['kca_year_id', 'code', 'name', 'starts_on', 'ends_on'])]
+#[Fillable(['kca_year_id', 'code', 'name', 'starts_on', 'ends_on', 'timezone'])]
 class KcaCohort extends Model
 {
     /** @use HasFactory<KcaCohortFactory> */

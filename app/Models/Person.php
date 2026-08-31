@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
@@ -83,5 +84,28 @@ class Person extends Model
     public function firstTimers(): HasMany
     {
         return $this->hasMany(FirstTimer::class);
+    }
+
+    public function converts(): HasMany
+    {
+        return $this->hasMany(Convert::class);
+    }
+
+    public function roleAssignments(): HasMany
+    {
+        return $this->hasMany(ChurchRoleAssignment::class);
+    }
+
+    public function mergedInto(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'merged_into_person_id');
+    }
+
+    /** @return array<string, string> */
+    protected function casts(): array
+    {
+        return [
+            'archived_at' => 'immutable_datetime',
+        ];
     }
 }

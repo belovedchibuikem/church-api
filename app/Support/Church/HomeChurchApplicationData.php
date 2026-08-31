@@ -2,13 +2,13 @@
 
 namespace App\Support\Church;
 
+use App\Church\HomeChurchMeetingSlot;
 use App\Church\MeetingDay;
 use App\Models\AdministrativeUnit;
 use App\Models\Church;
 use App\Models\Location;
 use App\Models\Person;
 use Carbon\CarbonInterface;
-use DateTimeImmutable;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 
@@ -16,12 +16,22 @@ final readonly class HomeChurchApplicationData
 {
     public string $proposedName;
 
+    public ?string $residenceFamilyName;
+
+    public MeetingDay $meetingDay;
+
     public string $meetingTime;
 
     public string $contactEmail;
 
     public string $contactPhone;
 
+    /** @var list<HomeChurchMeetingSlot> */
+    public array $meetingSchedules;
+
+    /**
+     * @param  list<array<string, mixed>>|null  $meetingSchedules
+     */
     public function __construct(
         public Person $applicant,
         public Church $church,
@@ -29,14 +39,27 @@ final readonly class HomeChurchApplicationData
         public AdministrativeUnit $administrativeUnit,
         string $proposedName,
         public int $expectedParticipants,
-        public MeetingDay $meetingDay,
+        MeetingDay $meetingDay,
         string $meetingTime,
         string $contactEmail,
         string $contactPhone,
         public CarbonInterface $guidelinesAgreedAt,
+        ?string $residenceFamilyName = null,
+        ?array $meetingSchedules = null,
     ) {
-        $this->proposedName = Str::squish($proposedName);
-        $this->meetingTime = $this->normalizeMeetingTime($meetingTime);
+        $family = $this->nullableSquished($residenceFamilyName);
+        $this->residenceFamilyName = $family;
+        $this->proposedName = $family !== null
+            ? HomeChurchProposedName::fromResidenceFamily($family)
+            : Str::squish($proposedName);
+        $this->meetingSchedules = HomeChurchMeetingSchedules::normalize(
+            $meetingSchedules,
+            $meetingDay,
+            $meetingTime,
+        );
+        $primary = $this->meetingSchedules[0];
+        $this->meetingDay = $primary->day;
+        $this->meetingTime = $primary->time;
         $this->contactEmail = Str::lower(Str::of($contactEmail)->trim()->toString());
         $this->contactPhone = Str::squish($contactPhone);
 
@@ -67,15 +90,14 @@ final readonly class HomeChurchApplicationData
         }
     }
 
-    private function normalizeMeetingTime(string $value): string
+    private function nullableSquished(?string $value): ?string
     {
-        $normalized = Str::of($value)->trim()->toString();
-        $time = DateTimeImmutable::createFromFormat('!H:i', $normalized);
-
-        if ($time === false || $time->format('H:i') !== $normalized) {
-            throw new InvalidArgumentException('Meeting time must use 24-hour HH:MM format.');
+        if ($value === null) {
+            return null;
         }
 
-        return $time->format('H:i:s');
+        $normalized = Str::squish($value);
+
+        return $normalized === '' ? null : $normalized;
     }
 }

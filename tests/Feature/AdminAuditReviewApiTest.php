@@ -37,6 +37,25 @@ class AdminAuditReviewApiTest extends TestCase
             ->assertJsonPath('data.0.allowed', false);
     }
 
+    public function test_audit_event_show_returns_minimized_record_and_csv(): void
+    {
+        $actor = $this->actorWithPermissions(['security.audit.view']);
+        $event = AuditEvent::factory()->create(['actor_user_id' => $actor->getKey(), 'action' => 'church.created', 'metadata' => ['secret' => 'hidden']]);
+        $this->authenticate($actor);
+        $headers = ['X-Scope-Type' => 'global', 'X-Scope-ID' => 'platform'];
+
+        $this->withHeaders($headers)->getJson('/api/v1/admin/security/audit-events/'.$event->public_id)
+            ->assertOk()
+            ->assertJsonPath('data.id', $event->public_id)
+            ->assertJsonPath('data.action', 'church.created')
+            ->assertJsonMissing(['secret' => 'hidden']);
+
+        $csv = $this->withHeaders($headers)->get('/api/v1/admin/security/audit-events/'.$event->public_id.'?format=csv');
+        $csv->assertOk();
+        $this->assertStringContainsString($event->public_id, $csv->streamedContent());
+        $this->assertStringContainsString('attachment; filename=', (string) $csv->headers->get('content-disposition'));
+    }
+
     public function test_non_global_scope_is_forbidden(): void
     {
         $scope = new ScopeReference('church', '01ARZ3NDEKTSV4RRFFQ69G5FAV');

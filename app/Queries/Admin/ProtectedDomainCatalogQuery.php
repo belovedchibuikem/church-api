@@ -2,6 +2,7 @@
 
 namespace App\Queries\Admin;
 
+use App\Mission\MissionSoulJourneyStatus;
 use App\Models\AdministrativeUnit;
 use App\Models\Church;
 use App\Models\ChurchAnnouncement;
@@ -20,6 +21,7 @@ use App\Models\HomeChurchApplication;
 use App\Models\HomeChurchAttendanceRecord;
 use App\Models\MissionInvitation;
 use App\Models\MissionSoulJourney;
+use App\Models\MissionTeamAssignment;
 use App\Models\PastoralNeed;
 use App\Models\Person;
 use App\Models\PrayerRequest;
@@ -39,9 +41,10 @@ class ProtectedDomainCatalogQuery
             'location:id,public_id,country_id,administrative_unit_id,name,address_line_one,address_line_two,locality,postal_code,timezone',
             'location.country:id,public_id,iso_code,name',
             'administrativeUnit:id,public_id,name',
-        ]);
+        ])->withCount(['homeChurches', 'memberships', 'firstTimers', 'homeChurchApplications']);
         $this->applyChurchScope($query, $scope);
         $this->applySearch($query, $filters);
+        $this->applyChurchIdFilter($query, $filters, 'id');
 
         return $query->latest()->paginate($perPage);
     }
@@ -49,10 +52,15 @@ class ProtectedDomainCatalogQuery
     /** @return LengthAwarePaginator<HomeChurch> */
     public function homeChurches(ScopeReference $scope, array $filters, int $perPage): LengthAwarePaginator
     {
-        $query = HomeChurch::query()->with(['church:id,public_id,name', ...PersonDisplayName::eager('leader')]);
+        $query = HomeChurch::query()->with(['church:id,public_id,name', ...PersonDisplayName::eager('leader')])
+            ->withCount('memberships');
         $this->applyChurchForeignKeyScope($query, $scope);
         $this->applySearch($query, $filters);
         $this->applyStatus($query, $filters);
+        $this->applyChurchIdFilter($query, $filters);
+        if (isset($filters['home_church_id'])) {
+            $query->where('public_id', $filters['home_church_id']);
+        }
 
         return $query->latest()->paginate($perPage);
     }
@@ -64,6 +72,7 @@ class ProtectedDomainCatalogQuery
         $this->applyChurchForeignKeyScope($query, $scope);
         $this->applySearch($query, $filters, 'proposed_name');
         $this->applyStatus($query, $filters);
+        $this->applyHomeChurchIdFilter($query, $filters);
 
         return $query->latest()->paginate($perPage);
     }
@@ -73,6 +82,7 @@ class ProtectedDomainCatalogQuery
     {
         $query = FirstTimer::query()->with([...PersonDisplayName::eager(), 'church:id,public_id,name', 'homeChurch:id,public_id,name']);
         $this->applyChurchForeignKeyScope($query, $scope);
+        $this->applyChurchIdFilter($query, $filters);
 
         return $query->latest('registered_at')->paginate($perPage);
     }
@@ -87,6 +97,8 @@ class ProtectedDomainCatalogQuery
         ]);
         $this->applyChurchForeignKeyScope($query, $scope);
         $this->applyStatus($query, $filters);
+        $this->applyHomeChurchIdFilter($query, $filters);
+        $this->applyChurchIdFilter($query, $filters);
 
         return $query->latest('joined_at')->paginate($perPage);
     }
@@ -114,11 +126,42 @@ class ProtectedDomainCatalogQuery
     /** @return LengthAwarePaginator<Crusade> */
     public function crusades(ScopeReference $scope, array $filters, int $perPage): LengthAwarePaginator
     {
-        $query = Crusade::query()->with('location:id,public_id,name,administrative_unit_id');
+        $query = Crusade::query()->with('location:id,public_id,name,administrative_unit_id')->withCount('soulJourneys');
         $this->applyCrusadeScope($query, $scope);
         $this->applySearch($query, $filters);
+        $this->applyStatus($query, $filters);
 
         return $query->latest('starts_at')->paginate($perPage);
+    }
+
+    /** @return array<string, int> */
+    public function followUpGaps(ScopeReference $scope): array
+    {
+        $query = MissionSoulJourney::query();
+        $crusadeIds = $this->crusadeIds($scope);
+        if ($crusadeIds !== null) {
+            $query->whereIn('crusade_id', $crusadeIds);
+        }
+        $stalledBefore = now()->utc()->subDays(7);
+
+        return [
+            'unassigned' => (clone $query)->where('status', MissionSoulJourneyStatus::New->value)->count(),
+            'never_contacted' => (clone $query)->whereNull('last_follow_up_at')->where('status', '!=', MissionSoulJourneyStatus::New->value)->count(),
+            'overdue' => (clone $query)->whereIn('status', [
+                MissionSoulJourneyStatus::MentorAssigned->value,
+                MissionSoulJourneyStatus::FollowUpActive->value,
+            ])->where(function ($inner) use ($stalledBefore): void {
+                $inner->whereNull('last_follow_up_at')->orWhere('last_follow_up_at', '<', $stalledBefore);
+            })->count(),
+            'stalled' => (clone $query)->where('status', MissionSoulJourneyStatus::FollowUpActive->value)
+                ->whereNotNull('last_follow_up_at')
+                ->where('last_follow_up_at', '<', $stalledBefore)
+                ->count(),
+            'active_follow_ups' => (clone $query)->whereIn('status', [
+                MissionSoulJourneyStatus::MentorAssigned->value,
+                MissionSoulJourneyStatus::FollowUpActive->value,
+            ])->count(),
+        ];
     }
 
     /** @return LengthAwarePaginator<MissionSoulJourney> */
@@ -160,6 +203,40 @@ class ProtectedDomainCatalogQuery
         return $query->latest()->paginate($perPage);
     }
 
+    /** @return LengthAwarePaginator<MissionTeamAssignment> */
+    public function teamAssignments(ScopeReference $scope, array $filters, int $perPage): LengthAwarePaginator
+    {
+        $query = MissionTeamAssignment::query()->with([
+            'crusade:id,public_id,name',
+            ...PersonDisplayName::eager(),
+        ]);
+        $crusadeIds = $this->crusadeIds($scope);
+
+        if ($crusadeIds !== null) {
+            $query->whereIn('crusade_id', $crusadeIds);
+        }
+
+        if (isset($filters['crusade_id'])) {
+            $query->whereHas('crusade', fn (Builder $inner) => $inner->where('public_id', $filters['crusade_id']));
+        }
+
+        if (isset($filters['role_code'])) {
+            $query->where('role_code', $filters['role_code']);
+        }
+
+        if (isset($filters['status'])) {
+            if ($filters['status'] === 'active') {
+                $query->where(function (Builder $inner): void {
+                    $inner->whereNull('ended_at')->orWhere('ended_at', '>', now()->utc());
+                });
+            } elseif ($filters['status'] === 'ended') {
+                $query->whereNotNull('ended_at')->where('ended_at', '<=', now()->utc());
+            }
+        }
+
+        return $query->latest('assigned_at')->paginate($perPage);
+    }
+
     /** @return LengthAwarePaginator<PrayerRequest> */
     public function prayerRequests(ScopeReference $scope, array $filters, int $perPage): LengthAwarePaginator
     {
@@ -178,6 +255,13 @@ class ProtectedDomainCatalogQuery
         $this->applyPersonChurchScope($query, $scope);
         $this->applyStatus($query, $filters);
         $this->applySearch($query, $filters, 'summary');
+        if (isset($filters['home_church_id'])) {
+            $homeChurchId = HomeChurch::query()->where('public_id', $filters['home_church_id'])->value('id');
+            $query->whereHas(
+                'person.memberships',
+                fn (Builder $membership) => $membership->where('home_church_id', $homeChurchId ?? 0),
+            );
+        }
 
         return $query->latest()->paginate($perPage);
     }
@@ -192,6 +276,7 @@ class ProtectedDomainCatalogQuery
         ]);
         $this->applyChurchForeignKeyScope($query, $scope);
         $this->applyStatus($query, $filters);
+        $this->applyChurchIdFilter($query, $filters);
 
         return $query->latest('converted_at')->paginate($perPage);
     }
@@ -203,6 +288,7 @@ class ProtectedDomainCatalogQuery
         $this->applyChurchForeignKeyScope($query, $scope);
         $this->applySearch($query, $filters, 'title');
         $this->applyStatus($query, $filters);
+        $this->applyChurchIdFilter($query, $filters);
 
         return $query->latest('occurred_at')->paginate($perPage);
     }
@@ -217,6 +303,7 @@ class ProtectedDomainCatalogQuery
         $this->applyChurchForeignKeyScope($query, $scope);
         $this->applySearch($query, $filters);
         $this->applyStatus($query, $filters);
+        $this->applyChurchIdFilter($query, $filters);
 
         return $query->latest()->paginate($perPage);
     }
@@ -234,6 +321,7 @@ class ProtectedDomainCatalogQuery
             $query->where('role_type', $roleType);
         }
         $this->applyStatus($query, $filters);
+        $this->applyChurchIdFilter($query, $filters);
 
         return $query->latest()->paginate($perPage);
     }
@@ -279,6 +367,11 @@ class ProtectedDomainCatalogQuery
         if ($churchIds !== null) {
             $query->whereHas('homeChurch', fn (Builder $hc) => $hc->whereIn('church_id', $churchIds));
         }
+        if (isset($filters['church_id'])) {
+            $churchId = Church::query()->where('public_id', $filters['church_id'])->value('id');
+            $query->whereHas('homeChurch', fn (Builder $hc) => $hc->where('church_id', $churchId ?? 0));
+        }
+        $this->applyHomeChurchIdFilter($query, $filters);
 
         return $query->latest('service_date')->paginate($perPage);
     }
@@ -292,6 +385,7 @@ class ProtectedDomainCatalogQuery
         ]);
         $this->applyChurchForeignKeyScope($query, $scope);
         $this->applySearch($query, $filters);
+        $this->applyChurchIdFilter($query, $filters);
 
         return $query->latest()->paginate($perPage);
     }
@@ -305,6 +399,7 @@ class ProtectedDomainCatalogQuery
         ]);
         $this->applyChurchForeignKeyScope($query, $scope);
         $this->applySearch($query, $filters, 'title');
+        $this->applyChurchIdFilter($query, $filters);
 
         return $query->latest('published_at')->paginate($perPage);
     }
@@ -312,26 +407,32 @@ class ProtectedDomainCatalogQuery
     /** @return LengthAwarePaginator<Person> */
     public function people(ScopeReference $scope, array $filters, int $perPage): LengthAwarePaginator
     {
-        $query = Person::query()->with([
+        $query = Person::query()->whereNull('archived_at')->with([
             'profile:id,person_id,given_name,middle_name,family_name,preferred_name,phone',
-            'user:id,person_id,name,email',
-            'memberships' => fn ($memberships) => $memberships->with('church:id,public_id,name')->latest('joined_at')->limit(1),
+            'user:id,person_id,name,email,account_status',
+            'memberships' => fn ($memberships) => $memberships->with('church:id,public_id,name')->latest('joined_at')->limit(3),
+            'firstTimers' => fn ($first) => $first->latest('registered_at')->limit(3),
+            'converts' => fn ($converts) => $converts->latest('converted_at')->limit(3),
+            'roleAssignments' => fn ($roles) => $roles->whereNull('ended_at')->limit(6),
         ]);
         $churchIds = $this->churchIds($scope);
         if ($churchIds !== null) {
             $query->where(function (Builder $inner) use ($churchIds): void {
                 $inner->whereHas('memberships', fn (Builder $m) => $m->whereIn('church_id', $churchIds))
-                    ->orWhereHas('firstTimers', fn (Builder $f) => $f->whereIn('church_id', $churchIds));
+                    ->orWhereHas('firstTimers', fn (Builder $f) => $f->whereIn('church_id', $churchIds))
+                    ->orWhereHas('converts', fn (Builder $c) => $c->whereIn('church_id', $churchIds))
+                    ->orWhereHas('roleAssignments', fn (Builder $r) => $r->whereIn('church_id', $churchIds));
             });
         }
         if (isset($filters['search'])) {
             $search = '%'.trim((string) $filters['search']).'%';
             $query->where(function (Builder $inner) use ($search): void {
-                $inner->whereHas('profile', function (Builder $profile) use ($search): void {
-                    $profile->where('given_name', 'like', $search)
-                        ->orWhere('family_name', 'like', $search)
-                        ->orWhere('preferred_name', 'like', $search);
-                })->orWhereHas('user', fn (Builder $user) => $user->where('email', 'like', $search)->orWhere('name', 'like', $search));
+                $inner->where('public_id', 'like', $search)
+                    ->orWhereHas('profile', function (Builder $profile) use ($search): void {
+                        $profile->where('given_name', 'like', $search)
+                            ->orWhere('family_name', 'like', $search)
+                            ->orWhere('preferred_name', 'like', $search);
+                    })->orWhereHas('user', fn (Builder $user) => $user->where('email', 'like', $search)->orWhere('name', 'like', $search));
             });
         }
 
@@ -458,6 +559,32 @@ class ProtectedDomainCatalogQuery
         } while ($changed);
 
         return array_map('intval', array_keys($allowed));
+    }
+
+    private function applyChurchIdFilter(Builder $query, array $filters, string $column = 'church_id'): void
+    {
+        if (! isset($filters['church_id'])) {
+            return;
+        }
+
+        if ($column === 'id') {
+            $query->where('public_id', $filters['church_id']);
+
+            return;
+        }
+
+        $churchId = Church::query()->where('public_id', $filters['church_id'])->value('id');
+        $query->where($column, $churchId ?? 0);
+    }
+
+    private function applyHomeChurchIdFilter(Builder $query, array $filters): void
+    {
+        if (! isset($filters['home_church_id'])) {
+            return;
+        }
+
+        $homeChurchId = HomeChurch::query()->where('public_id', $filters['home_church_id'])->value('id');
+        $query->where('home_church_id', $homeChurchId ?? 0);
     }
 
     private function applySearch(Builder $query, array $filters, string $column = 'name'): void

@@ -11,12 +11,14 @@ use App\Finance\Contracts\PaymentGateway;
 use App\Finance\PaymentIntentStatus;
 use App\Http\Controllers\Api\V1\User\Concerns\ResolvesAuthenticatedPerson;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\V1\User\CompleteGivingIntentRequest;
 use App\Http\Requests\Api\V1\User\CreateEventPaymentIntentRequest;
 use App\Http\Requests\Api\V1\User\CreateGivingIntentRequest;
 use App\Http\Resources\Api\V1\User\UserPaymentIntentResource;
 use App\Http\Resources\Api\V1\User\UserPaymentReceiptResource;
 use App\Http\Resources\Api\V1\User\UserPaymentTransactionResource;
 use App\Models\EventRegistration;
+use App\Models\FileAsset;
 use App\Models\PaymentIntent;
 use App\Models\PaymentReceipt;
 use App\Models\PaymentTransaction;
@@ -35,6 +37,7 @@ class PaymentController extends Controller
     {
         $person = $this->person($request);
         $intents = PaymentIntent::query()
+            ->with('proofFileAsset:id,public_id')
             ->where('payer_person_id', $person->getKey())
             ->latest('created_at')
             ->limit(100)
@@ -51,7 +54,7 @@ class PaymentController extends Controller
         $person = $this->person($request);
         $transactions = PaymentTransaction::query()
             ->with([
-                'intent:id,public_id,payer_person_id',
+                'intent:id,public_id,payer_person_id,purpose_code,status',
                 'receipt:id,public_id,payment_transaction_id',
             ])
             ->whereHas('intent', fn ($query) => $query->where('payer_person_id', $person->getKey()))
@@ -69,7 +72,7 @@ class PaymentController extends Controller
     {
         $person = $this->person($request);
         $owned = PaymentIntent::query()
-            ->with(['transactions.receipt'])
+            ->with(['transactions.receipt', 'proofFileAsset:id,public_id'])
             ->where('public_id', $intent)
             ->where('payer_person_id', $person->getKey())
             ->firstOrFail();
@@ -104,12 +107,18 @@ class PaymentController extends Controller
         $validated = $request->validated();
 
         try {
+            $proofId = $validated['proof_file_asset_id'] ?? null;
+            $proof = is_string($proofId)
+                ? FileAsset::query()->where('public_id', $proofId)->firstOrFail()
+                : null;
             $result = $action->handle(
                 payer: $person,
                 amountMinor: (int) $validated['amount_minor'],
                 currency: (string) $validated['currency'],
                 idempotencyKey: (string) $validated['idempotency_key'],
+                purposeCode: (string) $validated['purpose_code'],
                 actor: $user,
+                proof: $proof,
             );
         } catch (PaymentGovernanceDeniedException $exception) {
             return ApiResponse::error(
@@ -134,7 +143,7 @@ class PaymentController extends Controller
             );
         }
 
-        $payload = (new UserPaymentIntentResource($result['intent']))
+        $payload = (new UserPaymentIntentResource($result['intent']->loadMissing('proofFileAsset')))
             ->withCheckout($result['client_payload'], $result['provider_code'])
             ->resolve($request);
 
@@ -200,7 +209,7 @@ class PaymentController extends Controller
     }
 
     public function completeGivingIntent(
-        Request $request,
+        CompleteGivingIntentRequest $request,
         string $intent,
         CompleteLocalGivingAction $action,
     ): JsonResponse {
@@ -210,9 +219,12 @@ class PaymentController extends Controller
             ->where('public_id', $intent)
             ->where('payer_person_id', $person->getKey())
             ->firstOrFail();
+        $proof = FileAsset::query()
+            ->where('public_id', $request->validated('proof_file_asset_id'))
+            ->firstOrFail();
 
         try {
-            $result = $action->handle($owned, $person, $user);
+            $result = $action->handle($owned, $person, $user, $proof);
         } catch (PaymentGovernanceDeniedException $exception) {
             return ApiResponse::error(
                 $request,

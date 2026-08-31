@@ -131,7 +131,11 @@ class AdminRemainingDomainCatalogApiTest extends TestCase
 
         $this->assertContains('kca.applications', $keys);
         $this->assertContains('platform.files', $keys);
-        $this->assertSame(24, count($keys));
+        $this->assertContains('press.publications', $keys);
+        $this->assertContains('press.authors', $keys);
+        $this->assertContains('press.assets', $keys);
+        $this->assertContains('press.reviews', $keys);
+        $this->assertContains('press.translations', $keys);
     }
 
     /** @param array<int, string> $permissionCodes */

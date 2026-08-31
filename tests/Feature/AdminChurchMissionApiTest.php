@@ -3,11 +3,13 @@
 namespace Tests\Feature;
 
 use App\Church\HomeChurchApplicationStatus;
+use App\Church\HomeChurchStatus;
 use App\Models\AdministrativeUnit;
 use App\Models\AuditEvent;
 use App\Models\Church;
 use App\Models\Crusade;
 use App\Models\FirstTimer;
+use App\Models\HomeChurch;
 use App\Models\HomeChurchApplication;
 use App\Models\Location;
 use App\Models\MissionTeamAssignment;
@@ -61,11 +63,133 @@ class AdminChurchMissionApiTest extends TestCase
             'reason_code' => 'application_received',
         ])->assertOk()->assertJsonPath('data.status', 'submitted');
 
+        $this->withHeaders($headers)->getJson("/api/v1/admin/church/churches/{$churchId}")
+            ->assertOk()
+            ->assertJsonPath('data.id', $churchId)
+            ->assertJsonPath('data.home_churches_count', 0)
+            ->assertJsonPath('data.applications_count', 1);
+
         $this->withHeaders($headers)->getJson('/api/v1/admin/church/churches')
             ->assertOk()->assertJsonPath('meta.pagination.total', 1);
 
         $this->assertTrue(AuditEvent::query()->where('action', 'church.created')->where('target_id', $churchId)->exists());
         $this->assertTrue(AuditEvent::query()->where('action', 'home_church.application.status_changed')->where('target_id', $application->public_id)->exists());
+
+        $this->withHeaders($headers)
+            ->getJson("/api/v1/admin/church/home-church-applications/{$application->public_id}")
+            ->assertOk()
+            ->assertJsonPath('data.status', 'submitted')
+            ->assertJsonPath('data.allowed_actions.0.status', 'under_review');
+
+        $this->withHeaders($headers)->postJson("/api/v1/admin/church/home-church-applications/{$application->public_id}/transitions", [
+            'status' => 'under_review',
+            'reason_code' => 'review_started',
+            'expected_status' => 'draft',
+        ])->assertStatus(422);
+
+        $this->withHeaders($headers)->postJson("/api/v1/admin/church/home-church-applications/{$application->public_id}/transitions", [
+            'status' => 'rejected',
+            'reason_code' => 'incomplete',
+        ])->assertStatus(422);
+
+        $this->withHeaders($headers)->postJson("/api/v1/admin/church/home-church-applications/{$application->public_id}/transitions", [
+            'status' => 'rejected',
+            'reason_code' => 'incomplete',
+            'notes' => 'Missing leadership recommendation.',
+            'expected_status' => 'submitted',
+        ])->assertOk()->assertJsonPath('data.status', 'rejected');
+    }
+
+    public function test_unauthenticated_and_forbidden_home_church_application_access(): void
+    {
+        $application = HomeChurchApplication::factory()->create();
+
+        $this->getJson("/api/v1/admin/church/home-church-applications/{$application->public_id}")
+            ->assertUnauthorized();
+
+        $unit = AdministrativeUnit::factory()->create();
+        $scope = new ScopeReference('administrative_unit', $unit->public_id);
+        $member = $this->actorWithPermissions(['church.churches.view'], $scope);
+        $this->authenticate($member);
+
+        $this->withHeaders($this->headers($scope))
+            ->getJson("/api/v1/admin/church/home-church-applications/{$application->public_id}")
+            ->assertForbidden();
+    }
+
+    public function test_home_church_show_and_status_change_require_reason(): void
+    {
+        $unit = AdministrativeUnit::factory()->create();
+        $location = Location::factory()->create([
+            'country_id' => $unit->country_id,
+            'administrative_unit_id' => $unit->getKey(),
+        ]);
+        $scope = new ScopeReference('administrative_unit', $unit->public_id);
+        $actor = $this->actorWithPermissions([
+            'church.home_churches.view',
+            'church.home_church_applications.manage',
+        ], $scope);
+        $this->authenticate($actor);
+        $headers = $this->headers($scope);
+        $church = Church::factory()->create([
+            'location_id' => $location->getKey(),
+            'administrative_unit_id' => $unit->getKey(),
+        ]);
+        $homeChurch = HomeChurch::factory()->for($church)->create(['status' => HomeChurchStatus::Active]);
+
+        $this->withHeaders($headers)
+            ->getJson("/api/v1/admin/church/home-churches/{$homeChurch->public_id}")
+            ->assertOk()
+            ->assertJsonPath('data.id', $homeChurch->public_id);
+
+        $this->withHeaders($headers)->postJson("/api/v1/admin/church/home-churches/{$homeChurch->public_id}/status", [
+            'status' => 'suspended',
+        ])->assertStatus(422);
+
+        $this->withHeaders($headers)->postJson("/api/v1/admin/church/home-churches/{$homeChurch->public_id}/status", [
+            'status' => 'suspended',
+            'reason' => 'Leadership gap pending reassignment.',
+        ])->assertOk()->assertJsonPath('data.status', 'suspended');
+    }
+
+    public function test_church_unpublish_group_create_and_forbidden_member_access(): void
+    {
+        $unit = AdministrativeUnit::factory()->create();
+        $location = Location::factory()->create([
+            'country_id' => $unit->country_id,
+            'administrative_unit_id' => $unit->getKey(),
+        ]);
+        $scope = new ScopeReference('administrative_unit', $unit->public_id);
+        $actor = $this->actorWithPermissions([
+            'church.churches.view',
+            'church.churches.manage',
+        ], $scope);
+        $this->authenticate($actor);
+        $headers = $this->headers($scope);
+        $church = Church::factory()->create([
+            'location_id' => $location->getKey(),
+            'administrative_unit_id' => $unit->getKey(),
+        ]);
+
+        $this->withHeaders($headers)->postJson("/api/v1/admin/church/churches/{$church->public_id}/status", [
+            'status' => 'unpublished',
+        ])->assertStatus(422);
+
+        $this->withHeaders($headers)->postJson("/api/v1/admin/church/churches/{$church->public_id}/status", [
+            'status' => 'unpublished',
+            'reason' => 'Seasonal closure of public listing.',
+        ])->assertOk()->assertJsonPath('data.status', 'unpublished');
+
+        $this->withHeaders($headers)->postJson('/api/v1/admin/church/groups', [
+            'church_id' => $church->public_id,
+            'name' => 'Faith Cell',
+            'capacity' => 12,
+        ])->assertCreated()->assertJsonPath('data.name', 'Faith Cell');
+
+        $this->withHeaders($headers)
+            ->getJson('/api/v1/admin/church/groups?filter[church_id]='.$church->public_id)
+            ->assertOk()
+            ->assertJsonPath('meta.pagination.total', 1);
     }
 
     public function test_mission_operator_can_capture_assign_follow_up_and_complete_soul_journey(): void

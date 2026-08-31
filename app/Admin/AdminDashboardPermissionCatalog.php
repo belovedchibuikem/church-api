@@ -2,10 +2,12 @@
 
 namespace App\Admin;
 
+use App\Support\Authorization\AuthorizationBundleCatalog;
+
 /**
  * Maps dashboard modules to registered authorization bundle permissions.
  * Dashboard routes must never require permission codes that are absent from
- * {@see \App\Support\Authorization\AuthorizationBundleCatalog}.
+ * {@see AuthorizationBundleCatalog}.
  */
 final class AdminDashboardPermissionCatalog
 {
@@ -27,6 +29,9 @@ final class AdminDashboardPermissionCatalog
             AdminDashboardModule::Church => [
                 'church.churches.view',
             ],
+            AdminDashboardModule::People => [
+                'church.churches.view',
+            ],
             AdminDashboardModule::Kca => [
                 'kca.enrollments.view',
                 'kca.applications.view',
@@ -46,9 +51,15 @@ final class AdminDashboardPermissionCatalog
             ],
             AdminDashboardModule::Reports => [
                 'reporting.alert_rules.view',
+                'church.churches.view',
+                'organization.countries.view',
+                'church.home_churches.view',
             ],
             AdminDashboardModule::Security => [
                 'security.audit.view',
+            ],
+            AdminDashboardModule::Safeguarding => [
+                'safeguarding.incidents.report',
             ],
         };
     }

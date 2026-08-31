@@ -37,6 +37,14 @@ class ChurchResource extends JsonResource
                 ],
             ],
             'published_at' => $this->published_at?->toIso8601String(),
+            'home_churches' => $this->whenLoaded('homeChurches', function () {
+                return $this->homeChurches->map(static fn ($home): array => [
+                    'id' => $home->public_id,
+                    'name' => $home->name,
+                    'status' => $home->status?->value ?? (string) $home->status,
+                    'meeting_schedules' => $home->meeting_schedules ?? [],
+                ])->values()->all();
+            }),
         ];
     }
 }

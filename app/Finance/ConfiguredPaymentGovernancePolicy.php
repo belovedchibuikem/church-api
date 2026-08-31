@@ -25,8 +25,11 @@ class ConfiguredPaymentGovernancePolicy implements PaymentGovernancePolicy
 
         $purposes = config('finance.allowed_purpose_codes', ['giving']);
         $currencies = config('finance.allowed_currencies', ['NGN']);
+        if (! is_array($currencies)) {
+            $currencies = ['NGN'];
+        }
 
-        return in_array($purposeCode, $purposes, true)
+        return GivingPurpose::allowedBy($purposeCode, is_array($purposes) ? $purposes : ['giving'])
             && in_array(strtoupper($currency), $currencies, true)
             && $payer !== null;
     }

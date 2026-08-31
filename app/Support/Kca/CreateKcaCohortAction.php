@@ -23,6 +23,7 @@ class CreateKcaCohortAction
         CarbonImmutable $startsOn,
         CarbonImmutable $endsOn,
         User $actor,
+        string $timezone = 'UTC',
     ): KcaCohort {
         $normalizedCode = Str::squish($code);
         $normalizedName = Str::squish($name);
@@ -39,7 +40,9 @@ class CreateKcaCohortAction
             throw new InvalidArgumentException('KCA cohort end dates must be on or after the start date.');
         }
 
-        return DB::transaction(function () use ($year, $normalizedCode, $normalizedName, $startsOn, $endsOn, $actor): KcaCohort {
+        $normalizedTimezone = $timezone !== '' ? $timezone : 'UTC';
+
+        return DB::transaction(function () use ($year, $normalizedCode, $normalizedName, $startsOn, $endsOn, $actor, $normalizedTimezone): KcaCohort {
             $lockedYear = KcaYear::query()->lockForUpdate()->findOrFail($year->getKey());
 
             if (
@@ -58,6 +61,7 @@ class CreateKcaCohortAction
                 'name' => $normalizedName,
                 'starts_on' => $startsOn,
                 'ends_on' => $endsOn,
+                'timezone' => $normalizedTimezone,
             ]);
 
             $this->recordAuditEvent->handle(new AuditEventData(

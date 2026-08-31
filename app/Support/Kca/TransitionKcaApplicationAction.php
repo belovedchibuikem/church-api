@@ -34,6 +34,9 @@ class TransitionKcaApplicationAction
             $from = $lockedApplication->status;
 
             $this->transitions->assertCanTransition($from, $to);
+            if ($to->requiresDecisionReason() && ($reasonCode === null || $reasonCode === '')) {
+                throw new InvalidArgumentException('Adverse KCA decisions require a reason_code.');
+            }
 
             $now = now()->utc();
             $lockedApplication->status = $to;

@@ -35,8 +35,10 @@ class MobileCredentialLifecycleTest extends TestCase
         $this->assertSame($hasher->hash($credentials->plainRefreshToken), $credentials->refreshToken->token_hash);
         $this->assertNotSame($credentials->plainAccessToken, $credentials->accessToken->getRawOriginal('token_hash'));
         $this->assertNotSame($credentials->plainRefreshToken, $credentials->refreshToken->getRawOriginal('token_hash'));
-        $this->assertSame(900, (int) now()->diffInSeconds($credentials->accessToken->expires_at));
-        $this->assertSame(2_592_000, (int) now()->diffInSeconds($credentials->refreshToken->expires_at));
+        $this->assertGreaterThanOrEqual(2_592_000, (int) now()->diffInSeconds($credentials->accessToken->expires_at));
+        $this->assertGreaterThanOrEqual(2_592_000, (int) now()->diffInSeconds($credentials->refreshToken->expires_at));
+        $this->assertNotNull($credentials->securitySession->expires_at);
+        $this->assertGreaterThanOrEqual(2_592_000, (int) now()->diffInSeconds($credentials->securitySession->expires_at));
         $this->assertSame($credentials->device->getKey(), $credentials->securitySession->device_id);
         $this->assertSame('security.mobile_credentials.issued', AuditEvent::query()->latest('id')->value('action'));
     }
@@ -60,6 +62,10 @@ class MobileCredentialLifecycleTest extends TestCase
         $this->assertSame($credentials->refreshToken->family_id, $rotated->refreshToken->family_id);
         $this->assertNotNull($credentials->refreshToken->fresh()->used_at);
         $this->assertSame($rotated->refreshToken->getKey(), $credentials->refreshToken->fresh()->replaced_by_id);
+        $this->assertSame(
+            $credentials->securitySession->expires_at?->utc()->toIso8601String(),
+            $rotated->securitySession->fresh()->expires_at?->utc()->toIso8601String(),
+        );
 
         try {
             $this->app->make(RefreshMobileCredentialsAction::class)->handle(

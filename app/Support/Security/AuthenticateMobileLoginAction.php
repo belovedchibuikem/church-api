@@ -56,13 +56,14 @@ class AuthenticateMobileLoginAction
             }
 
             $device = $this->registerDevice->handle($user, $deviceData, $user);
-            // Null security-session expiry keeps the device signed in until logout;
-            // access/refresh token TTLs still rotate via MobileCredentialIssuer.
+            $network = ClientNetworkContext::fromRequest();
             $securitySession = $this->recordSecuritySession->handle(
                 user: $user,
                 device: $device,
-                expiresAt: null,
+                expiresAt: MobileCredentialTtl::sessionExpiresAt(),
                 actor: $user,
+                ipAddress: $network['ip'],
+                countryCode: $network['country'],
             );
 
             return $this->issueCredentials->handle($user, $device, $securitySession);

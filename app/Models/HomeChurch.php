@@ -20,6 +20,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'location_id',
     'administrative_unit_id',
     'name',
+    'meeting_schedules',
 ])]
 class HomeChurch extends Model
 {
@@ -82,6 +83,9 @@ class HomeChurch extends Model
     /** @return array<string, string> */
     protected function casts(): array
     {
-        return ['status' => HomeChurchStatus::class];
+        return [
+            'status' => HomeChurchStatus::class,
+            'meeting_schedules' => 'array',
+        ];
     }
 }

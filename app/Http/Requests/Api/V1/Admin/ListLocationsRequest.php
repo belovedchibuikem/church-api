@@ -25,11 +25,12 @@ class ListLocationsRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'filter' => ['sometimes', 'array:search,country_id,administrative_unit_id,timezone'],
+            'filter' => ['sometimes', 'array:search,country_id,administrative_unit_id,timezone,has_coordinates'],
             'filter.search' => ['sometimes', 'string', 'max:100'],
             'filter.country_id' => ['sometimes', 'string', Rule::exists('countries', 'public_id')],
             'filter.administrative_unit_id' => ['sometimes', 'string', Rule::exists('administrative_units', 'public_id')],
             'filter.timezone' => ['sometimes', 'string', 'timezone'],
+            'filter.has_coordinates' => ['sometimes'],
             'sort' => ['sometimes', Rule::in(['name', '-name', 'created_at', '-created_at'])],
             'page' => ['sometimes', 'integer', 'min:1'],
             'per_page' => ['sometimes', 'integer', 'between:1,100'],

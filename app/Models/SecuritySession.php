@@ -19,6 +19,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'started_at',
     'last_seen_at',
     'expires_at',
+    'last_ip',
+    'last_country',
 ])]
 class SecuritySession extends Model
 {

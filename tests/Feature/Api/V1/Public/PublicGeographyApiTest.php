@@ -36,9 +36,10 @@ class PublicGeographyApiTest extends TestCase
             ->where('name', 'Lagos')
             ->firstOrFail();
 
-        $this->getJson('/api/v1/geography/countries/NG/states/'.$lagos->public_id.'/localities')
+        $this->getJson('/api/v1/geography/countries/NG/states/Lagos State/localities')
             ->assertOk()
-            ->assertJsonPath('meta.state.name', 'Lagos');
+            ->assertJsonPath('meta.state.name', 'Lagos')
+            ->assertJsonPath('data.0.name', fn ($value) => is_string($value) && $value !== '');
     }
 
     public function test_seed_world_geography_action_is_idempotent_for_nigeria_fixture(): void

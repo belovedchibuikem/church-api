@@ -5,8 +5,9 @@ use App\Http\Controllers\Api\V1\Public\ChurchController;
 use App\Http\Controllers\Api\V1\Public\ContentPageController;
 use App\Http\Controllers\Api\V1\Public\HealthController;
 use App\Http\Controllers\Api\V1\Public\HomeChurchApplicationController;
-use App\Http\Controllers\Api\V1\Public\PressPublicationController;
+use App\Http\Controllers\Api\V1\Public\KcaLeadershipRecommendationController;
 use App\Http\Controllers\Api\V1\Public\NativePaymentWebhookController;
+use App\Http\Controllers\Api\V1\Public\PressPublicationController;
 use App\Http\Controllers\Api\V1\Public\PublicBrandingController;
 use App\Http\Controllers\Api\V1\Public\PublicCrusadeController;
 use App\Http\Controllers\Api\V1\Public\PublicEventController;
@@ -85,6 +86,15 @@ Route::prefix('livestreams')
 Route::get('/kca/certificates/verify', VerifyKcaCertificateController::class)
     ->middleware('throttle:public-certificate-verification')
     ->name('kca.certificates.verify');
+
+Route::get('/kca/recommendations/{token}', [KcaLeadershipRecommendationController::class, 'show'])
+    ->where('token', '[A-Fa-f0-9]{64}')
+    ->middleware('throttle:public-catalogue')
+    ->name('kca.recommendations.show');
+Route::post('/kca/recommendations/{token}', [KcaLeadershipRecommendationController::class, 'submit'])
+    ->where('token', '[A-Fa-f0-9]{64}')
+    ->middleware('throttle:public-catalogue')
+    ->name('kca.recommendations.submit');
 
 Route::prefix('mission')
     ->name('mission.')

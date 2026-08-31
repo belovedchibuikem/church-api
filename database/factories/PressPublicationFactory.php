@@ -6,6 +6,8 @@ use App\Models\PressPublication;
 use App\Press\PressPublicationAvailability;
 use App\Press\PressPublicationFormat;
 use App\Press\PressPublicationStatus;
+use App\Press\PressPublicationType;
+use App\Press\PressPublicationVisibility;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
 
@@ -27,6 +29,8 @@ class PressPublicationFactory extends Factory
             'language_code' => 'en',
             'category' => fake()->word(),
             'format' => PressPublicationFormat::Print,
+            'publication_type' => PressPublicationType::Book,
+            'visibility' => PressPublicationVisibility::Public,
             'availability' => PressPublicationAvailability::Unavailable,
             'status' => PressPublicationStatus::Manuscript,
             'idempotency_key_hash' => hash('sha256', Str::uuid()->toString()),

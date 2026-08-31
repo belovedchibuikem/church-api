@@ -16,11 +16,12 @@ use App\Http\Controllers\Api\V1\User\ProfileController;
 use App\Http\Controllers\Api\V1\User\SecuritySessionController;
 use App\Http\Controllers\Api\V1\User\SyncController;
 use App\Http\Controllers\Api\V1\User\UserAuthorizationController;
-use App\Http\Controllers\Api\V1\User\UserLivestreamController;
 use App\Http\Controllers\Api\V1\User\UserChurchCommunityController;
 use App\Http\Controllers\Api\V1\User\UserChurchOperationsController;
 use App\Http\Controllers\Api\V1\User\UserDomainOperationsController;
 use App\Http\Controllers\Api\V1\User\UserKcaCommunityController;
+use App\Http\Controllers\Api\V1\User\UserLivestreamController;
+use App\Http\Controllers\Api\V1\User\UserMissionController;
 use App\Http\Middleware\EnsureRecentMfa;
 use Illuminate\Support\Facades\Route;
 
@@ -34,6 +35,7 @@ Route::put('/preferences', [PreferenceController::class, 'update'])->name('prefe
 Route::get('/consents', [ConsentController::class, 'index'])->name('consents.index');
 
 Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read_all');
 Route::post('/notifications/{notification}/read', [NotificationController::class, 'markRead'])
     ->whereUlid('notification')
     ->name('notifications.read');
@@ -50,7 +52,16 @@ Route::get('/payments/receipts/{receipt}', [PaymentController::class, 'receipt']
 Route::get('/prayers', [PrayerRequestController::class, 'index'])->name('prayers.index');
 Route::post('/prayers', [PrayerRequestController::class, 'store'])->name('prayers.store');
 
+Route::prefix('mission')->name('mission.')->controller(UserMissionController::class)->group(function (): void {
+    Route::get('/invitations', 'invitations')->name('invitations.index');
+    Route::post('/invitations', 'storeInvitation')->name('invitations.store');
+    Route::get('/invitations/{invitation}', 'showInvitation')->whereUlid('invitation')->name('invitations.show');
+    Route::get('/support-requests', 'supportRequests')->name('support_requests.index');
+    Route::post('/support-requests', 'storeSupportRequest')->name('support_requests.store');
+});
+
 Route::prefix('kca')->name('kca.')->group(function (): void {
+    Route::get('/me', [KcaApplicationController::class, 'me'])->name('me');
     Route::get('/applications/current', [KcaApplicationController::class, 'showCurrent'])->name('applications.current');
     Route::post('/applications', [KcaApplicationController::class, 'store'])->name('applications.store');
     Route::get('/dashboard', [KcaCurriculumController::class, 'dashboard'])->name('dashboard');
@@ -59,8 +70,22 @@ Route::prefix('kca')->name('kca.')->group(function (): void {
         ->whereUlid('module')
         ->name('modules.show');
     Route::get('/assignments', [KcaCurriculumController::class, 'assignments'])->name('assignments.index');
+    Route::get('/assignments/{assignment}', [KcaCurriculumController::class, 'assignment'])
+        ->whereUlid('assignment')
+        ->name('assignments.show');
+    Route::post('/assignments/{assignment}/evidence', [KcaCurriculumController::class, 'submitEvidence'])
+        ->whereUlid('assignment')
+        ->name('assignments.evidence.store');
+    Route::get('/lessons/{lesson}', [KcaCurriculumController::class, 'lesson'])
+        ->whereUlid('lesson')
+        ->name('lessons.show');
+    Route::get('/certificates/current/download', [KcaCurriculumController::class, 'downloadCertificate'])
+        ->name('certificates.download');
     Route::get('/mentor', [KcaCurriculumController::class, 'mentor'])->name('mentor.show');
     Route::get('/attendance', [KcaCurriculumController::class, 'attendance'])->name('attendance.index');
+    Route::post('/lessons/{lesson}/complete', [KcaCurriculumController::class, 'completeLesson'])
+        ->whereUlid('lesson')
+        ->name('lessons.complete');
     Route::get('/directory', [UserKcaCommunityController::class, 'directory'])->name('directory.index');
     Route::post('/directory/{person}/follow', [UserKcaCommunityController::class, 'follow'])
         ->whereUlid('person')
@@ -159,6 +184,9 @@ Route::middleware(EnsureRecentMfa::class)->group(function (): void {
     Route::post('/churches/{church}/memberships', [UserChurchOperationsController::class, 'startMembership'])
         ->whereUlid('church')
         ->name('churches.memberships.store');
+    Route::post('/home-churches/{homeChurch}/memberships', [UserChurchOperationsController::class, 'joinHomeChurch'])
+        ->whereUlid('homeChurch')
+        ->name('home-churches.memberships.store');
     Route::post('/home-churches/{homeChurch}/reports', [UserChurchOperationsController::class, 'storeHomeChurchReport'])
         ->whereUlid('homeChurch')
         ->name('home-churches.reports.store');

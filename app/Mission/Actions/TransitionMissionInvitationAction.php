@@ -3,11 +3,14 @@
 namespace App\Mission\Actions;
 
 use App\Exceptions\MissionInvalidTransitionException;
+use App\Mission\CrusadeStatus;
 use App\Mission\MissionInvitationStatus;
+use App\Models\Crusade;
 use App\Models\MissionInvitation;
 use App\Models\User;
 use App\Support\Audit\AuditEventData;
 use App\Support\Audit\RecordAuditEventAction;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -32,10 +35,14 @@ class TransitionMissionInvitationAction
                 return $lockedInvitation;
             }
 
-            if ($sourceStatus->next() !== $targetStatus) {
+            if (! $sourceStatus->canTransitionTo($targetStatus)) {
                 throw new MissionInvalidTransitionException(
                     "Mission invitation cannot transition from {$sourceStatus->value} to {$targetStatus->value}.",
                 );
+            }
+
+            if ($targetStatus->requiresReason() && ($reasonCode === null || $reasonCode === '')) {
+                throw new InvalidArgumentException('A reason_code is required for this invitation decision.');
             }
 
             $lockedInvitation->forceFill([
@@ -43,6 +50,10 @@ class TransitionMissionInvitationAction
                 'transition_reason_code' => $reasonCode,
                 'status_changed_at' => now()->utc(),
             ])->save();
+
+            if ($targetStatus === MissionInvitationStatus::Approved && $lockedInvitation->crusade_id === null) {
+                $this->linkPlanningCrusade($lockedInvitation);
+            }
 
             $this->recordAuditEvent->handle(new AuditEventData(
                 action: 'mission.invitation.transitioned',
@@ -58,8 +69,38 @@ class TransitionMissionInvitationAction
                 ], static fn (mixed $value): bool => $value !== null),
             ));
 
-            return $lockedInvitation;
+            return $lockedInvitation->fresh(['crusade:id,public_id,name']) ?? $lockedInvitation;
         }, attempts: 3);
+    }
+
+    private function linkPlanningCrusade(MissionInvitation $invitation): void
+    {
+        $application = is_array($invitation->application_data) ? $invitation->application_data : [];
+        $title = Str::squish((string) ($application['title'] ?? $application['event_title'] ?? ''));
+        if ($title === '') {
+            $title = 'Mission request '.$invitation->public_id;
+        }
+
+        $startsAt = null;
+        if (isset($application['start']) && is_string($application['start']) && $application['start'] !== '') {
+            try {
+                $startsAt = CarbonImmutable::parse($application['start']);
+            } catch (\Throwable) {
+                $startsAt = null;
+            }
+        }
+
+        $crusade = Crusade::query()->create([
+            'name' => Str::substr($title, 0, 191),
+            'purpose' => $invitation->purpose,
+            'description' => $invitation->notes,
+            'status' => CrusadeStatus::Approved,
+            'location_id' => $invitation->requested_location_id,
+            'starts_at' => $startsAt,
+        ]);
+
+        $invitation->crusade_id = $crusade->getKey();
+        $invitation->save();
     }
 
     private function assertSafeCode(?string $code): void

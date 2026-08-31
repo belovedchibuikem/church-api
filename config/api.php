@@ -2,7 +2,7 @@
 
 return [
     'mobile' => [
-        'access_ttl_seconds' => (int) env('MOBILE_ACCESS_TTL_SECONDS', 900),
+        'access_ttl_seconds' => (int) env('MOBILE_ACCESS_TTL_SECONDS', 2592000),
         'refresh_ttl_seconds' => (int) env('MOBILE_REFRESH_TTL_SECONDS', 2592000),
     ],
 

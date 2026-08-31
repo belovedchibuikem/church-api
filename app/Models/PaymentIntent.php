@@ -44,6 +44,11 @@ class PaymentIntent extends Model
         return $this->hasMany(PaymentTransaction::class);
     }
 
+    public function proofFileAsset(): BelongsTo
+    {
+        return $this->belongsTo(FileAsset::class, 'proof_file_asset_id');
+    }
+
     protected function casts(): array
     {
         return ['status' => PaymentIntentStatus::class, 'amount_minor' => 'integer', 'expires_at' => 'immutable_datetime', 'succeeded_at' => 'immutable_datetime'];

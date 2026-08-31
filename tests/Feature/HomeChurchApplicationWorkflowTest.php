@@ -22,6 +22,7 @@ use App\Support\Church\TransitionHomeChurchApplicationAction;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use InvalidArgumentException;
 use Tests\TestCase;
 
@@ -65,13 +66,14 @@ class HomeChurchApplicationWorkflowTest extends TestCase
         $this->assertSame($transitionCount, HomeChurchApplicationTransition::query()->count());
         $this->assertSame($auditCount, AuditEvent::query()->count());
 
-        $transition->handle($sameApplication, HomeChurchApplicationStatus::Suspended, 'safeguard_review', $actor);
+        $transition->handle($sameApplication, HomeChurchApplicationStatus::Suspended, 'safeguard_review', $actor, 'Safeguard review required.');
         $transition->handle($sameApplication, HomeChurchApplicationStatus::Active, 'suspension_resolved', $actor);
         $closedApplication = $transition->handle(
             $sameApplication,
             HomeChurchApplicationStatus::Closed,
             'ministry_closed',
             $actor,
+            'Ministry closed after review.',
         );
         $homeChurch = HomeChurch::query()->findOrFail($closedApplication->home_church_id);
 
@@ -131,6 +133,7 @@ class HomeChurchApplicationWorkflowTest extends TestCase
             HomeChurchApplicationStatus::Rejected,
             'requirements_not_met',
             $actor,
+            'Requirements were not met.',
         );
         $terminalTransitionRejected = false;
 
@@ -254,6 +257,65 @@ class HomeChurchApplicationWorkflowTest extends TestCase
         $this->assertSame(HomeChurchApplicationStatus::Draft, $application->status);
         $this->assertSame(1, $application->active_marker);
         $this->assertNull($application->home_church_id);
+    }
+
+    public function test_request_information_and_deferral_require_notes_and_honour_expected_status(): void
+    {
+        $actor = User::factory()->create();
+        $application = $this->createHomeChurchApplication($actor);
+        $transition = $this->app->make(TransitionHomeChurchApplicationAction::class);
+        $transition->handle($application, HomeChurchApplicationStatus::Submitted, 'applicant_submitted', $actor);
+        $reviewed = $transition->handle($application, HomeChurchApplicationStatus::UnderReview, 'review_started', $actor);
+
+        $notesRequired = false;
+        try {
+            $transition->handle($reviewed, HomeChurchApplicationStatus::InformationRequired, 'missing_docs', $actor);
+            $this->fail('Expected notes to be required.');
+        } catch (InvalidArgumentException) {
+            $notesRequired = true;
+        }
+
+        $stale = false;
+        try {
+            $transition->handle(
+                $reviewed,
+                HomeChurchApplicationStatus::InformationRequired,
+                'missing_docs',
+                $actor,
+                'Please upload venue evidence.',
+                HomeChurchApplicationStatus::Submitted,
+            );
+            $this->fail('Expected a stale expected_status to be rejected.');
+        } catch (InvalidArgumentException) {
+            $stale = true;
+        }
+
+        $waiting = $transition->handle(
+            $reviewed,
+            HomeChurchApplicationStatus::InformationRequired,
+            'missing_docs',
+            $actor,
+            'Please upload venue evidence.',
+            HomeChurchApplicationStatus::UnderReview,
+        );
+        $resumed = $transition->handle($waiting, HomeChurchApplicationStatus::UnderReview, 'info_received', $actor);
+        $deferred = $transition->handle(
+            $resumed,
+            HomeChurchApplicationStatus::Deferred,
+            'capacity',
+            $actor,
+            'Defer until leadership training is complete.',
+        );
+
+        $this->assertTrue($notesRequired);
+        $this->assertTrue($stale);
+        $this->assertSame(HomeChurchApplicationStatus::Deferred, $deferred->status);
+        $this->assertSame(5, HomeChurchApplicationTransition::query()->count());
+        if (Schema::hasColumn('home_church_application_transitions', 'notes')) {
+            $this->assertNotNull(
+                HomeChurchApplicationTransition::query()->where('to_status', HomeChurchApplicationStatus::InformationRequired)->value('notes'),
+            );
+        }
     }
 
     public function test_contact_fields_are_encrypted_and_hidden_by_default(): void

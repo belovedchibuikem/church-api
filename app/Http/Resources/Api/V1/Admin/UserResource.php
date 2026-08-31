@@ -30,6 +30,12 @@ class UserResource extends JsonResource
             'suspended_at' => $this->suspended_at?->utc()->toIso8601String(),
             'reactivated_at' => $this->reactivated_at?->utc()->toIso8601String(),
             'created_at' => $this->created_at?->utc()->toIso8601String(),
+            'profile' => $this->whenLoaded('person', fn (): ?array => $this->person?->profile === null ? null : [
+                'given_name' => $this->person->profile->given_name,
+                'middle_name' => $this->person->profile->middle_name,
+                'family_name' => $this->person->profile->family_name,
+                'preferred_name' => $this->person->profile->preferred_name,
+            ]),
             'roles' => $this->whenLoaded('roleAssignments', fn (): array => $this->roleAssignments
                 ->map(fn (RoleAssignment $assignment): array => [
                     'assignment_id' => $assignment->public_id,

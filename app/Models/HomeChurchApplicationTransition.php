@@ -17,6 +17,7 @@ use LogicException;
     'from_status',
     'to_status',
     'reason_code',
+    'notes',
     'correlation_id',
     'occurred_at',
 ])]

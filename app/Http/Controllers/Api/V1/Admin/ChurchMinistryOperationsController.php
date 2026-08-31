@@ -17,17 +17,22 @@ use App\Models\EvangelismActivity;
 use App\Models\HomeChurch;
 use App\Models\HomeChurchAttendanceRecord;
 use App\Models\Person;
-use App\Models\SafeguardingIncident;
 use App\Models\Testimony;
 use App\Queries\Admin\ProtectedDomainCatalogQuery;
 use App\Services\Admin\ProtectedAdminContext;
 use App\Support\Api\ApiResponse;
-use App\Support\Authorization\ScopeReference;
+use App\Support\Audit\AuditEventData;
+use App\Support\Audit\RecordAuditEventAction;
 use App\Support\Identity\PersonDisplayName;
+use App\Support\People\ArchivePersonAction;
+use App\Support\People\CreatePersonAction;
+use App\Support\People\MatchPeopleQuery;
+use App\Support\People\MergePeopleAction;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 class ChurchMinistryOperationsController extends Controller
 {
@@ -36,6 +41,173 @@ class ChurchMinistryOperationsController extends Controller
     public function people(ListProtectedDomainRecordsRequest $request, ProtectedDomainCatalogQuery $catalog, ProtectedAdminContext $context): JsonResponse
     {
         return $this->page($request, $catalog->people($context->scope($request), $request->validated('filter', []), (int) $request->validated('per_page', 25)));
+    }
+
+    public function matchPeople(Request $request, MatchPeopleQuery $query): JsonResponse
+    {
+        $data = $request->validate([
+            'email' => ['nullable', 'email', 'max:191'],
+            'phone' => ['nullable', 'string', 'max:40'],
+            'given_name' => ['nullable', 'string', 'max:100'],
+            'family_name' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        return ApiResponse::success($request, [
+            'matches' => $query->handle(
+                $data['email'] ?? null,
+                $data['phone'] ?? null,
+                $data['given_name'] ?? null,
+                $data['family_name'] ?? null,
+            ),
+        ]);
+    }
+
+    public function storePerson(Request $request, CreatePersonAction $action, MatchPeopleQuery $query, ProtectedAdminContext $context): JsonResponse
+    {
+        $data = $request->validate([
+            'given_name' => ['required', 'string', 'max:100'],
+            'family_name' => ['required', 'string', 'max:100'],
+            'preferred_name' => ['nullable', 'string', 'max:100'],
+            'phone' => ['nullable', 'string', 'max:40'],
+            'email' => ['nullable', 'email', 'max:191'],
+            'confirm_new' => ['sometimes', 'boolean'],
+        ]);
+        $matches = $query->handle($data['email'] ?? null, $data['phone'] ?? null, $data['given_name'], $data['family_name']);
+        if ($matches !== [] && ! $request->boolean('confirm_new')) {
+            return ApiResponse::success($request, [
+                'requires_confirmation' => true,
+                'matches' => $matches,
+            ], status: 409);
+        }
+        $person = $this->execute(fn (): Person => $action->handle($data, $context->actor($request)));
+        $person->load($this->personShowRelations());
+
+        return ApiResponse::success($request, $this->person360($request, $person), status: 201);
+    }
+
+    public function showPerson(Request $request, string $person, ProtectedAdminContext $context): JsonResponse
+    {
+        $target = Person::query()->with($this->personShowRelations())->where('public_id', $person)->firstOrFail();
+        $this->ensurePersonVisible($request, $context, $target);
+
+        return ApiResponse::success($request, $this->person360($request, $target));
+    }
+
+    public function mergePeople(Request $request, string $person, MergePeopleAction $action, ProtectedAdminContext $context): JsonResponse
+    {
+        $data = $request->validate([
+            'source_person_id' => ['required', 'ulid', 'exists:people,public_id'],
+        ]);
+        $canonical = Person::query()->with(['user', 'memberships.church', 'firstTimers.church'])->where('public_id', $person)->firstOrFail();
+        $duplicate = Person::query()->with('user')->where('public_id', $data['source_person_id'])->firstOrFail();
+        if ($canonical->is($duplicate)) {
+            abort(422, 'Cannot merge a person into themselves.');
+        }
+        $this->ensurePersonVisible($request, $context, $canonical);
+        $merged = $this->execute(fn (): Person => $action->handle($canonical, $duplicate, $context->actor($request)));
+        $merged->load($this->personShowRelations());
+
+        return ApiResponse::success($request, $this->person360($request, $merged));
+    }
+
+    public function archivePerson(Request $request, string $person, ArchivePersonAction $action, ProtectedAdminContext $context): JsonResponse
+    {
+        $data = $request->validate(['reason' => ['required', 'string', 'max:191']]);
+        $target = Person::query()->with(['memberships.church', 'firstTimers.church'])->where('public_id', $person)->firstOrFail();
+        $this->ensurePersonVisible($request, $context, $target);
+        $archived = $this->execute(fn (): Person => $action->handle($target, $context->actor($request), $data['reason']));
+        $archived->load($this->personShowRelations());
+
+        return ApiResponse::success($request, $this->person360($request, $archived));
+    }
+
+    public function showCounsellingCase(Request $request, string $case, ProtectedAdminContext $context, RecordAuditEventAction $recordAuditEvent): JsonResponse
+    {
+        $target = CounsellingCase::query()
+            ->with(['church:id,public_id,name', ...PersonDisplayName::eager('client'), ...PersonDisplayName::eager('counselor')])
+            ->where('public_id', $case)
+            ->firstOrFail();
+        if ($target->church !== null) {
+            $context->ensureContains($request, $target->church->scopeReference());
+        }
+        $payload = (new ProtectedDomainRecordResource($target))->resolve($request);
+        $payload['client_person_id'] = $target->client?->public_id;
+        $payload['person_name'] = PersonDisplayName::of($target->client);
+        $payload['counselor_person_id'] = $target->counselor?->public_id;
+        $payload['counselor_name'] = PersonDisplayName::of($target->counselor);
+        $payload['summary'] = $target->summary;
+        $this->execute(fn () => $recordAuditEvent->handle(new AuditEventData(
+            action: 'counselling.case.viewed',
+            actor: $context->actor($request),
+            targetType: 'counselling_case',
+            targetId: $target->public_id,
+            metadata: ['status' => $target->status],
+        )));
+
+        return ApiResponse::success($request, $payload);
+    }
+
+    /** @return array<int, mixed> */
+    private function personShowRelations(): array
+    {
+        return [
+            'profile:id,person_id,given_name,middle_name,family_name,preferred_name,phone',
+            'user:id,person_id,name,email,account_status',
+            'memberships' => fn ($memberships) => $memberships->with('church:id,public_id,name')->latest('joined_at'),
+            'firstTimers' => fn ($first) => $first->with('church:id,public_id,name')->latest('registered_at'),
+            'converts' => fn ($converts) => $converts->with('church:id,public_id,name')->latest('converted_at'),
+            'roleAssignments' => fn ($roles) => $roles->with('church:id,public_id,name')->latest('started_at'),
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function person360(Request $request, Person $person): array
+    {
+        $base = (new ProtectedDomainRecordResource($person))->resolve($request);
+
+        return [
+            ...$base,
+            'memberships' => $person->memberships->map(fn ($row) => [
+                'id' => $row->public_id,
+                'church_name' => $row->church?->name,
+                'status' => $row->status->value ?? $row->status,
+                'joined_at' => $row->joined_at?->utc()->toIso8601String(),
+                'ended_at' => $row->ended_at?->utc()->toIso8601String(),
+            ])->all(),
+            'first_timers' => $person->firstTimers->map(fn ($row) => [
+                'id' => $row->public_id,
+                'church_name' => $row->church?->name,
+                'registered_at' => $row->registered_at?->utc()->toIso8601String(),
+            ])->all(),
+            'converts' => $person->converts->map(fn ($row) => [
+                'id' => $row->public_id,
+                'church_name' => $row->church?->name,
+                'converted_at' => $row->converted_at?->utc()->toIso8601String(),
+                'status' => $row->status,
+            ])->all(),
+            'role_assignments' => $person->roleAssignments->map(fn ($row) => [
+                'id' => $row->public_id,
+                'role_type' => $row->role_type,
+                'title' => $row->title,
+                'church_name' => $row->church?->name,
+                'status' => $row->status,
+                'started_at' => $row->started_at?->utc()->toIso8601String(),
+                'ended_at' => $row->ended_at?->utc()->toIso8601String(),
+            ])->all(),
+        ];
+    }
+
+    private function ensurePersonVisible(Request $request, ProtectedAdminContext $context, Person $person): void
+    {
+        $scope = $context->scope($request);
+        if ($context->isGlobal($scope)) {
+            return;
+        }
+        $church = $person->memberships->first()?->church ?? $person->firstTimers->first()?->church;
+        if ($church === null) {
+            throw new NotFoundHttpException;
+        }
+        $context->ensureContains($request, $church->scopeReference());
     }
 
     public function converts(ListProtectedDomainRecordsRequest $request, ProtectedDomainCatalogQuery $catalog, ProtectedAdminContext $context): JsonResponse
@@ -57,9 +229,19 @@ class ChurchMinistryOperationsController extends Controller
         ]);
         $church = Church::query()->where('public_id', $data['church_id'])->firstOrFail();
         $context->ensureContains($request, $church->scopeReference());
-        $convert = $this->execute(function () use ($data, $church): Convert {
+        $person = Person::query()->where('public_id', $data['person_id'])->firstOrFail();
+        $convert = $this->execute(function () use ($data, $church, $person): Convert {
+            $duplicate = Convert::query()
+                ->where('person_id', $person->getKey())
+                ->where('church_id', $church->getKey())
+                ->where('status', 'active')
+                ->exists();
+            if ($duplicate) {
+                throw new \InvalidArgumentException('This person already has an active convert record at this church.');
+            }
+
             return Convert::query()->create([
-                'person_id' => Person::query()->where('public_id', $data['person_id'])->firstOrFail()->getKey(),
+                'person_id' => $person->getKey(),
                 'church_id' => $church->getKey(),
                 'home_church_id' => isset($data['home_church_id'])
                     ? HomeChurch::query()->where('public_id', $data['home_church_id'])->value('id')
@@ -292,17 +474,31 @@ class ChurchMinistryOperationsController extends Controller
         ]);
         $church = Church::query()->where('public_id', $data['church_id'])->firstOrFail();
         $context->ensureContains($request, $church->scopeReference());
-        $assignment = $this->execute(fn (): ChurchRoleAssignment => ChurchRoleAssignment::query()->create([
-            'church_id' => $church->getKey(),
-            'person_id' => Person::query()->where('public_id', $data['person_id'])->firstOrFail()->getKey(),
-            'department_id' => isset($data['department_id'])
-                ? ChurchDepartment::query()->where('public_id', $data['department_id'])->value('id')
-                : null,
-            'role_type' => $data['role_type'],
-            'title' => $data['title'],
-            'status' => $data['status'] ?? 'active',
-            'started_at' => isset($data['started_at']) ? CarbonImmutable::parse($data['started_at']) : now()->utc(),
-        ]));
+        $person = Person::query()->where('public_id', $data['person_id'])->firstOrFail();
+        $assignment = $this->execute(function () use ($data, $church, $person): ChurchRoleAssignment {
+            $duplicate = ChurchRoleAssignment::query()
+                ->where('church_id', $church->getKey())
+                ->where('person_id', $person->getKey())
+                ->where('role_type', $data['role_type'])
+                ->where('status', 'active')
+                ->whereNull('ended_at')
+                ->exists();
+            if ($duplicate) {
+                throw new \InvalidArgumentException('This person already has an active assignment of that role at this church.');
+            }
+
+            return ChurchRoleAssignment::query()->create([
+                'church_id' => $church->getKey(),
+                'person_id' => $person->getKey(),
+                'department_id' => isset($data['department_id'])
+                    ? ChurchDepartment::query()->where('public_id', $data['department_id'])->value('id')
+                    : null,
+                'role_type' => $data['role_type'],
+                'title' => $data['title'],
+                'status' => $data['status'] ?? 'active',
+                'started_at' => isset($data['started_at']) ? CarbonImmutable::parse($data['started_at']) : now()->utc(),
+            ]);
+        });
         $assignment->load(['church:id,public_id,name', 'department:id,public_id,name', ...PersonDisplayName::eager()]);
 
         return ApiResponse::success($request, (new ProtectedDomainRecordResource($assignment))->resolve($request), status: 201);
@@ -584,9 +780,97 @@ class ChurchMinistryOperationsController extends Controller
         return $this->page($request, $catalog->churchGroups($context->scope($request), $request->validated('filter', []), (int) $request->validated('per_page', 25)));
     }
 
+    public function storeChurchGroup(Request $request, ProtectedAdminContext $context): JsonResponse
+    {
+        $data = $request->validate([
+            'church_id' => ['required', 'ulid', 'exists:churches,public_id'],
+            'name' => ['required', 'string', 'max:191'],
+            'description' => ['nullable', 'string', 'max:500'],
+            'leader_person_id' => ['nullable', 'ulid', 'exists:people,public_id'],
+            'capacity' => ['nullable', 'integer', 'min:1', 'max:65535'],
+            'is_published' => ['nullable', 'boolean'],
+        ]);
+        $church = Church::query()->where('public_id', $data['church_id'])->firstOrFail();
+        $context->ensureContains($request, $church->scopeReference());
+        $group = $this->execute(fn (): ChurchGroup => ChurchGroup::query()->create([
+            'church_id' => $church->getKey(),
+            'name' => $data['name'],
+            'description' => $data['description'] ?? null,
+            'leader_person_id' => isset($data['leader_person_id'])
+                ? Person::query()->where('public_id', $data['leader_person_id'])->value('id')
+                : null,
+            'capacity' => $data['capacity'] ?? null,
+            'is_published' => $data['is_published'] ?? true,
+        ]));
+        $group->load(['church:id,public_id,name', ...PersonDisplayName::eager('leader')]);
+
+        return ApiResponse::success($request, (new ProtectedDomainRecordResource($group))->resolve($request), status: 201);
+    }
+
+    public function updateChurchGroup(Request $request, string $group, ProtectedAdminContext $context): JsonResponse
+    {
+        $target = ChurchGroup::query()->with('church')->where('public_id', $group)->firstOrFail();
+        $context->ensureContains($request, $target->church->scopeReference());
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:191'],
+            'description' => ['nullable', 'string', 'max:500'],
+            'leader_person_id' => ['nullable', 'ulid', 'exists:people,public_id'],
+            'capacity' => ['nullable', 'integer', 'min:1', 'max:65535'],
+            'is_published' => ['nullable', 'boolean'],
+        ]);
+        $this->execute(function () use ($target, $data): void {
+            $target->forceFill([
+                'name' => $data['name'],
+                'description' => $data['description'] ?? $target->description,
+                'leader_person_id' => array_key_exists('leader_person_id', $data)
+                    ? ($data['leader_person_id'] ? Person::query()->where('public_id', $data['leader_person_id'])->value('id') : null)
+                    : $target->leader_person_id,
+                'capacity' => $data['capacity'] ?? $target->capacity,
+                'is_published' => array_key_exists('is_published', $data) ? (bool) $data['is_published'] : $target->is_published,
+            ])->save();
+        });
+        $target->load(['church:id,public_id,name', ...PersonDisplayName::eager('leader')]);
+
+        return ApiResponse::success($request, (new ProtectedDomainRecordResource($target))->resolve($request));
+    }
+
+    public function destroyChurchGroup(Request $request, string $group, ProtectedAdminContext $context): JsonResponse
+    {
+        $target = ChurchGroup::query()->with('church')->where('public_id', $group)->firstOrFail();
+        $context->ensureContains($request, $target->church->scopeReference());
+        $this->execute(function () use ($target): void {
+            if ($target->memberships()->exists()) {
+                throw new \InvalidArgumentException('Archive the group instead of deleting it while members remain.');
+            }
+            $target->delete();
+        });
+
+        return ApiResponse::success($request, ['id' => $group, 'deleted' => true]);
+    }
+
     public function announcements(ListProtectedDomainRecordsRequest $request, ProtectedDomainCatalogQuery $catalog, ProtectedAdminContext $context): JsonResponse
     {
         return $this->page($request, $catalog->churchAnnouncements($context->scope($request), $request->validated('filter', []), (int) $request->validated('per_page', 25)));
+    }
+
+    public function storeAnnouncement(Request $request, ProtectedAdminContext $context): JsonResponse
+    {
+        $data = $request->validate([
+            'church_id' => ['required', 'ulid', 'exists:churches,public_id'],
+            'title' => ['required', 'string', 'max:191'],
+            'body' => ['required', 'string', 'max:10000'],
+        ]);
+        $church = Church::query()->where('public_id', $data['church_id'])->firstOrFail();
+        $context->ensureContains($request, $church->scopeReference());
+        $announcement = $this->execute(fn (): ChurchAnnouncement => ChurchAnnouncement::query()->create([
+            'church_id' => $church->getKey(),
+            'title' => $data['title'],
+            'body' => $data['body'],
+            'published_at' => now()->utc(),
+        ]));
+        $announcement->load(['church:id,public_id,name']);
+
+        return ApiResponse::success($request, (new ProtectedDomainRecordResource($announcement))->resolve($request), status: 201);
     }
 
     public function safeguardingIncidents(ListProtectedDomainRecordsRequest $request, ProtectedDomainCatalogQuery $catalog, ProtectedAdminContext $context): JsonResponse

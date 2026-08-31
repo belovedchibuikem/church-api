@@ -15,7 +15,10 @@ class CreateKcaLessonAction
 {
     public function __construct(private RecordAuditEventAction $recordAuditEvent) {}
 
-    public function handle(KcaModule $module, string $code, string $title, int $sequence, User $actor): KcaLesson
+    /**
+     * @param  array{summary?: string|null, body?: string|null, content_url?: string|null, estimated_minutes?: int|null, lesson_type?: string|null, day_index?: int|null, requires_acknowledgement?: bool|null}  $content
+     */
+    public function handle(KcaModule $module, string $code, string $title, int $sequence, User $actor, array $content = []): KcaLesson
     {
         $normalizedCode = Str::squish($code);
         $normalizedTitle = Str::squish($title);
@@ -32,7 +35,7 @@ class CreateKcaLessonAction
             throw new InvalidArgumentException('KCA lesson sequences must be between 1 and 65535.');
         }
 
-        return DB::transaction(function () use ($module, $normalizedCode, $normalizedTitle, $sequence, $actor): KcaLesson {
+        return DB::transaction(function () use ($module, $normalizedCode, $normalizedTitle, $sequence, $actor, $content): KcaLesson {
             $lockedModule = KcaModule::query()->lockForUpdate()->findOrFail($module->getKey());
             $duplicate = KcaLesson::query()
                 ->whereBelongsTo($lockedModule, 'module')
@@ -51,6 +54,13 @@ class CreateKcaLessonAction
                 'code' => $normalizedCode,
                 'title' => $normalizedTitle,
                 'sequence' => $sequence,
+                'summary' => isset($content['summary']) ? Str::squish((string) $content['summary']) : null,
+                'body' => isset($content['body']) ? (string) $content['body'] : null,
+                'content_url' => isset($content['content_url']) ? Str::squish((string) $content['content_url']) : null,
+                'estimated_minutes' => isset($content['estimated_minutes']) ? (int) $content['estimated_minutes'] : null,
+                'lesson_type' => isset($content['lesson_type']) ? Str::squish((string) $content['lesson_type']) : 'text',
+                'day_index' => isset($content['day_index']) ? (int) $content['day_index'] : null,
+                'requires_acknowledgement' => (bool) ($content['requires_acknowledgement'] ?? true),
             ]);
 
             $this->recordAuditEvent->handle(new AuditEventData(

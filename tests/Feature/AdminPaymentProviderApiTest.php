@@ -125,6 +125,7 @@ class AdminPaymentProviderApiTest extends TestCase
         $create = $this->postJson('/api/v1/user/payments/giving-intents', [
             'amount_minor' => 500000,
             'currency' => 'NGN',
+            'purpose_code' => 'offering',
             'idempotency_key' => 'giving-paystack-0001',
         ])->assertCreated();
 

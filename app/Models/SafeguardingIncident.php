@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Media\HasMedia;
 use App\Safeguarding\IncidentSeverity;
 use App\Safeguarding\IncidentStatus;
 use Database\Factories\SafeguardingIncidentFactory;
@@ -12,12 +13,12 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['concern_type', 'severity', 'restricted_summary', 'occurred_at'])]
-#[Hidden(['restricted_summary'])]
+#[Fillable(['concern_type', 'severity', 'restricted_summary', 'occurred_at', 'case_notes'])]
+#[Hidden(['restricted_summary', 'case_notes'])]
 class SafeguardingIncident extends Model
 {
     /** @use HasFactory<SafeguardingIncidentFactory> */
-    use HasFactory, HasUlids;
+    use HasFactory, HasMedia, HasUlids;
 
     /** @return array<int, string> */
     public function uniqueIds(): array
@@ -52,6 +53,7 @@ class SafeguardingIncident extends Model
             'severity' => IncidentSeverity::class,
             'status' => IncidentStatus::class,
             'restricted_summary' => 'encrypted',
+            'case_notes' => 'encrypted:array',
             'occurred_at' => 'immutable_datetime',
             'reported_at' => 'immutable_datetime',
             'closed_at' => 'immutable_datetime',
