@@ -306,7 +306,14 @@
                 "Udi",
                 "Uzo-Uwani"
             ],
-            "Federal Capital Territory": [],
+            "Federal Capital Territory": [
+                "Abaji",
+                "Abuja Municipal",
+                "Bwari",
+                "Gwagwalada",
+                "Kuje",
+                "Kwali"
+            ],
             "Gombe State": [
                 "Akko",
                 "Balanga",

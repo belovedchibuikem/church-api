@@ -555,6 +555,7 @@ Route::prefix('kca')->name('kca.')->controller(KcaOperationsController::class)->
     Route::delete('/mentor-assignments/{assignment}', 'destroyMentorAssignment')->whereUlid('assignment')->middleware(RequirePermissionAndScope::class.':kca.enrollments.manage')->name('mentor_assignments.destroy');
     Route::delete('/prerequisites/{prerequisite}', 'destroyPrerequisite')->whereUlid('prerequisite')->middleware(RequirePermissionAndScope::class.':kca.modules.manage')->name('prerequisites.destroy');
     Route::post('/enrollments/{enrollment}/attendance', 'recordAttendance')->whereUlid('enrollment')->middleware(RequirePermissionAndScope::class.':kca.attendance.record')->name('enrollments.attendance.store');
+    Route::post('/assessment-results', 'recordAssessmentResults')->middleware(RequirePermissionAndScope::class.':kca.enrollments.manage')->name('assessment_results.store');
     Route::post('/applications/{application}/transitions', 'transitionApplication')->whereUlid('application')->middleware(RequirePermissionAndScope::class.':kca.applications.transition')->name('applications.transitions.store');
     Route::post('/applications/{application}/enrollments', 'enroll')->whereUlid('application')->middleware(RequirePermissionAndScope::class.':kca.enrollments.manage')->name('applications.enrollments.store');
     Route::post('/recommendations/{recommendation}/verify', 'verifyRecommendation')->whereUlid('recommendation')->middleware(RequirePermissionAndScope::class.':kca.applications.transition')->name('recommendations.verify');

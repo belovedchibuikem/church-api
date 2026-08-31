@@ -31,6 +31,16 @@ class PublicGeographyApiTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.0.name', fn ($value) => is_string($value) && $value !== '');
 
+        $states = $this->getJson('/api/v1/geography/countries/NG/states')->json('data');
+        $this->assertIsArray($states);
+        $this->assertGreaterThanOrEqual(36, count($states), 'Nigeria must expose all states plus FCT, not the demo Lagos/Enugu pair.');
+
+        $lgaTotal = AdministrativeUnit::query()
+            ->whereHas('country', fn ($q) => $q->where('iso_code', 'NG'))
+            ->whereHas('administrativeLevel', fn ($q) => $q->where('code', 'local_government'))
+            ->count();
+        $this->assertGreaterThanOrEqual(770, $lgaTotal);
+
         $lagos = AdministrativeUnit::query()
             ->whereHas('country', fn ($q) => $q->where('iso_code', 'NG'))
             ->where('name', 'Lagos')

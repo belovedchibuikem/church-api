@@ -13,6 +13,7 @@ use App\Http\Requests\Api\V1\Admin\CreateKcaModuleRequest;
 use App\Http\Requests\Api\V1\Admin\CreateKcaYearRequest;
 use App\Http\Requests\Api\V1\Admin\EnrollKcaStudentRequest;
 use App\Http\Requests\Api\V1\Admin\IssueKcaCertificateRequest;
+use App\Http\Requests\Api\V1\Admin\RecordKcaAssessmentResultsRequest;
 use App\Http\Requests\Api\V1\Admin\RecordKcaAttendanceRequest;
 use App\Http\Requests\Api\V1\Admin\ReviewKcaEvidenceRequest;
 use App\Http\Requests\Api\V1\Admin\RevokeKcaCertificateRequest;
@@ -54,6 +55,7 @@ use App\Support\Kca\EnrollKcaStudentAction;
 use App\Support\Kca\IssueKcaCertificateAction;
 use App\Support\Kca\MapKcaModuleDaysAction;
 use App\Support\Kca\PublishKcaModuleAction;
+use App\Support\Kca\RecordKcaAssessmentResultsAction;
 use App\Support\Kca\RecordKcaAttendanceAction;
 use App\Support\Kca\ReviewKcaEvidenceAction;
 use App\Support\Kca\RevokeKcaCertificateAction;
@@ -338,9 +340,29 @@ class KcaOperationsController extends Controller
             CarbonImmutable::parse((string) $request->validated('session_on')),
             $context->actor($request),
         ));
-        $attendance->load(['enrollment:id,public_id', 'lesson:id,public_id']);
+        $attendance->load(['enrollment:id,public_id,registration_number', 'lesson:id,public_id,title,code', ...PersonDisplayName::eager('enrollment.person')]);
 
         return ApiResponse::success($request, (new ProtectedCatalogRecordResource($attendance))->resolve($request), status: 201);
+    }
+
+    public function recordAssessmentResults(RecordKcaAssessmentResultsRequest $request, RecordKcaAssessmentResultsAction $action, ProtectedAdminContext $context): JsonResponse
+    {
+        $context->ensureGlobal($request);
+        $validated = $request->validated();
+        $enrollmentId = $validated['kca_enrollment_id'] ?? $validated['enrollment_id'] ?? null;
+        $result = $this->execute(fn (): array => $action->handle(
+            (string) $validated['audience'],
+            $enrollmentId ? KcaEnrollment::query()->where('public_id', $enrollmentId)->firstOrFail() : null,
+            isset($validated['year_id']) ? KcaYear::query()->where('public_id', $validated['year_id'])->firstOrFail() : null,
+            isset($validated['kca_module_id']) ? KcaModule::query()->where('public_id', $validated['kca_module_id'])->firstOrFail() : null,
+            isset($validated['kca_lesson_id']) ? KcaLesson::query()->where('public_id', $validated['kca_lesson_id'])->firstOrFail() : null,
+            (string) $validated['assessment_code'],
+            (string) $validated['result_code'],
+            isset($validated['score']) ? (string) $validated['score'] : null,
+            $context->actor($request),
+        ));
+
+        return ApiResponse::success($request, $result, status: 201);
     }
 
     public function storeLecturerAssignment(CreateKcaLecturerAssignmentRequest $request, CreateKcaLecturerAssignmentAction $action, ProtectedAdminContext $context): JsonResponse

@@ -16,6 +16,7 @@ use App\Models\FileAsset;
 use App\Models\GuardianRelationship;
 use App\Models\KcaApplication;
 use App\Models\KcaAssessmentResult;
+use App\Models\KcaAttendance;
 use App\Models\KcaCertificate;
 use App\Models\KcaCohort;
 use App\Models\KcaEnrollment;
@@ -85,7 +86,13 @@ class ProtectedDomainRegistry
                 'path' => 'kca/enrollments',
                 'operation_id' => 'listAdminCatalogKcaEnrollments',
                 'model' => KcaEnrollment::class,
-                'with' => [...PersonDisplayName::eager(), 'year:id,public_id', 'cohort:id,public_id', 'application:id,public_id'],
+                'with' => [
+                    ...PersonDisplayName::eager(),
+                    'year:id,public_id,name,code',
+                    'cohort:id,public_id,name,code',
+                    'application:id,public_id',
+                    ...PersonDisplayName::eager('mentorAssignments.mentor'),
+                ],
                 'order_column' => 'starts_on',
             ],
             'kca.evidence' => [
@@ -101,8 +108,25 @@ class ProtectedDomainRegistry
                 'path' => 'kca/assessment-results',
                 'operation_id' => 'listAdminCatalogKcaAssessmentResults',
                 'model' => KcaAssessmentResult::class,
-                'with' => ['enrollment:id,public_id', 'module:id,public_id'],
+                'with' => [
+                    'enrollment:id,public_id,registration_number',
+                    ...PersonDisplayName::eager('enrollment.person'),
+                    'module:id,public_id,title,code',
+                ],
                 'order_column' => 'assessed_at',
+            ],
+            'kca.attendance' => [
+                'permission' => 'kca.enrollments.view',
+                'path' => 'kca/attendance',
+                'operation_id' => 'listAdminCatalogKcaAttendance',
+                'model' => KcaAttendance::class,
+                'with' => [
+                    'enrollment:id,public_id,registration_number',
+                    ...PersonDisplayName::eager('enrollment.person'),
+                    'lesson:id,public_id,title,code',
+                ],
+                'order_column' => 'session_on',
+                'order_direction' => 'desc',
             ],
             'kca.certificates' => [
                 'permission' => 'kca.certificates.view',

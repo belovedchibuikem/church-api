@@ -8,6 +8,7 @@ use App\Communication\CommunicationChannel;
 use App\Files\FileAssetStatus;
 use App\Models\Church;
 use App\Models\FileAsset;
+use App\Models\KcaEnrollment;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\SecuritySession;
@@ -77,6 +78,26 @@ class AdminRemainingGapsApiTest extends TestCase
             ->assertCreated()
             ->assertJsonPath('data.code', 'year-2026-gaps')
             ->assertJsonPath('data.name', '2026 KCA Year');
+    }
+
+    public function test_kca_operator_can_record_an_assessment_for_one_student(): void
+    {
+        $scope = new ScopeReference('global', 'platform');
+        $actor = $this->actorWithPermissions(['kca.enrollments.manage'], $scope);
+        $this->authenticate($actor);
+        $enrollment = KcaEnrollment::factory()->create();
+
+        $this->withHeaders($this->headers($scope))
+            ->postJson('/api/v1/admin/kca/assessment-results', [
+                'audience' => 'student',
+                'kca_enrollment_id' => $enrollment->public_id,
+                'assessment_code' => 'Identity final',
+                'result_code' => 'pass',
+                'score' => 88,
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.recorded', 1)
+            ->assertJsonPath('data.assessment_code', 'Identity final');
     }
 
     public function test_events_operator_can_create_an_event(): void

@@ -52,7 +52,7 @@ final class YoutubeLivestreamUrl
 
     public static function embedUrl(string $videoId): string
     {
-        return 'https://www.youtube-nocookie.com/embed/'.$videoId.'?autoplay=1&rel=0&modestbranding=1';
+        return 'https://www.youtube.com/embed/'.$videoId.'?rel=0&modestbranding=1&playsinline=1';
     }
 
     public static function thumbnailUrl(string $videoId): string

@@ -91,6 +91,7 @@ use App\Support\Authorization\ScopeReference;
 use App\Support\Identity\PersonDisplayName;
 use App\Support\Kca\KcaCertificateCodeHasher;
 use App\Support\Livestream\UpsertLivestreamAction;
+use App\Support\Organization\SeedWorldGeographyAction;
 use Database\Seeders\ContentPagesSeeder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
@@ -123,6 +124,8 @@ class SeedDemoDatasetAction
         if ($force && $existing !== null) {
             app(WipeDemoDatasetAction::class)->handle();
         }
+
+        $this->seedPriorityGeographyCatalogue();
 
         return DB::transaction(function (): array {
             $this->provisionBundles->handle();
@@ -278,6 +281,26 @@ class SeedDemoDatasetAction
     }
 
     /**
+     * Full civic catalogue (all NG states/LGAs, plus GH/KE) is platform data, not demo rows.
+     */
+    private function seedPriorityGeographyCatalogue(): void
+    {
+        $path = database_path('data/geography/world-states.json');
+        if (! is_file($path)) {
+            return;
+        }
+
+        try {
+            app(SeedWorldGeographyAction::class)->handle(
+                onlyIsos: ['NG', 'GH', 'KE'],
+                withLocalities: true,
+            );
+        } catch (\Throwable) {
+            // Demo churches still attach to the Lagos/Enugu units created below.
+        }
+    }
+
+    /**
      * @param  array<string, mixed>  $countries
      * @param  array<string, array{0: int, 1: int, 2: int}>  $palette
      * @return list<Church>
@@ -325,8 +348,8 @@ class SeedDemoDatasetAction
             'youtube_url' => $youtubeUrl,
             'status' => 'live',
             'church_id' => $church->public_id,
-            'viewer_count' => 128,
-            'reaction_count' => 42,
+            'viewer_count' => 0,
+            'reaction_count' => 0,
             'starts_at' => now()->utc()->subMinutes(15)->toIso8601String(),
         ]);
     }
@@ -1162,6 +1185,20 @@ class SeedDemoDatasetAction
         string $reference,
         ?AdministrativeUnit $parent = null,
     ): AdministrativeUnit {
+        $existing = AdministrativeUnit::query()
+            ->whereBelongsTo($country)
+            ->where('administrative_level_id', $level->getKey())
+            ->whereRaw('LOWER(name) = ?', [mb_strtolower($name)])
+            ->when(
+                $parent !== null,
+                static fn ($query) => $query->where('parent_id', $parent->getKey()),
+                static fn ($query) => $query->whereNull('parent_id'),
+            )
+            ->first();
+        if ($existing !== null) {
+            return $existing;
+        }
+
         $unit = AdministrativeUnit::query()->firstOrCreate(
             ['country_id' => $country->getKey(), 'reference_code' => $reference],
             [

@@ -472,7 +472,7 @@ class ProtectedDomainRecordResource extends JsonResource
     /** @return array<string, mixed> */
     private function homeChurchAttendance(): array
     {
-        $total = (int) $this->adults + (int) $this->children;
+        $total = (int) $this->adults + (int) $this->children + (int) $this->first_timers;
 
         return [
             'id' => $this->public_id,
