@@ -6,31 +6,29 @@ use RuntimeException;
 
 final class BibleTextStore
 {
-    /** @var array{version: string, name: string, license: string, books: array<string, list<list<string>>>}|null */
-    private static ?array $payload = null;
+    /** @var array<string, array{version: string, name: string, license: string, books: array<string, list<list<string>>>}> */
+    private static array $payloads = [];
 
-    public static function version(): array
+    /**
+     * @return array{id: string, abbreviation: string, name: string, license: string, available: bool}
+     */
+    public static function version(?string $version = null): array
     {
-        $payload = self::payload();
-
-        return [
-            'id' => $payload['version'],
-            'name' => $payload['name'],
-            'license' => $payload['license'],
-        ];
+        return BibleVersions::summary($version ?? BibleVersions::KJV);
     }
 
     /**
      * @return array{book: array<string, mixed>, chapter: int, verse_count: int, verses: list<array{verse: int, text: string}>}
      */
-    public static function chapter(string $bookKey, int $chapter): array
+    public static function chapter(string $bookKey, int $chapter, ?string $version = null): array
     {
         $book = BibleCanon::bookByIdOrSlug($bookKey);
         if ($book === null || $chapter < 1 || $chapter > $book['chapters']) {
             throw new RuntimeException('Unknown Bible chapter.');
         }
 
-        $verses = self::payload()['books'][$book['id']][$chapter - 1] ?? null;
+        $payload = self::payload($version);
+        $verses = $payload['books'][$book['id']][$chapter - 1] ?? null;
         if (! is_array($verses)) {
             throw new RuntimeException('Bible text is not available for this chapter.');
         }
@@ -45,6 +43,7 @@ final class BibleTextStore
                 'id' => $book['id'],
                 'slug' => $book['slug'],
                 'name' => $book['name'],
+                'abbrev' => strtoupper($book['id']),
                 'testament' => $book['testament'],
                 'chapters' => $book['chapters'],
             ],
@@ -53,18 +52,18 @@ final class BibleTextStore
             'verses' => $rows,
             'previous' => self::adjacent($book['id'], $chapter, -1),
             'next' => self::adjacent($book['id'], $chapter, 1),
-            'version' => self::version(),
+            'version' => self::version($version),
         ];
     }
 
     /**
      * @return list<array{book_id: string, book_slug: string, book_name: string, chapter: int, verse: int, text: string, reference: string}>
      */
-    public static function search(string $query, int $limit = 20): array
+    public static function search(string $query, int $limit = 20, ?string $version = null): array
     {
         $reference = BibleCanon::parseReference($query);
         if ($reference !== null) {
-            $chapter = self::chapter($reference['book']['id'], $reference['chapter']);
+            $chapter = self::chapter($reference['book']['id'], $reference['chapter'], $version);
             if ($reference['verse'] !== null) {
                 foreach ($chapter['verses'] as $verse) {
                     if ($verse['verse'] === $reference['verse']) {
@@ -95,7 +94,7 @@ final class BibleTextStore
         }
 
         $needle = mb_strtolower(trim($query));
-        if (mb_strlen($needle) < 3) {
+        if (mb_strlen($needle) < 2) {
             return [];
         }
 
@@ -105,7 +104,7 @@ final class BibleTextStore
             $books[$book['id']] = $book;
         }
 
-        foreach (self::payload()['books'] as $bookId => $chapters) {
+        foreach (self::payload($version)['books'] as $bookId => $chapters) {
             $book = $books[$bookId] ?? null;
             if ($book === null) {
                 continue;
@@ -163,21 +162,24 @@ final class BibleTextStore
     /**
      * @return array{version: string, name: string, license: string, books: array<string, list<list<string>>>}
      */
-    private static function payload(): array
+    private static function payload(?string $version): array
     {
-        if (self::$payload !== null) {
-            return self::$payload;
+        $id = BibleVersions::normalize($version);
+        if (isset(self::$payloads[$id])) {
+            return self::$payloads[$id];
         }
 
-        $path = database_path('data/bible/kjv.json');
+        $path = BibleVersions::path($id);
         if (! is_file($path)) {
-            throw new RuntimeException('The King James Bible text file is missing.');
+            throw new RuntimeException(
+                BibleVersions::summary($id)['abbreviation'].' is not installed on this server. Add database/data/bible/'.$id.'.json (licensed text) or keep reading in KJV.',
+            );
         }
 
         /** @var array{version: string, name: string, license: string, books: array<string, list<list<string>>>} $decoded */
         $decoded = json_decode((string) file_get_contents($path), true, 512, JSON_THROW_ON_ERROR);
-        self::$payload = $decoded;
+        self::$payloads[$id] = $decoded;
 
-        return self::$payload;
+        return self::$payloads[$id];
     }
 }

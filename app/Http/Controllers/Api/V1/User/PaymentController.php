@@ -87,7 +87,7 @@ class PaymentController extends Controller
     {
         $person = $this->person($request);
         $owned = PaymentReceipt::query()
-            ->with('transaction:id,public_id,payment_intent_id')
+            ->with(['transaction.intent'])
             ->where('public_id', $receipt)
             ->whereHas('transaction.intent', fn ($query) => $query->where('payer_person_id', $person->getKey()))
             ->firstOrFail();
@@ -240,6 +240,9 @@ class PaymentController extends Controller
                 status: 422,
             );
         }
+
+        $result['transaction']->setRelation('intent', $result['intent']);
+        $result['receipt']->setRelation('transaction', $result['transaction']);
 
         return ApiResponse::success($request, [
             'intent' => UserPaymentIntentResource::make($result['intent'])->resolve($request),

@@ -154,6 +154,7 @@ Route::prefix('bible')
     ->name('bible.')
     ->middleware('throttle:public-catalogue')
     ->group(function (): void {
+        Route::get('/versions', [PublicBibleController::class, 'versions'])->name('versions.index');
         Route::get('/books', [PublicBibleController::class, 'books'])->name('books.index');
         Route::get('/books/{book}/chapters/{chapter}', [PublicBibleController::class, 'chapter'])
             ->where('book', '[a-z0-9]+(?:-[a-z0-9]+)*')
@@ -162,6 +163,6 @@ Route::prefix('bible')
         Route::get('/search', [PublicBibleController::class, 'search'])->name('search');
         Route::get('/plans', [PublicBibleController::class, 'plans'])->name('plans.index');
         Route::get('/plans/{plan}', [PublicBibleController::class, 'plan'])
-            ->where('plan', 'year_[123]')
+            ->where('plan', 'month_[36]|year_[123]|days_[1-9][0-9]{0,3}')
             ->name('plans.show');
     });

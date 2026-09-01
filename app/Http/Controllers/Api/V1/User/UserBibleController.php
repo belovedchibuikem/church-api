@@ -31,7 +31,7 @@ class UserBibleController extends Controller
             $request,
             $this->progress->enroll(
                 $this->person($request),
-                $validated['plan_code'],
+                $request->resolvedPlanCode() ?? '',
                 $validated['started_on'] ?? null,
                 $validated['timezone'] ?? null,
             ),

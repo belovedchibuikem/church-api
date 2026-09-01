@@ -61,11 +61,22 @@ class UserGivingPurposeApiTest extends TestCase
             'purpose' => GivingPurpose::PROOF_FILE_PURPOSE,
         ]);
 
-        $this->postJson("/api/v1/user/payments/giving-intents/{$intentId}/complete", [
+        $completed = $this->postJson("/api/v1/user/payments/giving-intents/{$intentId}/complete", [
             'proof_file_asset_id' => $proof->public_id,
         ])->assertOk()
             ->assertJsonPath('data.intent.purpose_code', 'tithe')
-            ->assertJsonPath('data.intent.status', 'succeeded');
+            ->assertJsonPath('data.intent.status', 'succeeded')
+            ->assertJsonPath('data.receipt.purpose_code', 'tithe')
+            ->assertJsonPath('data.receipt.purpose_label', 'Tithe')
+            ->assertJsonPath('data.receipt.settlement', 'manual')
+            ->assertJsonPath('data.receipt.amount_minor', 250000)
+            ->assertJsonPath('data.receipt.currency', 'NGN');
+
+        $receiptId = $completed->json('data.receipt.id');
+        $this->getJson("/api/v1/user/payments/receipts/{$receiptId}")
+            ->assertOk()
+            ->assertJsonPath('data.settlement', 'manual')
+            ->assertJsonPath('data.amount_minor', 250000);
 
         $this->assertTrue(
             PaymentIntent::query()->where('public_id', $intentId)->where('proof_file_asset_id', $proof->getKey())->exists(),

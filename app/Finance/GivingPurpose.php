@@ -46,6 +46,24 @@ final class GivingPurpose
         return in_array($purposeCode, self::codes(), true);
     }
 
+    public static function label(?string $purposeCode): string
+    {
+        return match ($purposeCode) {
+            self::TITHE => 'Tithe',
+            self::OFFERING => 'Offering',
+            self::MISSIONS => 'Missions',
+            self::PROJECTS => 'Projects',
+            self::DONATION => 'Donation',
+            self::KCA => 'KCA',
+            self::PUBLICATION => 'Publication',
+            self::LEGACY => 'Giving',
+            self::EVENT_PAYMENT => 'Event payment',
+            default => $purposeCode === null || $purposeCode === ''
+                ? 'Giving'
+                : ucwords(str_replace('_', ' ', $purposeCode)),
+        };
+    }
+
     /**
      * @param  list<string>|array<int, mixed>  $allowed
      */
