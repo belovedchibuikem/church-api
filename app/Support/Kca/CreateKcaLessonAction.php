@@ -16,7 +16,7 @@ class CreateKcaLessonAction
     public function __construct(private RecordAuditEventAction $recordAuditEvent) {}
 
     /**
-     * @param  array{summary?: string|null, body?: string|null, content_url?: string|null, estimated_minutes?: int|null, lesson_type?: string|null, day_index?: int|null, requires_acknowledgement?: bool|null}  $content
+     * @param  array{summary?: string|null, body?: string|null, content_url?: string|null, estimated_minutes?: int|null, lesson_type?: string|null, day_index?: int|null, requires_acknowledgement?: bool|null, chapters?: list<array<string, mixed>>}  $content
      */
     public function handle(KcaModule $module, string $code, string $title, int $sequence, User $actor, array $content = []): KcaLesson
     {
@@ -62,6 +62,44 @@ class CreateKcaLessonAction
                 'day_index' => isset($content['day_index']) ? (int) $content['day_index'] : null,
                 'requires_acknowledgement' => (bool) ($content['requires_acknowledgement'] ?? true),
             ]);
+
+            $chapters = $content['chapters'] ?? [];
+            if (is_array($chapters) && $chapters !== []) {
+                $sequenceCursor = 1;
+                foreach ($chapters as $chapter) {
+                    if (! is_array($chapter)) {
+                        continue;
+                    }
+                    app(CreateKcaChapterAction::class)->handle(
+                        $lesson,
+                        (string) ($chapter['code'] ?? 'CH'.str_pad((string) $sequenceCursor, 2, '0', STR_PAD_LEFT)),
+                        (string) ($chapter['title'] ?? 'Chapter '.$sequenceCursor),
+                        (int) ($chapter['sequence'] ?? $sequenceCursor),
+                        $actor,
+                        [
+                            'summary' => $chapter['summary'] ?? null,
+                            'body' => $chapter['body'] ?? null,
+                            'content_url' => $chapter['content_url'] ?? null,
+                            'estimated_minutes' => $chapter['estimated_minutes'] ?? null,
+                        ],
+                    );
+                    $sequenceCursor++;
+                }
+            } elseif (($lesson->body || $lesson->summary || $lesson->content_url) && $lesson->chapters()->doesntExist()) {
+                app(CreateKcaChapterAction::class)->handle(
+                    $lesson,
+                    'CH01',
+                    'Chapter 1',
+                    1,
+                    $actor,
+                    [
+                        'summary' => $lesson->summary,
+                        'body' => $lesson->body,
+                        'content_url' => $lesson->content_url,
+                        'estimated_minutes' => $lesson->estimated_minutes,
+                    ],
+                );
+            }
 
             $this->recordAuditEvent->handle(new AuditEventData(
                 action: 'kca.lesson.created',

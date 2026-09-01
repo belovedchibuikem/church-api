@@ -548,6 +548,8 @@ Route::prefix('kca')->name('kca.')->controller(KcaOperationsController::class)->
     Route::post('/modules/{module}/day-map', 'mapModuleDays')->whereUlid('module')->middleware(RequirePermissionAndScope::class.':kca.modules.manage')->name('modules.day_map');
     Route::post('/modules/{module}/publish', 'publishModule')->whereUlid('module')->middleware(RequirePermissionAndScope::class.':kca.modules.manage')->name('modules.publish');
     Route::post('/modules/{module}/lessons', 'storeLesson')->whereUlid('module')->middleware(RequirePermissionAndScope::class.':kca.lessons.manage')->name('modules.lessons.store');
+    Route::post('/lessons/{lesson}/chapters', 'storeChapter')->whereUlid('lesson')->middleware(RequirePermissionAndScope::class.':kca.lessons.manage')->name('lessons.chapters.store');
+    Route::post('/assignments', 'storeAssignment')->middleware(RequirePermissionAndScope::class.':kca.assignments.transition')->name('assignments.store');
     Route::post('/modules/{module}/prerequisites', 'storePrerequisite')->whereUlid('module')->middleware(RequirePermissionAndScope::class.':kca.modules.manage')->name('modules.prerequisites.store');
     Route::post('/lecturer-assignments', 'storeLecturerAssignment')->middleware(RequirePermissionAndScope::class.':kca.modules.manage')->name('lecturer_assignments.store');
     Route::delete('/lecturer-assignments/{assignment}', 'destroyLecturerAssignment')->whereUlid('assignment')->middleware(RequirePermissionAndScope::class.':kca.modules.manage')->name('lecturer_assignments.destroy');

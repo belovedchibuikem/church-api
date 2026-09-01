@@ -58,13 +58,16 @@ final class MobilePermissionAliasCatalog
         'kca.lessons.deliver' => 'kca.enrollments.view',
         'kca.mentoring.intervene' => 'kca.enrollments.view',
 
-        // Finance catalog reads
+        // Church/home-church finance workspaces (staff catalog)
         'church.finance.view' => 'finance.payment_intents.view',
         'home_church.finance.view' => 'finance.payment_intents.view',
-        'giving.history.view' => 'finance.payment_transactions.view',
-        'payments.receipts.view_own' => 'finance.payment_receipts.view',
-        'payments.history.view_own' => 'finance.payment_transactions.view',
-        'payments.transactions.view_own' => 'finance.payment_transactions.view',
+
+        // Member self-service giving/history uses signed-in /user/payments
+        // routes, not the admin finance catalog permissions.
+        'giving.history.view' => self::MOBILE_APP_ACCESS,
+        'payments.receipts.view_own' => self::MOBILE_APP_ACCESS,
+        'payments.history.view_own' => self::MOBILE_APP_ACCESS,
+        'payments.transactions.view_own' => self::MOBILE_APP_ACCESS,
         'payments.refunds.view_own' => 'finance.payment_refunds.view',
         'payments.disputes.view_own' => 'finance.payment_disputes.view',
 

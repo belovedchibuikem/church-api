@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['kca_enrollment_id', 'kca_module_id', 'title', 'due_at'])]
+#[Fillable(['kca_enrollment_id', 'kca_module_id', 'title', 'assignment_kind', 'soul_tree_spec', 'due_at'])]
 class KcaAssignment extends Model
 {
     /** @use HasFactory<KcaAssignmentFactory> */
@@ -49,10 +49,21 @@ class KcaAssignment extends Model
         return $this->hasMany(KcaEvidenceSubmission::class);
     }
 
+    public function soulWins(): HasMany
+    {
+        return $this->hasMany(KcaSoulWin::class);
+    }
+
+    public function isSoulWinning(): bool
+    {
+        return ($this->assignment_kind ?? 'standard') === 'soul_winning';
+    }
+
     protected function casts(): array
     {
         return [
             'state' => KcaAssignmentState::class,
+            'soul_tree_spec' => 'array',
             'due_at' => 'immutable_datetime',
             'assigned_at' => 'immutable_datetime',
             'submitted_at' => 'immutable_datetime',

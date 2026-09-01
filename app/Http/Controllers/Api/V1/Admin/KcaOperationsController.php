@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Http\Controllers\Api\V1\Admin\Concerns\ExecutesDomainMutations;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\V1\Admin\CreateKcaChapterRequest;
 use App\Http\Requests\Api\V1\Admin\CreateKcaCohortRequest;
+use App\Http\Requests\Api\V1\Admin\CreateKcaStudentAssignmentRequest;
 use App\Http\Requests\Api\V1\Admin\CreateKcaLecturerAssignmentRequest;
 use App\Http\Requests\Api\V1\Admin\CreateKcaLessonRequest;
 use App\Http\Requests\Api\V1\Admin\CreateKcaMentorAssignmentRequest;
@@ -25,6 +27,7 @@ use App\Kca\KcaApplicationState;
 use App\Kca\KcaAssignmentState;
 use App\Kca\KcaAttendanceStatus;
 use App\Models\FileAsset;
+use App\Models\KcaChapter;
 use App\Models\KcaApplication;
 use App\Models\KcaAssignment;
 use App\Models\KcaAttendance;
@@ -45,6 +48,8 @@ use App\Models\Person;
 use App\Services\Admin\ProtectedAdminContext;
 use App\Support\Api\ApiResponse;
 use App\Support\Identity\PersonDisplayName;
+use App\Support\Kca\CreateKcaAssignmentAction;
+use App\Support\Kca\CreateKcaChapterAction;
 use App\Support\Kca\CreateKcaCohortAction;
 use App\Support\Kca\CreateKcaLecturerAssignmentAction;
 use App\Support\Kca\CreateKcaLessonAction;
@@ -298,11 +303,56 @@ class KcaOperationsController extends Controller
                 'lesson_type' => $request->validated('lesson_type') ?? 'text',
                 'day_index' => $request->validated('day_index'),
                 'requires_acknowledgement' => $request->boolean('requires_acknowledgement', true),
+                'chapters' => $request->validated('chapters') ?? [],
             ],
         ));
-        $lesson->load(['module:id,public_id']);
+        $lesson->load(['module:id,public_id', 'chapters']);
 
         return ApiResponse::success($request, (new ProtectedCatalogRecordResource($lesson))->resolve($request), status: 201);
+    }
+
+    public function storeChapter(CreateKcaChapterRequest $request, string $lesson, CreateKcaChapterAction $action, ProtectedAdminContext $context): JsonResponse
+    {
+        $context->ensureGlobal($request);
+        $target = KcaLesson::query()->where('public_id', $lesson)->firstOrFail();
+        $chapter = $this->execute(fn (): KcaChapter => $action->handle(
+            $target,
+            (string) $request->validated('code'),
+            (string) $request->validated('title'),
+            (int) $request->validated('sequence'),
+            $context->actor($request),
+            [
+                'summary' => $request->validated('summary'),
+                'body' => $request->validated('body'),
+                'content_url' => $request->validated('content_url'),
+                'estimated_minutes' => $request->validated('estimated_minutes'),
+            ],
+        ));
+        $chapter->load(['lesson:id,public_id,title,code']);
+
+        return ApiResponse::success($request, (new ProtectedCatalogRecordResource($chapter))->resolve($request), status: 201);
+    }
+
+    public function storeAssignment(CreateKcaStudentAssignmentRequest $request, CreateKcaAssignmentAction $action, ProtectedAdminContext $context): JsonResponse
+    {
+        $context->ensureGlobal($request);
+        $enrollment = KcaEnrollment::query()->where('public_id', $request->validated('kca_enrollment_id'))->firstOrFail();
+        $module = KcaModule::query()->where('public_id', $request->validated('kca_module_id'))->firstOrFail();
+        $dueAt = $request->validated('due_at')
+            ? CarbonImmutable::parse((string) $request->validated('due_at'))
+            : null;
+        $assignment = $this->execute(fn (): KcaAssignment => $action->handle(
+            $enrollment,
+            $module,
+            (string) $request->validated('title'),
+            $context->actor($request),
+            (string) ($request->validated('assignment_kind') ?? 'standard'),
+            array_map('intval', $request->validated('soul_tree_levels') ?? []),
+            $dueAt,
+        ));
+        $assignment->load(['enrollment:id,public_id', 'module:id,public_id,code,title']);
+
+        return ApiResponse::success($request, (new ProtectedCatalogRecordResource($assignment))->resolve($request), status: 201);
     }
 
     public function storePrerequisite(CreateKcaModulePrerequisiteRequest $request, string $module, ProtectedAdminContext $context): JsonResponse

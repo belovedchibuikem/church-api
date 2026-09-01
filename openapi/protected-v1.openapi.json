@@ -5955,9 +5955,13 @@
                         }
                     }
                 ],
-                "security": [],
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
                 "responses": {
-                    "201": {
+                    "200": {
                         "description": "Successful response.",
                         "content": {
                             "application/json": {
@@ -7798,6 +7802,260 @@
                         "application/json": {
                             "schema": {
                                 "$ref": "#/components/schemas/CreateUserPrayerRequestInput"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/user/bible/progress": {
+            "get": {
+                "operationId": "getUserBibleProgress",
+                "tags": [
+                    "User"
+                ],
+                "parameters": [
+                    {
+                        "name": "X-Correlation-ID",
+                        "in": "header",
+                        "required": false,
+                        "schema": {
+                            "$ref": "#/components/schemas/CorrelationId"
+                        }
+                    }
+                ],
+                "security": [
+                    {
+                        "cookieSession": [],
+                        "csrfToken": []
+                    },
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SuccessEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "default": {
+                        "description": "Normalized API error.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/user/bible/enrollments": {
+            "post": {
+                "operationId": "createUserBibleEnrollment",
+                "tags": [
+                    "User"
+                ],
+                "parameters": [
+                    {
+                        "name": "X-Correlation-ID",
+                        "in": "header",
+                        "required": false,
+                        "schema": {
+                            "$ref": "#/components/schemas/CorrelationId"
+                        }
+                    }
+                ],
+                "security": [
+                    {
+                        "cookieSession": [],
+                        "csrfToken": []
+                    },
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Successful response.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/SuccessEnvelope"
+                                        },
+                                        {
+                                            "properties": {
+                                                "data": {
+                                                    "$ref": "#/components/schemas/ProtectedDomainRecord"
+                                                }
+                                            }
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "default": {
+                        "description": "Normalized API error.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                },
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateUserBibleEnrollmentInput"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/user/bible/enrollments/{enrollment}/days/{day}/complete": {
+            "post": {
+                "operationId": "completeUserBiblePlanDay",
+                "tags": [
+                    "User"
+                ],
+                "parameters": [
+                    {
+                        "name": "X-Correlation-ID",
+                        "in": "header",
+                        "required": false,
+                        "schema": {
+                            "$ref": "#/components/schemas/CorrelationId"
+                        }
+                    },
+                    {
+                        "name": "enrollment",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "day",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "security": [
+                    {
+                        "cookieSession": [],
+                        "csrfToken": []
+                    },
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SuccessEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "default": {
+                        "description": "Normalized API error.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/user/bible/position": {
+            "put": {
+                "operationId": "updateUserBibleReadingPosition",
+                "tags": [
+                    "User"
+                ],
+                "parameters": [
+                    {
+                        "name": "X-Correlation-ID",
+                        "in": "header",
+                        "required": false,
+                        "schema": {
+                            "$ref": "#/components/schemas/CorrelationId"
+                        }
+                    }
+                ],
+                "security": [
+                    {
+                        "cookieSession": [],
+                        "csrfToken": []
+                    },
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/SuccessEnvelope"
+                                        },
+                                        {
+                                            "properties": {
+                                                "data": {
+                                                    "$ref": "#/components/schemas/ProtectedDomainRecord"
+                                                }
+                                            }
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "default": {
+                        "description": "Normalized API error.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                },
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateUserBibleReadingPositionInput"
                             }
                         }
                     }
@@ -15821,6 +16079,47 @@
                 },
                 "additionalProperties": false
             },
+            "CreateUserBibleEnrollmentInput": {
+                "type": "object",
+                "required": [
+                    "plan_code"
+                ],
+                "properties": {
+                    "plan_code": {
+                        "type": "string",
+                        "enum": [
+                            "year_1",
+                            "year_2",
+                            "year_3"
+                        ]
+                    },
+                    "started_on": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "timezone": {
+                        "type": "string"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "UpdateUserBibleReadingPositionInput": {
+                "type": "object",
+                "required": [
+                    "book",
+                    "chapter"
+                ],
+                "properties": {
+                    "book": {
+                        "type": "string"
+                    },
+                    "chapter": {
+                        "type": "integer",
+                        "minimum": 1
+                    }
+                },
+                "additionalProperties": false
+            },
             "CreateUserPastoralNeedInput": {
                 "type": "object",
                 "required": [
@@ -15957,6 +16256,9 @@
                             "string",
                             "null"
                         ]
+                    },
+                    "confirm_transfer": {
+                        "type": "boolean"
                     }
                 },
                 "additionalProperties": false

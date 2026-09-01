@@ -20,6 +20,8 @@ final class GivingPurpose
 
     public const LEGACY = 'giving';
 
+    public const EVENT_PAYMENT = 'event_payment';
+
     public const PROOF_FILE_PURPOSE = 'payment.proof';
 
     /**

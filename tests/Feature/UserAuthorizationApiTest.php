@@ -44,6 +44,19 @@ class UserAuthorizationApiTest extends TestCase
             ->assertJsonPath('data.canonical_permission', MobilePermissionAliasCatalog::MOBILE_APP_ACCESS);
     }
 
+    public function test_giving_history_uses_member_mobile_access(): void
+    {
+        $actor = $this->memberWithMobileAccess();
+        $this->authenticateBrowser($actor);
+
+        $this->postJson('/api/v1/user/authorization/check', [
+            'permission' => 'giving.history.view',
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.allowed', true)
+            ->assertJsonPath('data.canonical_permission', MobilePermissionAliasCatalog::MOBILE_APP_ACCESS);
+    }
+
     public function test_authorization_check_forbids_missing_capability(): void
     {
         $actor = User::factory()->create();

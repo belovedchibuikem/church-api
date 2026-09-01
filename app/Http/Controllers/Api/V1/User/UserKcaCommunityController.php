@@ -23,7 +23,11 @@ class UserKcaCommunityController extends Controller
     public function directory(ListUserRecordsRequest $request): JsonResponse
     {
         $caller = $this->requirePerson($this->actor($request));
-        $q = trim((string) $request->validated('q', ''));
+        $q = $this->queryValue($request, 'q');
+        $country = $this->queryValue($request, 'country');
+        $region = $this->queryValue($request, 'region');
+        $locality = $this->queryValue($request, 'locality');
+        $scope = $this->queryValue($request, 'scope') ?: 'all';
 
         $personIds = KcaEnrollment::query()->pluck('person_id')
             ->merge(
@@ -36,8 +40,13 @@ class UserKcaCommunityController extends Controller
             ->values();
 
         $query = Person::query()
-            ->with(['profile:id,person_id,given_name,middle_name,family_name,preferred_name,country', 'user:id,person_id,name,email'])
+            ->with(['profile:id,person_id,given_name,middle_name,family_name,preferred_name,country,region,locality', 'user:id,person_id,name,email'])
             ->whereIn('id', $personIds);
+
+        $own = $caller->profile;
+        $ownCountry = trim((string) ($own?->country ?? ''));
+        $ownRegion = trim((string) ($own?->region ?? ''));
+        $ownLocality = trim((string) ($own?->locality ?? ''));
 
         if ($q !== '') {
             $query->where(function (Builder $builder) use ($q): void {
@@ -53,6 +62,42 @@ class UserKcaCommunityController extends Controller
             });
         }
 
+        $hasExplicitGeo = $country !== '' || $region !== '' || $locality !== '';
+        $hasScope = $scope !== '' && $scope !== 'all';
+        if ($hasExplicitGeo || $hasScope) {
+            $query->whereHas('profile', function (Builder $profile) use ($country, $region, $locality, $scope, $ownCountry, $ownRegion, $ownLocality): void {
+            if ($scope === 'own_country' && $ownCountry !== '') {
+                $profile->where('country', $ownCountry);
+            } elseif ($scope === 'own_state' && $ownRegion !== '') {
+                $profile->where('region', $ownRegion);
+            } elseif ($scope === 'own_lga' && $ownLocality !== '') {
+                $profile->where('locality', $ownLocality);
+            } elseif ($scope === 'other_country' && $ownCountry !== '') {
+                $profile->where(function (Builder $inner) use ($ownCountry): void {
+                    $inner->whereNull('country')->orWhere('country', '!=', $ownCountry);
+                });
+            } elseif ($scope === 'other_state' && $ownRegion !== '') {
+                $profile->where(function (Builder $inner) use ($ownRegion): void {
+                    $inner->whereNull('region')->orWhere('region', '!=', $ownRegion);
+                });
+            } elseif ($scope === 'other_lga' && $ownLocality !== '') {
+                $profile->where(function (Builder $inner) use ($ownLocality): void {
+                    $inner->whereNull('locality')->orWhere('locality', '!=', $ownLocality);
+                });
+            }
+
+            if ($country !== '') {
+                $profile->where('country', $country);
+            }
+            if ($region !== '') {
+                $profile->where('region', $region);
+            }
+            if ($locality !== '') {
+                $profile->where('locality', $locality);
+            }
+            });
+        }
+
         $paginator = $query->orderBy('id')->paginate((int) $request->validated('per_page', 25));
         $followedIds = KcaFollow::query()
             ->where('follower_person_id', $caller->getKey())
@@ -62,10 +107,14 @@ class UserKcaCommunityController extends Controller
             ->all();
 
         $rows = $paginator->getCollection()->map(static function (Person $person) use ($followedIds): array {
+            $profile = $person->profile;
+
             return [
                 'id' => $person->public_id,
                 'display_name' => PersonDisplayName::of($person),
-                'country' => $person->profile?->country,
+                'country' => $profile?->country,
+                'region' => $profile?->region,
+                'locality' => $profile?->locality,
                 'is_following' => in_array((int) $person->getKey(), $followedIds, true),
             ];
         })->values()->all();
@@ -127,7 +176,7 @@ class UserKcaCommunityController extends Controller
         $paginator = KcaFollow::query()
             ->with([
                 'followed:id,public_id',
-                'followed.profile:id,person_id,given_name,middle_name,family_name,preferred_name,country',
+                'followed.profile:id,person_id,given_name,middle_name,family_name,preferred_name,country,region,locality',
                 'followed.user:id,person_id,name,email',
             ])
             ->where('follower_person_id', $caller->getKey())
@@ -141,11 +190,27 @@ class UserKcaCommunityController extends Controller
                 'id' => $person?->public_id,
                 'display_name' => PersonDisplayName::of($person),
                 'country' => $person?->profile?->country,
+                'region' => $person?->profile?->region,
+                'locality' => $person?->profile?->locality,
                 'is_following' => true,
             ];
         })->values()->all();
 
         return $this->page($request, $paginator, $rows);
+    }
+
+    private function queryValue(ListUserRecordsRequest $request, string $key): string
+    {
+        $direct = $request->validated($key);
+        if (is_string($direct) && trim($direct) !== '') {
+            return trim($direct);
+        }
+        $filter = $request->validated('filter');
+        if (is_array($filter) && isset($filter[$key]) && is_string($filter[$key])) {
+            return trim($filter[$key]);
+        }
+
+        return '';
     }
 
     private function actor(Request $request): User

@@ -20,6 +20,7 @@ use App\Http\Controllers\Api\V1\User\UserChurchCommunityController;
 use App\Http\Controllers\Api\V1\User\UserChurchOperationsController;
 use App\Http\Controllers\Api\V1\User\UserDomainOperationsController;
 use App\Http\Controllers\Api\V1\User\UserKcaCommunityController;
+use App\Http\Controllers\Api\V1\User\UserBibleController;
 use App\Http\Controllers\Api\V1\User\UserLivestreamController;
 use App\Http\Controllers\Api\V1\User\UserMissionController;
 use App\Http\Middleware\EnsureRecentMfa;
@@ -52,6 +53,16 @@ Route::get('/payments/receipts/{receipt}', [PaymentController::class, 'receipt']
 Route::get('/prayers', [PrayerRequestController::class, 'index'])->name('prayers.index');
 Route::post('/prayers', [PrayerRequestController::class, 'store'])->name('prayers.store');
 
+Route::prefix('bible')->name('bible.')->controller(UserBibleController::class)->group(function (): void {
+    Route::get('/progress', 'progress')->name('progress.show');
+    Route::post('/enrollments', 'enroll')->name('enrollments.store');
+    Route::post('/enrollments/{enrollment}/days/{day}/complete', 'completeDay')
+        ->whereUlid('enrollment')
+        ->whereNumber('day')
+        ->name('enrollments.days.complete');
+    Route::put('/position', 'position')->name('position.update');
+});
+
 Route::prefix('mission')->name('mission.')->controller(UserMissionController::class)->group(function (): void {
     Route::get('/invitations', 'invitations')->name('invitations.index');
     Route::post('/invitations', 'storeInvitation')->name('invitations.store');
@@ -65,6 +76,8 @@ Route::prefix('kca')->name('kca.')->group(function (): void {
     Route::get('/applications/current', [KcaApplicationController::class, 'showCurrent'])->name('applications.current');
     Route::post('/applications', [KcaApplicationController::class, 'store'])->name('applications.store');
     Route::get('/dashboard', [KcaCurriculumController::class, 'dashboard'])->name('dashboard');
+    Route::get('/orientation', [KcaCurriculumController::class, 'orientation'])->name('orientation.show');
+    Route::get('/practical-service', [KcaCurriculumController::class, 'practicalService'])->name('practical_service.show');
     Route::get('/modules', [KcaCurriculumController::class, 'modules'])->name('modules.index');
     Route::get('/modules/{module}', [KcaCurriculumController::class, 'module'])
         ->whereUlid('module')
@@ -79,6 +92,22 @@ Route::prefix('kca')->name('kca.')->group(function (): void {
     Route::get('/lessons/{lesson}', [KcaCurriculumController::class, 'lesson'])
         ->whereUlid('lesson')
         ->name('lessons.show');
+    Route::get('/chapters/{chapter}', [KcaCurriculumController::class, 'chapter'])
+        ->whereUlid('chapter')
+        ->name('chapters.show');
+    Route::post('/chapters/{chapter}/complete', [KcaCurriculumController::class, 'completeChapter'])
+        ->whereUlid('chapter')
+        ->name('chapters.complete');
+    Route::get('/notes', [KcaCurriculumController::class, 'notes'])->name('notes.index');
+    Route::post('/notes', [KcaCurriculumController::class, 'storeNote'])->name('notes.store');
+    Route::post('/devotionals', [KcaCurriculumController::class, 'storeDevotional'])->name('devotionals.store');
+    Route::post('/assignments/{assignment}/souls', [KcaCurriculumController::class, 'storeSoulWin'])
+        ->whereUlid('assignment')
+        ->name('assignments.souls.store');
+    Route::get('/mentees', [KcaCurriculumController::class, 'mentees'])->name('mentees.index');
+    Route::get('/mentees/{enrollment}', [KcaCurriculumController::class, 'mentee'])
+        ->whereUlid('enrollment')
+        ->name('mentees.show');
     Route::get('/certificates/current/download', [KcaCurriculumController::class, 'downloadCertificate'])
         ->name('certificates.download');
     Route::get('/mentor', [KcaCurriculumController::class, 'mentor'])->name('mentor.show');

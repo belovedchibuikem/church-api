@@ -32,8 +32,10 @@ class CompleteLocalGivingAction
      */
     public function handle(PaymentIntent $intent, Person $payer, User $actor, FileAsset $proof): array
     {
-        if (! GivingPurpose::isMemberGiving((string) $intent->purpose_code)) {
-            throw new InvalidArgumentException('Only giving intents can be completed via the local gateway.');
+        $purpose = (string) $intent->purpose_code;
+        $isEvent = $purpose === GivingPurpose::EVENT_PAYMENT;
+        if (! GivingPurpose::isMemberGiving($purpose) && ! $isEvent) {
+            throw new InvalidArgumentException('Only giving or event-fee intents can be completed via the local gateway.');
         }
 
         if ((int) $intent->payer_person_id !== (int) $payer->getKey()) {
@@ -50,7 +52,7 @@ class CompleteLocalGivingAction
             throw new PaymentGovernanceDeniedException('Payment governance has not enabled local giving completion.');
         }
 
-        return DB::transaction(function () use ($intent, $payer, $actor, $proof): array {
+        return DB::transaction(function () use ($intent, $payer, $actor, $proof, $isEvent): array {
             $locked = PaymentIntent::query()->lockForUpdate()->findOrFail($intent->getKey());
 
             if ($locked->status === PaymentIntentStatus::Succeeded) {
@@ -99,7 +101,7 @@ class CompleteLocalGivingAction
             ])->save();
 
             $this->recordAuditEvent->handle(new AuditEventData(
-                action: 'finance.giving.local_completed',
+                action: $isEvent ? 'finance.event.local_completed' : 'finance.giving.local_completed',
                 actor: $actor,
                 targetType: 'payment_intent',
                 targetId: $locked->public_id,

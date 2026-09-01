@@ -29,6 +29,15 @@ class TransitionKcaAssignmentAction
             $from = $lockedAssignment->state;
 
             $this->transitions->assertCanTransition($from, $to);
+            if (in_array($to, [
+                KcaAssignmentState::Submitted,
+                KcaAssignmentState::MentorReview,
+                KcaAssignmentState::Approved,
+                KcaAssignmentState::AdminReview,
+                KcaAssignmentState::FinalAssessment,
+            ], true)) {
+                app(KcaSoulTreeService::class)->assertCompleteForClosure($lockedAssignment);
+            }
             $now = now()->utc();
             $lockedAssignment->state = $to;
             $lockedAssignment->last_transitioned_by_user_id = $actor->getKey();

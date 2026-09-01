@@ -19,6 +19,7 @@ use App\Models\GuardianRelationship;
 use App\Models\KcaApplication;
 use App\Models\KcaAssessmentResult;
 use App\Models\KcaAssignment;
+use App\Models\KcaChapter;
 use App\Models\KcaAttendance;
 use App\Models\KcaCertificate;
 use App\Models\KcaCohort;
@@ -97,6 +98,8 @@ class ProtectedCatalogRecordResource extends JsonResource
                 'enrollment_id' => $this->enrollment?->public_id,
                 'module_id' => $this->module?->public_id,
                 'title' => $this->title,
+                'assignment_kind' => $this->assignment_kind ?? 'standard',
+                'soul_tree_spec' => $this->soul_tree_spec,
                 'state' => $this->state->value,
                 'due_at' => $this->due_at?->utc()->toIso8601String(),
             ],
@@ -174,6 +177,20 @@ class ProtectedCatalogRecordResource extends JsonResource
                 'sequence' => $this->sequence,
                 'day_index' => $this->day_index,
                 'lesson_type' => $this->lesson_type,
+                'chapters_count' => $this->relationLoaded('chapters') ? $this->chapters->count() : null,
+                'status' => 'Active',
+            ],
+            $this->resource instanceof KcaChapter => [
+                'id' => $this->public_id,
+                'lesson_id' => $this->lesson?->public_id,
+                'lesson_title' => $this->lesson?->title,
+                'code' => $this->code,
+                'title' => $this->title,
+                'summary' => $this->summary,
+                'body' => $this->body,
+                'content_url' => $this->content_url,
+                'estimated_minutes' => $this->estimated_minutes,
+                'sequence' => $this->sequence,
                 'status' => 'Active',
             ],
             $this->resource instanceof KcaModulePrerequisite => [

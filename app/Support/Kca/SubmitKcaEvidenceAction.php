@@ -94,6 +94,7 @@ class SubmitKcaEvidenceAction
 
             $from = $lockedAssignment->state;
             $this->transitions->assertCanTransition($from, KcaAssignmentState::Submitted);
+            app(KcaSoulTreeService::class)->assertCompleteForClosure($lockedAssignment);
             $now = now()->utc();
             $submission = (new KcaEvidenceSubmission)->forceFill([
                 'kca_assignment_id' => $lockedAssignment->getKey(),

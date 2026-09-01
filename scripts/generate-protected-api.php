@@ -1194,6 +1194,25 @@ function protectedDomainSchemas(): array
             ],
             'additionalProperties' => false,
         ],
+        'CreateUserBibleEnrollmentInput' => [
+            'type' => 'object',
+            'required' => ['plan_code'],
+            'properties' => [
+                'plan_code' => ['type' => 'string', 'enum' => ['year_1', 'year_2', 'year_3']],
+                'started_on' => ['type' => 'string', 'format' => 'date'],
+                'timezone' => ['type' => 'string'],
+            ],
+            'additionalProperties' => false,
+        ],
+        'UpdateUserBibleReadingPositionInput' => [
+            'type' => 'object',
+            'required' => ['book', 'chapter'],
+            'properties' => [
+                'book' => ['type' => 'string'],
+                'chapter' => ['type' => 'integer', 'minimum' => 1],
+            ],
+            'additionalProperties' => false,
+        ],
         'CreateUserPastoralNeedInput' => [
             'type' => 'object',
             'required' => ['category', 'summary'],
@@ -1339,6 +1358,7 @@ function operationHasRequestBody(string $operationId, string $method): bool
         'markUserNotificationRead',
         'approveAdminFileAsset',
         'completeUserGivingPaymentIntent',
+        'completeUserBiblePlanDay',
     ], true);
 }
 
@@ -1713,6 +1733,8 @@ export interface GrantUserConsentInput { purpose: string; policy_version: string
 export interface UpdateUserPreferencesInput { locale: string; timezone: string; notification_channels: string[]; }
 export interface CreateUserGivingPaymentIntentInput { amount_minor: number; currency: string; }
 export interface CreateUserPrayerRequestInput { subject: string; body: string; }
+export interface CreateUserBibleEnrollmentInput { plan_code: 'year_1' | 'year_2' | 'year_3'; started_on?: string; timezone?: string; }
+export interface UpdateUserBibleReadingPositionInput { book: string; chapter: number; }
 export interface CreateUserPastoralNeedInput { category: string; summary: string; }
 export interface CreateUserMessageConversationInput {
   participant_person_ids: string[]; first_message: string; subject?: string | null;

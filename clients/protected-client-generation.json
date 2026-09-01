@@ -509,6 +509,22 @@
             "method": "POST",
             "path": "/api/v1/user/prayers"
         },
+        "getUserBibleProgress": {
+            "method": "GET",
+            "path": "/api/v1/user/bible/progress"
+        },
+        "createUserBibleEnrollment": {
+            "method": "POST",
+            "path": "/api/v1/user/bible/enrollments"
+        },
+        "completeUserBiblePlanDay": {
+            "method": "POST",
+            "path": "/api/v1/user/bible/enrollments/{enrollment}/days/{day}/complete"
+        },
+        "updateUserBibleReadingPosition": {
+            "method": "PUT",
+            "path": "/api/v1/user/bible/position"
+        },
         "listUserPastoralNeeds": {
             "method": "GET",
             "path": "/api/v1/user/needs"
@@ -1139,6 +1155,14 @@
         },
         "createUserPrayerRequest": {
             "request": "CreateUserPrayerRequestInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "createUserBibleEnrollment": {
+            "request": "CreateUserBibleEnrollmentInput",
+            "response": "ProtectedDomainRecord"
+        },
+        "updateUserBibleReadingPosition": {
+            "request": "UpdateUserBibleReadingPositionInput",
             "response": "ProtectedDomainRecord"
         },
         "createUserPastoralNeed": {

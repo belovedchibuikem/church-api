@@ -1,4 +1,4 @@
-// Generated from openapi/protected-v1.openapi.json (SHA-256: ac99484ebb77fdc19e1ff81bbc49914584022c220576d56f1cc518487437318d).
+// Generated from openapi/protected-v1.openapi.json (SHA-256: 94cfd9861b2768fd273ca83036bfa0a564f8055441ea2342663cdd463663223e).
 // Do not edit directly. Run: php scripts/generate-protected-api.php
 
 export type JsonPrimitive = string | number | boolean | null;
@@ -230,6 +230,8 @@ export interface GrantUserConsentInput { purpose: string; policy_version: string
 export interface UpdateUserPreferencesInput { locale: string; timezone: string; notification_channels: string[]; }
 export interface CreateUserGivingPaymentIntentInput { amount_minor: number; currency: string; }
 export interface CreateUserPrayerRequestInput { subject: string; body: string; }
+export interface CreateUserBibleEnrollmentInput { plan_code: 'year_1' | 'year_2' | 'year_3'; started_on?: string; timezone?: string; }
+export interface UpdateUserBibleReadingPositionInput { book: string; chapter: number; }
 export interface CreateUserPastoralNeedInput { category: string; summary: string; }
 export interface CreateUserMessageConversationInput {
   participant_person_ids: string[]; first_message: string; subject?: string | null;
@@ -240,7 +242,7 @@ export interface RegisterUserEventRegistrationInput { idempotency_key?: string; 
 export interface RecordUserEventFeedbackInput { rating: number; registration_id: string; }
 export interface SubmitUserDataSubjectRequestInput { request_type: string; notes?: string | null; }
 export interface StoreUserFileAssetInput { purpose: string; classification: string; [key: string]: JsonValue; }
-export interface StartUserChurchMembershipInput { home_church_id?: string | null; confirm_transfer?: boolean; }
+export interface StartUserChurchMembershipInput { home_church_id?: string | null; }
 export interface SubmitUserHomeChurchReportInput { summary: string; period_code?: string | null; }
 export interface UserHomeChurchReportSubmission { id: string; status: 'submitted'; submitted_at: string; }
 
@@ -760,6 +762,22 @@ export class FamilyHouseProtectedApiClient {
 
   public createUserPrayerRequest(body: CreateUserPrayerRequestInput, options: ProtectedRequestOptions = {}): Promise<SuccessEnvelope<ProtectedDomainRecord>> {
     return this.request<ProtectedDomainRecord>('POST', '/api/v1/user/prayers', options, body as unknown as JsonObject);
+  }
+
+  public getUserBibleProgress(options: ProtectedRequestOptions = {}): Promise<SuccessEnvelope<JsonValue>> {
+    return this.request<JsonValue>('GET', '/api/v1/user/bible/progress', options);
+  }
+
+  public createUserBibleEnrollment(body: CreateUserBibleEnrollmentInput, options: ProtectedRequestOptions = {}): Promise<SuccessEnvelope<ProtectedDomainRecord>> {
+    return this.request<ProtectedDomainRecord>('POST', '/api/v1/user/bible/enrollments', options, body as unknown as JsonObject);
+  }
+
+  public completeUserBiblePlanDay(enrollment: string, day: string, options: ProtectedRequestOptions = {}): Promise<SuccessEnvelope<JsonValue>> {
+    return this.request<JsonValue>('POST', `/api/v1/user/bible/enrollments/${encodeURIComponent(enrollment)}/days/${encodeURIComponent(day)}/complete`, options);
+  }
+
+  public updateUserBibleReadingPosition(body: UpdateUserBibleReadingPositionInput, options: ProtectedRequestOptions = {}): Promise<SuccessEnvelope<ProtectedDomainRecord>> {
+    return this.request<ProtectedDomainRecord>('PUT', '/api/v1/user/bible/position', options, body as unknown as JsonObject);
   }
 
   public listUserPastoralNeeds(options: ProtectedRequestOptions = {}): Promise<SuccessEnvelope<JsonValue>> {

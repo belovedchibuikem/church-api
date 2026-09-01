@@ -1,4 +1,4 @@
-// Generated from openapi/protected-v1.openapi.json (SHA-256: ac99484ebb77fdc19e1ff81bbc49914584022c220576d56f1cc518487437318d).
+// Generated from openapi/protected-v1.openapi.json (SHA-256: 94cfd9861b2768fd273ca83036bfa0a564f8055441ea2342663cdd463663223e).
 // Do not edit directly. Run: php scripts/generate-protected-api.php
 
 typedef JsonMap = Map<String, Object?>;
@@ -429,6 +429,18 @@ final class FamilyHouseProtectedApiClient {
 
   Future<JsonMap> createUserPrayerRequest({JsonMap body = const {}, ProtectedRequestOptions options = const ProtectedRequestOptions()}) =>
       _request('POST', '/api/v1/user/prayers', options, body: body);
+
+  Future<JsonMap> getUserBibleProgress({ProtectedRequestOptions options = const ProtectedRequestOptions()}) =>
+      _request('GET', '/api/v1/user/bible/progress', options);
+
+  Future<JsonMap> createUserBibleEnrollment({JsonMap body = const {}, ProtectedRequestOptions options = const ProtectedRequestOptions()}) =>
+      _request('POST', '/api/v1/user/bible/enrollments', options, body: body);
+
+  Future<JsonMap> completeUserBiblePlanDay({required String enrollment, required String day, ProtectedRequestOptions options = const ProtectedRequestOptions()}) =>
+      _request('POST', '/api/v1/user/bible/enrollments/${Uri.encodeComponent(enrollment)}/days/${Uri.encodeComponent(day)}/complete', options);
+
+  Future<JsonMap> updateUserBibleReadingPosition({JsonMap body = const {}, ProtectedRequestOptions options = const ProtectedRequestOptions()}) =>
+      _request('PUT', '/api/v1/user/bible/position', options, body: body);
 
   Future<JsonMap> listUserPastoralNeeds({ProtectedRequestOptions options = const ProtectedRequestOptions()}) =>
       _request('GET', '/api/v1/user/needs', options);

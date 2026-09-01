@@ -72,6 +72,21 @@ class KcaEnrollment extends Model
         return $this->hasMany(KcaAttendance::class);
     }
 
+    public function lessonProgress(): HasMany
+    {
+        return $this->hasMany(KcaLessonProgress::class);
+    }
+
+    public function studyNotes(): HasMany
+    {
+        return $this->hasMany(KcaStudyNote::class);
+    }
+
+    public function devotionalReadings(): HasMany
+    {
+        return $this->hasMany(KcaDevotionalReading::class);
+    }
+
     protected function casts(): array
     {
         return ['starts_on' => 'immutable_date'];

@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\V1\Public\HomeChurchApplicationController;
 use App\Http\Controllers\Api\V1\Public\KcaLeadershipRecommendationController;
 use App\Http\Controllers\Api\V1\Public\NativePaymentWebhookController;
 use App\Http\Controllers\Api\V1\Public\PressPublicationController;
+use App\Http\Controllers\Api\V1\Public\PublicBibleController;
 use App\Http\Controllers\Api\V1\Public\PublicBrandingController;
 use App\Http\Controllers\Api\V1\Public\PublicCrusadeController;
 use App\Http\Controllers\Api\V1\Public\PublicEventController;
@@ -147,4 +148,20 @@ Route::prefix('content')
         Route::get('/pages/{slug}', [ContentPageController::class, 'show'])
             ->where('slug', '[a-z0-9]+(?:-[a-z0-9]+)*')
             ->name('pages.show');
+    });
+
+Route::prefix('bible')
+    ->name('bible.')
+    ->middleware('throttle:public-catalogue')
+    ->group(function (): void {
+        Route::get('/books', [PublicBibleController::class, 'books'])->name('books.index');
+        Route::get('/books/{book}/chapters/{chapter}', [PublicBibleController::class, 'chapter'])
+            ->where('book', '[a-z0-9]+(?:-[a-z0-9]+)*')
+            ->whereNumber('chapter')
+            ->name('chapters.show');
+        Route::get('/search', [PublicBibleController::class, 'search'])->name('search');
+        Route::get('/plans', [PublicBibleController::class, 'plans'])->name('plans.index');
+        Route::get('/plans/{plan}', [PublicBibleController::class, 'plan'])
+            ->where('plan', 'year_[123]')
+            ->name('plans.show');
     });

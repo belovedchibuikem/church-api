@@ -84,6 +84,26 @@
         "getContentPage": {
             "method": "GET",
             "path": "/api/v1/content/pages/{slug}"
+        },
+        "listBibleBooks": {
+            "method": "GET",
+            "path": "/api/v1/bible/books"
+        },
+        "getBibleChapter": {
+            "method": "GET",
+            "path": "/api/v1/bible/books/{book}/chapters/{chapter}"
+        },
+        "searchBible": {
+            "method": "GET",
+            "path": "/api/v1/bible/search"
+        },
+        "listBiblePlans": {
+            "method": "GET",
+            "path": "/api/v1/bible/plans"
+        },
+        "getBiblePlan": {
+            "method": "GET",
+            "path": "/api/v1/bible/plans/{plan}"
         }
     },
     "outputs": {

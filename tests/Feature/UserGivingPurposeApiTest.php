@@ -72,6 +72,42 @@ class UserGivingPurposeApiTest extends TestCase
         );
     }
 
+    public function test_manual_event_payment_completes_with_receipt_upload(): void
+    {
+        $this->enableLocalGiving();
+        $user = User::factory()->withPerson()->create();
+        $this->authenticate($user);
+
+        $event = \App\Models\MinistryEvent::factory()->published()->create([
+            'fee_amount_minor' => 500000,
+            'fee_currency' => 'NGN',
+        ]);
+        $registration = \App\Models\EventRegistration::factory()
+            ->for($event, 'event')
+            ->for($user->person)
+            ->create([
+                'status' => \App\Events\EventRegistrationStatus::PaymentPending,
+            ]);
+
+        $created = $this->postJson(
+            "/api/v1/user/events/registrations/{$registration->public_id}/payment-intents",
+            ['idempotency_key' => 'event-manual-proof-01', 'checkout_return' => 'mobile'],
+        )->assertCreated();
+        $intentId = $created->json('data.id');
+        $this->assertSame('event_payment', $created->json('data.purpose_code'));
+
+        $proof = FileAsset::factory()->available()->create([
+            'owner_person_id' => $user->person->getKey(),
+            'purpose' => GivingPurpose::PROOF_FILE_PURPOSE,
+        ]);
+
+        $this->postJson("/api/v1/user/payments/giving-intents/{$intentId}/complete", [
+            'proof_file_asset_id' => $proof->public_id,
+        ])->assertOk()
+            ->assertJsonPath('data.intent.status', 'succeeded')
+            ->assertJsonPath('data.intent.purpose_code', 'event_payment');
+    }
+
     private function enableLocalGiving(): void
     {
         config()->set('finance.governance_mode', 'allow_local');

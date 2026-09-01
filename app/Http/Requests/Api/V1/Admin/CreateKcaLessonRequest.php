@@ -28,6 +28,14 @@ class CreateKcaLessonRequest extends FormRequest
             'content_url' => ['nullable', 'string', 'max:2048'],
             'estimated_minutes' => ['nullable', 'integer', 'min:1', 'max:1440'],
             'requires_acknowledgement' => ['sometimes', 'boolean'],
+            'chapters' => ['sometimes', 'array'],
+            'chapters.*.code' => ['nullable', 'string', 'max:50'],
+            'chapters.*.title' => ['required_with:chapters', 'string', 'max:191'],
+            'chapters.*.sequence' => ['nullable', 'integer', 'min:1', 'max:65535'],
+            'chapters.*.summary' => ['nullable', 'string', 'max:500'],
+            'chapters.*.body' => ['nullable', 'string', 'max:20000'],
+            'chapters.*.content_url' => ['nullable', 'string', 'max:2048'],
+            'chapters.*.estimated_minutes' => ['nullable', 'integer', 'min:1', 'max:1440'],
         ];
     }
 }

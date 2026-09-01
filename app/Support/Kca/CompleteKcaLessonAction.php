@@ -3,6 +3,8 @@
 namespace App\Support\Kca;
 
 use App\Exceptions\KcaIdempotencyConflictException;
+use App\Models\KcaChapter;
+use App\Models\KcaChapterProgress;
 use App\Models\KcaEnrollment;
 use App\Models\KcaLesson;
 use App\Models\KcaLessonProgress;
@@ -55,6 +57,7 @@ class CompleteKcaLessonAction
             if ($existing?->completed_at !== null) {
                 return $existing;
             }
+            $this->assertChaptersComplete($enrollment, $lockedLesson);
             if ($idempotencyKey) {
                 $byKey = KcaLessonProgress::query()
                     ->where('kca_enrollment_id', $enrollment->getKey())
@@ -107,6 +110,22 @@ class CompleteKcaLessonAction
             throw new AccessDeniedHttpException('This lesson is not published.');
         }
         $this->assertDayUnlocked($enrollment, $module, (int) ($lesson->day_index ?? 1));
+    }
+
+    private function assertChaptersComplete(KcaEnrollment $enrollment, KcaLesson $lesson): void
+    {
+        $chapterIds = KcaChapter::query()->where('kca_lesson_id', $lesson->getKey())->pluck('id');
+        if ($chapterIds->isEmpty()) {
+            return;
+        }
+        $completed = KcaChapterProgress::query()
+            ->where('kca_enrollment_id', $enrollment->getKey())
+            ->whereIn('kca_chapter_id', $chapterIds)
+            ->whereNotNull('completed_at')
+            ->count();
+        if ($completed < $chapterIds->count()) {
+            throw new InvalidArgumentException('Complete every chapter in this lesson before marking the lesson complete.');
+        }
     }
 
     private function assertDayUnlocked(KcaEnrollment $enrollment, KcaModule $module, int $dayIndex): void

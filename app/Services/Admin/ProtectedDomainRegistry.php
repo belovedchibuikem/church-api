@@ -23,6 +23,7 @@ use App\Models\KcaEnrollment;
 use App\Models\KcaEvidenceSubmission;
 use App\Models\KcaLecturerAssignment;
 use App\Models\KcaLesson;
+use App\Models\KcaChapter;
 use App\Models\KcaMentorAssignment;
 use App\Models\KcaModule;
 use App\Models\KcaModulePrerequisite;
@@ -169,7 +170,17 @@ class ProtectedDomainRegistry
                 'path' => 'kca/lessons',
                 'operation_id' => 'listAdminCatalogKcaLessons',
                 'model' => KcaLesson::class,
-                'with' => ['module:id,public_id,title,code'],
+                'with' => ['module:id,public_id,title,code', 'chapters'],
+                'order_column' => 'sequence',
+                'order_direction' => 'asc',
+                'search_column' => 'title',
+            ],
+            'kca.chapters' => [
+                'permission' => 'kca.enrollments.view',
+                'path' => 'kca/chapters',
+                'operation_id' => 'listAdminCatalogKcaChapters',
+                'model' => KcaChapter::class,
+                'with' => ['lesson:id,public_id,title,code'],
                 'order_column' => 'sequence',
                 'order_direction' => 'asc',
                 'search_column' => 'title',

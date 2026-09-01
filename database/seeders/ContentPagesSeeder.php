@@ -209,7 +209,7 @@ class ContentPagesSeeder extends Seeder
                 'items' => [
                     ['kind' => 'card', 'title' => 'Browse titles', 'body' => 'Leadership, prayer, worship, and Christian living from Kingdom Press.', 'href' => '/press', 'meta' => ['icon' => '📘']],
                     ['kind' => 'card', 'title' => 'Sermons', 'body' => 'Watch and download messages from Family House pulpits.', 'href' => '/online-church/sermons', 'meta' => ['icon' => '▶']],
-                    ['kind' => 'card', 'title' => 'Devotionals', 'body' => 'Daily readings that keep households in the Word.', 'href' => '/press', 'meta' => ['icon' => '📖']],
+                    ['kind' => 'card', 'title' => 'Devotionals', 'body' => 'Daily readings and Study Manuals. Each title shows its type.', 'href' => '/press/devotionals', 'meta' => ['icon' => '📖']],
                 ],
             ],
             [

@@ -29,6 +29,9 @@
             "name": "KCA"
         },
         {
+            "name": "Bible"
+        },
+        {
             "name": "Mission"
         },
         {
@@ -789,6 +792,113 @@
                     }
                 }
             }
+        },
+        "/api/v1/bible/books": {
+            "get": {
+                "operationId": "listBibleBooks",
+                "summary": "List Bible books",
+                "tags": ["Bible"],
+                "parameters": [
+                    { "$ref": "#/components/parameters/CorrelationId" }
+                ],
+                "responses": {
+                    "200": { "$ref": "#/components/responses/BibleSuccess" },
+                    "429": { "$ref": "#/components/responses/RateLimited" },
+                    "500": { "$ref": "#/components/responses/InternalError" }
+                }
+            }
+        },
+        "/api/v1/bible/books/{book}/chapters/{chapter}": {
+            "get": {
+                "operationId": "getBibleChapter",
+                "summary": "Get a Bible chapter",
+                "tags": ["Bible"],
+                "parameters": [
+                    { "$ref": "#/components/parameters/CorrelationId" },
+                    {
+                        "name": "book",
+                        "in": "path",
+                        "required": true,
+                        "schema": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                    },
+                    {
+                        "name": "chapter",
+                        "in": "path",
+                        "required": true,
+                        "schema": { "type": "integer", "minimum": 1 }
+                    }
+                ],
+                "responses": {
+                    "200": { "$ref": "#/components/responses/BibleSuccess" },
+                    "404": { "$ref": "#/components/responses/NotFound" },
+                    "429": { "$ref": "#/components/responses/RateLimited" },
+                    "500": { "$ref": "#/components/responses/InternalError" }
+                }
+            }
+        },
+        "/api/v1/bible/search": {
+            "get": {
+                "operationId": "searchBible",
+                "summary": "Search Bible text or a scripture reference",
+                "tags": ["Bible"],
+                "parameters": [
+                    { "$ref": "#/components/parameters/CorrelationId" },
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "required": false,
+                        "schema": { "type": "string" }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "required": false,
+                        "schema": { "type": "integer", "minimum": 1, "maximum": 50 }
+                    }
+                ],
+                "responses": {
+                    "200": { "$ref": "#/components/responses/BibleSuccess" },
+                    "429": { "$ref": "#/components/responses/RateLimited" },
+                    "500": { "$ref": "#/components/responses/InternalError" }
+                }
+            }
+        },
+        "/api/v1/bible/plans": {
+            "get": {
+                "operationId": "listBiblePlans",
+                "summary": "List paced Bible reading plans",
+                "tags": ["Bible"],
+                "parameters": [
+                    { "$ref": "#/components/parameters/CorrelationId" }
+                ],
+                "responses": {
+                    "200": { "$ref": "#/components/responses/BibleSuccess" },
+                    "429": { "$ref": "#/components/responses/RateLimited" },
+                    "500": { "$ref": "#/components/responses/InternalError" }
+                }
+            }
+        },
+        "/api/v1/bible/plans/{plan}": {
+            "get": {
+                "operationId": "getBiblePlan",
+                "summary": "Get a paced Bible reading plan",
+                "tags": ["Bible"],
+                "parameters": [
+                    { "$ref": "#/components/parameters/CorrelationId" },
+                    {
+                        "name": "plan",
+                        "in": "path",
+                        "required": true,
+                        "schema": { "type": "string", "enum": ["year_1", "year_2", "year_3"] }
+                    }
+                ],
+                "responses": {
+                    "200": { "$ref": "#/components/responses/BibleSuccess" },
+                    "404": { "$ref": "#/components/responses/NotFound" },
+                    "429": { "$ref": "#/components/responses/RateLimited" },
+                    "500": { "$ref": "#/components/responses/InternalError" }
+                }
+            }
         }
     },
     "components": {
@@ -1387,6 +1497,21 @@
                     "application/json": {
                         "schema": {
                             "$ref": "#/components/schemas/ContentPageEnvelope"
+                        }
+                    }
+                }
+            },
+            "BibleSuccess": {
+                "description": "Bible catalogue, chapter, search, or reading plan.",
+                "headers": {
+                    "X-Correlation-ID": {
+                        "$ref": "#/components/headers/CorrelationId"
+                    }
+                },
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/BibleEnvelope"
                         }
                     }
                 }
@@ -2790,6 +2915,15 @@
                 "properties": {
                     "data": {
                         "$ref": "#/components/schemas/ContentPage"
+                    }
+                }
+            },
+            "BibleEnvelope": {
+                "$ref": "#/components/schemas/EnvelopeBase",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "additionalProperties": true
                     }
                 }
             },

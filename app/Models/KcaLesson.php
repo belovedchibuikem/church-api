@@ -48,6 +48,11 @@ class KcaLesson extends Model
         return $this->hasMany(KcaAttendance::class);
     }
 
+    public function chapters(): HasMany
+    {
+        return $this->hasMany(KcaChapter::class)->orderBy('sequence');
+    }
+
     protected function casts(): array
     {
         return [

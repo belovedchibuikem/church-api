@@ -143,6 +143,23 @@ class UserKcaMeAndPacingTest extends TestCase
             ->assertJsonPath('data.enrolled', false);
     }
 
+    public function test_orientation_and_practical_service_are_api_payloads(): void
+    {
+        $user = User::factory()->withPerson()->create();
+        $this->authenticate($user);
+
+        $this->getJson('/api/v1/user/kca/orientation')
+            ->assertOk()
+            ->assertJsonPath('data.enrolled', false)
+            ->assertJsonPath('data.stages.0.key', 'overview')
+            ->assertJsonPath('data.stages.3.key', 'mentors');
+
+        $this->getJson('/api/v1/user/kca/practical-service')
+            ->assertOk()
+            ->assertJsonPath('data.enrolled', false)
+            ->assertJsonPath('data.departments_count', 0);
+    }
+
     private function authenticate(User $user): void
     {
         $session = SecuritySession::factory()->for($user)->create();
