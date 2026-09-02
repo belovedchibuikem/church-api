@@ -37,8 +37,12 @@ final class SimplePdfDocument
 
         $pageRefs = [];
         $nextId = 3;
-        $fontId = $nextId++;
-        $objects[$fontId] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>';
+        $fontRegularId = $nextId++;
+        $fontBoldId = $nextId++;
+        $fontItalicId = $nextId++;
+        $objects[$fontRegularId] = '<< /Type /Font /Subtype /Type1 /BaseFont /Times-Roman >>';
+        $objects[$fontBoldId] = '<< /Type /Font /Subtype /Type1 /BaseFont /Times-Bold >>';
+        $objects[$fontItalicId] = '<< /Type /Font /Subtype /Type1 /BaseFont /Times-Italic >>';
 
         $imageIds = [];
         foreach ($this->images as $name => $image) {
@@ -53,7 +57,7 @@ final class SimplePdfDocument
             $contentId = $nextId++;
             $pageRefs[] = "{$pageId} 0 R";
 
-            $resources = "<< /Font << /F1 {$fontId} 0 R >>";
+            $resources = "<< /Font << /F1 {$fontRegularId} 0 R /F2 {$fontBoldId} 0 R /F3 {$fontItalicId} 0 R >>";
             if ($imageIds !== []) {
                 $xObjects = [];
                 foreach ($imageIds as $name => $id) {

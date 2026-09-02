@@ -93,7 +93,9 @@ final class BuildKcaOrientationProgramAction
                         'key' => $step->slug,
                         'title' => $step->title,
                         'subtitle' => $mentorName === null ? ($step->subtitle ?? 'Connect with your mentor') : $mentorName,
-                        'body' => $mentor === null ? ($step->body ?? 'A mentor is assigned after enrollment is activated.') : $step->body,
+                        'body' => $step->body ?? ($mentor === null
+                            ? 'A mentor is assigned after enrollment is activated to walk with you through the programme.'
+                            : null),
                         'display_type' => $step->display_type,
                         'mentor' => $mentor,
                         'completed' => $completed,
@@ -137,7 +139,7 @@ final class BuildKcaOrientationProgramAction
                 'slug' => 'path',
                 'title' => 'Learning Path',
                 'subtitle' => 'Your journey ahead',
-                'body' => null,
+                'body' => "Kingdom Change Agents is a structured discipleship journey. Each module builds on the previous one to help you know Christ, grow in Christ, serve Christ, and influence your generation.\n\nThe modules listed below are your published learning path. Open any module to explore the lessons inside.",
                 'display_type' => 'modules_list',
                 'sequence' => 3,
                 'is_active' => true,
@@ -146,7 +148,7 @@ final class BuildKcaOrientationProgramAction
                 'slug' => 'mentors',
                 'title' => 'Meet Your Mentors',
                 'subtitle' => 'Connect with your mentors',
-                'body' => 'A mentor is assigned after enrollment is activated.',
+                'body' => "A mentor walks with you throughout the KCA programme — encouraging your growth, answering questions, and helping you stay accountable.\n\nYour mentor is assigned after enrollment is activated. Until then, read this step to understand how mentorship works in KCA.",
                 'display_type' => 'mentor',
                 'sequence' => 4,
                 'is_active' => true,

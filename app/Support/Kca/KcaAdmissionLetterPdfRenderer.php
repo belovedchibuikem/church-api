@@ -16,17 +16,41 @@ class KcaAdmissionLetterPdfRenderer
 
     private const MARGIN_X = 43;
 
-    private const CONTENT_TOP_Y = 562;
+    private const MARGIN_RIGHT = 43;
 
-    private const CONTENT_BOTTOM_Y = 96;
+    private const CONTENT_WIDTH = 526;
+
+    private const FOOTER_HEIGHT = 42;
+
+    private const HEADER_LINE_Y = 662;
+
+    private const HEADER_GOLD_LINE_Y = 657;
+
+    private const LOGO_X = 43;
+
+    private const LOGO_BOTTOM_Y = 668;
+
+    private const LOGO_HEIGHT = 78;
+
+    private const HEADER_TEXT_X = 134;
+
+    private const CONTENT_TOP_Y = 632;
+
+    private const CONTENT_BOTTOM_Y = 56;
 
     private const BODY_FONT_SIZE = 10;
 
-    private const HEADING_FONT_SIZE = 11;
+    private const HEADING_FONT_SIZE = 10;
 
     private const LINE_HEIGHT = 13;
 
-    private const HEADING_LINE_HEIGHT = 16;
+    private const HEADING_LINE_HEIGHT = 15;
+
+    /** @var array{0: float, 1: float, 2: float} */
+    private const COLOR_NAVY = [0.102, 0.243, 0.553];
+
+    /** @var array{0: float, 1: float, 2: float} */
+    private const COLOR_GOLD = [0.722, 0.580, 0.310];
 
     private int $signatureImageCounter = 0;
 
@@ -44,7 +68,10 @@ class KcaAdmissionLetterPdfRenderer
 
         $pdf = new SimplePdfDocument;
         $this->signatureImageCounter = 0;
-        $operations = $this->letterheadOperations($pdf, $letter->letterheadFile);
+        $operations = $this->brandedFooter();
+
+        $logoJpeg = $this->resolveLogoJpeg($letter->letterheadFile);
+        $operations = array_merge($operations, $this->brandedHeader($pdf, $logoJpeg));
 
         $body = trim((string) ($letter->letter_body ?? ''));
         if ($body === '') {
@@ -60,26 +87,18 @@ class KcaAdmissionLetterPdfRenderer
         $referenceCode = trim((string) ($letter->reference_code ?? ''));
         $body = SyncKcaAdmissionLetterReference::inBody($body, $referenceCode);
 
-        $hasLetterhead = $letter->letterheadFile instanceof FileAsset && $operations !== [];
         $structured = $this->isStructuredTemplate($body);
         $signerName = trim((string) ($letter->signer_name ?? ''));
         $signerTitle = trim((string) ($letter->signer_title ?? ''));
         $signatureInserted = false;
-        $y = $hasLetterhead || $structured ? self::CONTENT_TOP_Y : 468;
+        $signerTitleRendered = false;
+        $y = self::CONTENT_TOP_Y;
 
-        if ($hasLetterhead && ! $structured) {
-            $applicant = PersonDisplayName::of($letter->application?->person) ?: 'Applicant';
-            $reference = $referenceCode !== '' ? $referenceCode : 'Pending';
-            $issuedOn = $letter->issued_at?->format('d/m/Y') ?? now()->format('d/m/Y');
-            $operations = array_merge($operations, $this->simplePreamble($issuedOn, $reference, $applicant));
-            $y = 412;
-        } elseif (! $hasLetterhead && ! $structured) {
-            $applicant = PersonDisplayName::of($letter->application?->person) ?: 'Applicant';
-            $reference = (string) ($letter->reference_code ?? 'Pending');
-            $issuedOn = $letter->issued_at?->format('d/m/Y') ?? now()->format('d/m/Y');
-            $operations = array_merge($operations, $this->simplePreamble($issuedOn, $reference, $applicant));
-            $y = 412;
-        }
+        $applicant = PersonDisplayName::of($letter->application?->person) ?: 'Applicant';
+        $reference = $referenceCode !== '' ? $referenceCode : 'Pending';
+        $issuedOn = $letter->issued_at?->format('d/m/Y') ?? now()->format('d/m/Y');
+        $operations = array_merge($operations, $this->letterMeta($issuedOn, $reference, $applicant, $y));
+        $y -= 4;
 
         foreach (preg_split("/\R\R+/", $body) ?: [] as $paragraph) {
             $paragraph = trim((string) $paragraph);
@@ -87,20 +106,20 @@ class KcaAdmissionLetterPdfRenderer
                 break;
             }
 
-            if ($hasLetterhead && $this->shouldSkipLetterheadBannerBlock($paragraph)) {
+            if ($this->shouldSkipLetterheadBannerBlock($paragraph)) {
                 continue;
             }
 
-            if ($hasLetterhead && ! $structured && $this->shouldSkipOverlayPreambleLine($paragraph)) {
+            if ($structured && $this->shouldSkipOverlayPreambleLine($paragraph)) {
                 continue;
             }
 
             if ($this->isSectionHeading($paragraph)) {
-                $y -= 4;
-                foreach ($this->renderLines($paragraph, self::HEADING_FONT_SIZE, self::HEADING_LINE_HEIGHT, $y) as $lineOp) {
+                $y -= 6;
+                foreach ($this->renderLines($paragraph, 'F2', self::HEADING_FONT_SIZE, self::HEADING_LINE_HEIGHT, $y, self::COLOR_NAVY) as $lineOp) {
                     $operations[] = $lineOp;
                 }
-                $y -= 4;
+                $y -= 2;
 
                 continue;
             }
@@ -117,13 +136,30 @@ class KcaAdmissionLetterPdfRenderer
                         continue;
                     }
 
-                    foreach ($this->renderLines($line, self::BODY_FONT_SIZE, self::LINE_HEIGHT, $y) as $lineOp) {
-                        $operations[] = $lineOp;
+                    if ($index === $nameLineIndex) {
+                        foreach ($this->renderLines($line, 'F3', 12, 15, $y) as $lineOp) {
+                            $operations[] = $lineOp;
+                        }
+                        $y = $this->appendSignature($pdf, $operations, $letter->signatureFile, $y, $signerTitle);
+                        $signatureInserted = true;
+                        $signerTitleRendered = $signerTitle !== '';
+
+                        continue;
                     }
 
-                    if ($index === $nameLineIndex) {
-                        $y = $this->appendSignature($pdf, $operations, $letter->signatureFile, $y);
-                        $signatureInserted = $signatureInserted || $letter->signatureFile instanceof FileAsset;
+                    if ($signerTitle !== '' && $this->matchesSigner($line, $signerTitle)) {
+                        if (! $signerTitleRendered) {
+                            foreach ($this->renderLines($line, 'F2', self::BODY_FONT_SIZE, self::LINE_HEIGHT, $y) as $lineOp) {
+                                $operations[] = $lineOp;
+                            }
+                            $signerTitleRendered = true;
+                        }
+
+                        continue;
+                    }
+
+                    foreach ($this->renderLines($line, 'F1', self::BODY_FONT_SIZE, self::LINE_HEIGHT, $y) as $lineOp) {
+                        $operations[] = $lineOp;
                     }
                 }
 
@@ -131,42 +167,41 @@ class KcaAdmissionLetterPdfRenderer
             }
 
             if ($signerName !== '' && $this->matchesSigner($paragraph, $signerName)) {
-                foreach ($this->renderLines($paragraph, self::BODY_FONT_SIZE, self::LINE_HEIGHT, $y) as $lineOp) {
+                foreach ($this->renderLines($paragraph, 'F3', 12, 15, $y) as $lineOp) {
                     $operations[] = $lineOp;
                 }
-                $y = $this->appendSignature($pdf, $operations, $letter->signatureFile, $y);
-                $signatureInserted = $signatureInserted || $letter->signatureFile instanceof FileAsset;
+                $y = $this->appendSignature($pdf, $operations, $letter->signatureFile, $y, $signerTitle);
+                $signatureInserted = true;
+                $signerTitleRendered = $signerTitle !== '';
 
                 continue;
             }
 
             if ($signerTitle !== '' && $this->matchesSigner($paragraph, $signerTitle)) {
-                foreach ($this->renderLines($paragraph, self::BODY_FONT_SIZE, self::LINE_HEIGHT, $y) as $lineOp) {
-                    $operations[] = $lineOp;
+                if (! $signerTitleRendered) {
+                    foreach ($this->renderLines($paragraph, 'F2', self::BODY_FONT_SIZE, self::LINE_HEIGHT, $y) as $lineOp) {
+                        $operations[] = $lineOp;
+                    }
+                    $signerTitleRendered = true;
                 }
 
                 continue;
             }
 
-            foreach ($this->renderLines($paragraph, self::BODY_FONT_SIZE, self::LINE_HEIGHT, $y) as $lineOp) {
+            foreach ($this->renderLines($paragraph, 'F1', self::BODY_FONT_SIZE, self::LINE_HEIGHT, $y) as $lineOp) {
                 $operations[] = $lineOp;
             }
         }
 
         if (! $signatureInserted && $signerName !== '') {
             $y -= 8;
-            foreach ($this->renderLines('Yours faithfully,', self::BODY_FONT_SIZE, self::LINE_HEIGHT, $y) as $lineOp) {
+            foreach ($this->renderLines('Yours faithfully,', 'F1', self::BODY_FONT_SIZE, self::LINE_HEIGHT, $y) as $lineOp) {
                 $operations[] = $lineOp;
             }
-            foreach ($this->renderLines($signerName, self::BODY_FONT_SIZE, self::LINE_HEIGHT, $y) as $lineOp) {
+            foreach ($this->renderLines($signerName, 'F3', 12, 15, $y) as $lineOp) {
                 $operations[] = $lineOp;
             }
-            $y = $this->appendSignature($pdf, $operations, $letter->signatureFile, $y);
-            if ($signerTitle !== '') {
-                foreach ($this->renderLines($signerTitle, self::BODY_FONT_SIZE, self::LINE_HEIGHT, $y) as $lineOp) {
-                    $operations[] = $lineOp;
-                }
-            }
+            $y = $this->appendSignature($pdf, $operations, $letter->signatureFile, $y, $signerTitle);
         }
 
         $pdf->addPage($operations);
@@ -175,57 +210,154 @@ class KcaAdmissionLetterPdfRenderer
     }
 
     /** @return array<int, string> */
-    private function letterheadOperations(SimplePdfDocument $pdf, ?FileAsset $letterhead): array
+    private function brandedHeader(SimplePdfDocument $pdf, ?string $logoJpeg): array
     {
-        if (! $letterhead instanceof FileAsset) {
-            return [];
+        $operations = [];
+
+        if ($logoJpeg !== null) {
+            $info = getimagesizefromstring($logoJpeg);
+            if (is_array($info)) {
+                $pdf->addJpegImage('Logo', $logoJpeg, (int) $info[0], (int) $info[1]);
+                $aspect = (int) $info[0] / max(1, (int) $info[1]);
+                $drawWidth = self::LOGO_HEIGHT * $aspect;
+                $operations[] = 'q';
+                $operations[] = sprintf(
+                    '%.2f 0 0 %.2f %.2f %.2f cm',
+                    $drawWidth,
+                    self::LOGO_HEIGHT,
+                    self::LOGO_X,
+                    self::LOGO_BOTTOM_Y,
+                );
+                $operations[] = '/Logo Do';
+                $operations[] = 'Q';
+            }
         }
 
-        $jpeg = $this->jpegBytes($letterhead);
-        if ($jpeg === null) {
-            return [];
-        }
+        $operations = array_merge($operations, $this->coloredText(
+            'KINGDOM CHANGE AGENTS (KCA)',
+            self::HEADER_TEXT_X,
+            728,
+            'F2',
+            13,
+            self::COLOR_NAVY,
+        ));
+        $operations = array_merge($operations, $this->coloredText(
+            "THE FAMILY HOUSE OF GOD INT'L",
+            self::HEADER_TEXT_X,
+            710,
+            'F2',
+            11,
+            self::COLOR_NAVY,
+        ));
+        $operations = array_merge($operations, $this->coloredText(
+            'Equipping Kingdom Leaders • Transforming Nations',
+            self::HEADER_TEXT_X,
+            694,
+            'F3',
+            9,
+            self::COLOR_GOLD,
+        ));
 
-        $info = getimagesizefromstring($jpeg);
-        if (! is_array($info)) {
-            return [];
-        }
+        $operations = array_merge($operations, $this->horizontalLine(self::HEADER_LINE_Y, 2.0, self::COLOR_NAVY));
+        $operations = array_merge($operations, $this->horizontalLine(self::HEADER_GOLD_LINE_Y, 0.75, self::COLOR_GOLD));
 
-        $pdf->addJpegImage('Letterhead', $jpeg, (int) $info[0], (int) $info[1]);
+        return $operations;
+    }
+
+    /** @return array<int, string> */
+    private function brandedFooter(): array
+    {
+        [$r, $g, $b] = self::COLOR_NAVY;
+        $leftLabel = 'Kingdom Change Agents';
+        $rightLabel = 'Admission Office';
+        $labelWidth = 220.0;
+        $startX = (self::PAGE_WIDTH - $labelWidth) / 2;
+        $bulletX = $startX + 118;
+        $operations = [
+            'q',
+            sprintf('%.3f %.3f %.3f rg', $r, $g, $b),
+            '0 0 '.self::PAGE_WIDTH.' '.self::FOOTER_HEIGHT.' re f',
+            'Q',
+            ...$this->coloredText($leftLabel, $startX, 16, 'F2', 9, [1, 1, 1]),
+            ...$this->coloredText($rightLabel, $bulletX + 10, 16, 'F2', 9, [1, 1, 1]),
+        ];
+
+        [$gr, $gg, $gb] = self::COLOR_GOLD;
+        $operations[] = 'q';
+        $operations[] = sprintf('%.3f %.3f %.3f rg', $gr, $gg, $gb);
+        $operations[] = sprintf('%.2f 14 5 5 re f', $bulletX - 1);
+        $operations[] = 'Q';
+
+        return $operations;
+    }
+
+    /** @return array<int, string> */
+    private function letterMeta(string $issuedOn, string $reference, string $applicant, int &$y): array
+    {
+        $operations = [
+            ...$this->plainText('Ref. No.: '.$reference, self::MARGIN_X, $y, 'F1', 10),
+            ...$this->plainText('Date: '.$issuedOn, 468, $y, 'F1', 10),
+        ];
+        $y -= 18;
+        $operations = array_merge($operations, $this->plainText(
+            'Dear '.$applicant.',',
+            self::MARGIN_X,
+            $y,
+            'F1',
+            11,
+        ));
+        $y -= 20;
+
+        return $operations;
+    }
+
+    /**
+     * @param  array{0: float, 1: float, 2: float}  $rgb
+     * @return array<int, string>
+     */
+    private function coloredText(
+        string $text,
+        float $x,
+        float $y,
+        string $font,
+        int $size,
+        array $rgb,
+    ): array {
+        [$r, $g, $b] = $rgb;
 
         return [
             'q',
-            self::PAGE_WIDTH.' 0 0 '.self::PAGE_HEIGHT.' 0 0 cm',
-            '/Letterhead Do',
+            sprintf('%.3f %.3f %.3f rg', $r, $g, $b),
+            "BT /{$font} {$size} Tf {$x} {$y} Td (".SimplePdfDocument::escapeText($text).') Tj ET',
             'Q',
         ];
     }
 
     /** @return array<int, string> */
-    private function simplePreamble(string $issuedOn, string $reference, string $applicant): array
+    private function plainText(string $text, float $x, float $y, string $font, int $size): array
     {
         return [
-            'BT /F1 10 Tf',
-            '72 '.self::CONTENT_TOP_Y.' Td (Date: '.SimplePdfDocument::escapeText($issuedOn).') Tj',
-            '0 -16 Td (Ref: '.SimplePdfDocument::escapeText($reference).') Tj',
-            '0 -24 Td /F1 11 Tf (Dear '.SimplePdfDocument::escapeText($applicant).',) Tj',
-            'ET',
+            "BT /{$font} {$size} Tf {$x} {$y} Td (".SimplePdfDocument::escapeText($text).') Tj ET',
         ];
     }
 
-    /** @return array<int, string> */
-    private function renderLines(string $text, int $fontSize, int $lineHeight, int &$y): array
+    /**
+     * @param  array{0: float, 1: float, 2: float}  $rgb
+     * @return array<int, string>
+     */
+    private function horizontalLine(float $y, float $width, array $rgb): array
     {
-        $operations = [];
-        foreach ($this->wrapText($text, 82) as $line) {
-            if ($y < self::CONTENT_BOTTOM_Y) {
-                break;
-            }
-            $operations[] = 'BT /F1 '.$fontSize.' Tf '.self::MARGIN_X.' '.$y.' Td ('.SimplePdfDocument::escapeText($line).') Tj ET';
-            $y -= $lineHeight;
-        }
+        [$r, $g, $b] = $rgb;
+        $x2 = self::PAGE_WIDTH - self::MARGIN_RIGHT;
 
-        return $operations;
+        return [
+            'q',
+            sprintf('%.3f %.3f %.3f RG', $r, $g, $b),
+            sprintf('%.2f w', $width),
+            sprintf('%.2f %.2f m', self::MARGIN_X, $y),
+            sprintf('%.2f %.2f l S', $x2, $y),
+            'Q',
+        ];
     }
 
     /** @param  array<int, string>  $operations */
@@ -234,39 +366,60 @@ class KcaAdmissionLetterPdfRenderer
         array &$operations,
         ?FileAsset $signatureFile,
         int $y,
+        ?string $signerTitle = null,
     ): int {
-        if (! $signatureFile instanceof FileAsset) {
-            return $y - 6;
+        $lineY = $y - 4;
+
+        if ($signatureFile instanceof FileAsset) {
+            $signatureJpeg = $this->jpegBytes($signatureFile);
+            if ($signatureJpeg !== null) {
+                $info = getimagesizefromstring($signatureJpeg);
+                if (is_array($info)) {
+                    $imageName = $this->nextSignatureImageName();
+                    $pdf->addJpegImage($imageName, $signatureJpeg, (int) $info[0], (int) $info[1]);
+                    $drawWidth = 150;
+                    $drawHeight = 52;
+                    $signatureY = $y - $drawHeight;
+                    $operations[] = 'q';
+                    $operations[] = "{$drawWidth} 0 0 {$drawHeight} ".self::MARGIN_X." {$signatureY} cm";
+                    $operations[] = "/{$imageName} Do";
+                    $operations[] = 'Q';
+                    $lineY = $signatureY - 8;
+                }
+            }
         }
 
-        $signatureJpeg = $this->jpegBytes($signatureFile);
-        if ($signatureJpeg === null) {
-            return $y - 6;
+        $lineEnd = self::MARGIN_X + 150;
+        $operations[] = 'q 0 0 0 RG 0.75 w';
+        $operations[] = self::MARGIN_X.' '.$lineY.' m '.$lineEnd.' '.$lineY.' l S Q';
+        $y = $lineY - 14;
+
+        if ($signerTitle !== null && trim($signerTitle) !== '') {
+            foreach ($this->renderLines($signerTitle, 'F2', self::BODY_FONT_SIZE, self::LINE_HEIGHT, $y) as $lineOp) {
+                $operations[] = $lineOp;
+            }
         }
 
-        $info = getimagesizefromstring($signatureJpeg);
-        if (! is_array($info)) {
-            return $y - 6;
-        }
-
-        $imageName = $this->nextSignatureImageName();
-        $pdf->addJpegImage($imageName, $signatureJpeg, (int) $info[0], (int) $info[1]);
-        $drawWidth = 140;
-        $drawHeight = 48;
-        $signatureY = $y - $drawHeight;
-        $operations[] = 'q';
-        $operations[] = "{$drawWidth} 0 0 {$drawHeight} ".self::MARGIN_X." {$signatureY} cm";
-        $operations[] = "/{$imageName} Do";
-        $operations[] = 'Q';
-
-        return $signatureY - 10;
+        return $y - 4;
     }
 
-    private function nextSignatureImageName(): string
+    private function resolveLogoJpeg(?FileAsset $letterhead): ?string
     {
-        $this->signatureImageCounter++;
+        if ($letterhead instanceof FileAsset) {
+            $jpeg = $this->jpegBytes($letterhead);
+            if ($jpeg !== null) {
+                return $jpeg;
+            }
+        }
 
-        return 'Signature'.$this->signatureImageCounter;
+        $path = resource_path('kca/admission-letter-logo.jpg');
+        if (! is_string($path) || ! is_file($path)) {
+            return null;
+        }
+
+        $bytes = file_get_contents($path);
+
+        return is_string($bytes) && $bytes !== '' ? $bytes : null;
     }
 
     private function isStructuredTemplate(string $body): bool
@@ -308,6 +461,8 @@ class KcaAdmissionLetterPdfRenderer
 
         return in_array($normalized, [
             'THE FAMILY HOUSE OF GOD INTERNATIONAL',
+            'THE FAMILY HOUSE OF GOD INT\'L',
+            "THE FAMILY HOUSE OF GOD INT'L",
             'KINGDOM CHANGE AGENTS (KCA)',
             'YOUTH DISCIPLESHIP TRAINING PROGRAMME',
             'ADMISSION & ACCEPTANCE LETTER',
@@ -349,6 +504,35 @@ class KcaAdmissionLetterPdfRenderer
             || str_starts_with($right, $left.',');
     }
 
+    /**
+     * @param  array{0: float, 1: float, 2: float}|null  $rgb
+     * @return array<int, string>
+     */
+    private function renderLines(
+        string $text,
+        string $font,
+        int $fontSize,
+        int $lineHeight,
+        int &$y,
+        ?array $rgb = null,
+    ): array {
+        $operations = [];
+        foreach ($this->wrapText($text, 82) as $line) {
+            if ($y < self::CONTENT_BOTTOM_Y) {
+                break;
+            }
+
+            if ($rgb !== null) {
+                $operations = array_merge($operations, $this->coloredText($line, self::MARGIN_X, $y, $font, $fontSize, $rgb));
+            } else {
+                $operations[] = "BT /{$font} {$fontSize} Tf ".self::MARGIN_X.' '.$y.' Td ('.SimplePdfDocument::escapeText($line).') Tj ET';
+            }
+            $y -= $lineHeight;
+        }
+
+        return $operations;
+    }
+
     /** @return array<int, string> */
     private function wrapText(string $text, int $maxChars): array
     {
@@ -369,6 +553,13 @@ class KcaAdmissionLetterPdfRenderer
         }
 
         return $lines;
+    }
+
+    private function nextSignatureImageName(): string
+    {
+        $this->signatureImageCounter++;
+
+        return 'Signature'.$this->signatureImageCounter;
     }
 
     private function jpegBytes(FileAsset $asset): ?string
