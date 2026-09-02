@@ -120,6 +120,34 @@ class KcaAdmissionLetterApiTest extends TestCase
             ->assertJsonPath('data.status', 'issued');
     }
 
+    public function test_admin_can_download_issued_admission_letter_pdf(): void
+    {
+        $person = Person::factory()->create();
+        $application = KcaApplication::factory()->create([
+            'person_id' => $person->getKey(),
+            'status' => KcaApplicationState::Accepted,
+        ]);
+        KcaGovernanceConfiguration::factory()->create([
+            'admission_signer_name' => 'Provost Jane',
+            'admission_signer_title' => 'Provost, KCA',
+        ]);
+
+        $scope = new ScopeReference('global', 'platform');
+        $actor = $this->actorWithPermissions(['kca.applications.transition', 'kca.applications.view'], $scope);
+        $this->authenticate($actor);
+
+        $this->withHeaders($this->headers($scope))
+            ->postJson("/api/v1/admin/kca/applications/{$application->public_id}/admission-letter/issue")
+            ->assertCreated();
+
+        $response = $this->withHeaders($this->headers($scope))
+            ->get("/api/v1/admin/kca/applications/{$application->public_id}/admission-letter/download");
+
+        $response->assertOk();
+        $this->assertStringStartsWith('%PDF', $response->getContent() ?: '');
+        $response->assertHeader('Content-Type', 'application/pdf');
+    }
+
     public function test_accepted_applicant_can_view_issued_admission_letter(): void
     {
         $person = Person::factory()->create();

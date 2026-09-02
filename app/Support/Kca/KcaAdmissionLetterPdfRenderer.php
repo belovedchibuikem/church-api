@@ -2,61 +2,165 @@
 
 namespace App\Support\Kca;
 
+use App\Files\Queries\OpenFileAssetStreamQuery;
+use App\Models\FileAsset;
 use App\Models\KcaAdmissionLetter;
 use App\Support\Identity\PersonDisplayName;
+use App\Support\Pdf\SimplePdfDocument;
 
 class KcaAdmissionLetterPdfRenderer
 {
+    private const PAGE_WIDTH = 612;
+    private const PAGE_HEIGHT = 792;
+
+    public function __construct(
+        private readonly OpenFileAssetStreamQuery $fileAssetStreams,
+    ) {}
+
     public function render(KcaAdmissionLetter $letter): string
     {
-        $letter->loadMissing(['application.person.profile']);
-        $holder = PersonDisplayName::of($letter->application?->person) ?: 'Applicant';
-        $lines = [
-            $this->pdfText('KINGDOM CITIZENS ACADEMY'),
-            $this->pdfText('Admission Letter'),
-            $this->pdfText($this->sanitize((string) $letter->reference_code)),
-            $this->pdfText($this->sanitize($holder)),
-            $this->pdfText($this->sanitize((string) ($letter->batch_label ?? 'Upcoming intake'))),
-            $this->pdfText($this->sanitize((string) ($letter->signer_name ?? 'Provost, KCA'))),
-            $this->pdfText($this->sanitize((string) ($letter->signer_title ?? ''))),
-            $this->pdfText($this->sanitize($letter->issued_at?->toDateString() ?? now()->toDateString())),
-        ];
-        $content = "BT /F1 16 Tf 72 720 Td ({$lines[0]}) Tj 0 -28 Td /F1 14 Tf ({$lines[1]}) Tj 0 -24 Td /F1 11 Tf ({$lines[2]}) Tj 0 -28 Td /F1 18 Tf ({$lines[3]}) Tj 0 -24 Td /F1 12 Tf ({$lines[4]}) Tj 0 -36 Td /F1 12 Tf ({$lines[5]}) Tj 0 -18 Td ({$lines[6]}) Tj 0 -18 Td ({$lines[7]}) Tj ET";
-        $length = strlen($content);
+        $letter->loadMissing([
+            'application.person.profile',
+            'letterheadFile',
+            'signatureFile',
+        ]);
 
-        $objects = [
-            "1 0 obj<< /Type /Catalog /Pages 2 0 R >>endobj\n",
-            "2 0 obj<< /Type /Pages /Kids [3 0 R] /Count 1 >>endobj\n",
-            "3 0 obj<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>endobj\n",
-            "4 0 obj<< /Length {$length} >>stream\n{$content}\nendstream\nendobj\n",
-            "5 0 obj<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>endobj\n",
-        ];
+        $pdf = new SimplePdfDocument;
+        $operations = [];
 
-        $pdf = "%PDF-1.4\n";
-        $offsets = [0];
-        foreach ($objects as $object) {
-            $offsets[] = strlen($pdf);
-            $pdf .= $object;
+        if ($letter->letterheadFile instanceof FileAsset) {
+            $jpeg = $this->jpegBytes($letter->letterheadFile);
+            if ($jpeg !== null) {
+                $info = getimagesizefromstring($jpeg);
+                if (is_array($info)) {
+                    $pdf->addJpegImage('Letterhead', $jpeg, (int) $info[0], (int) $info[1]);
+                    $operations[] = 'q';
+                    $operations[] = self::PAGE_WIDTH.' 0 0 '.self::PAGE_HEIGHT.' 0 0 cm';
+                    $operations[] = '/Letterhead Do';
+                    $operations[] = 'Q';
+                }
+            }
         }
-        $xref = strlen($pdf);
-        $pdf .= "xref\n0 6\n0000000000 65535 f \n";
-        for ($i = 1; $i <= 5; $i++) {
-            $pdf .= sprintf("%010d 00000 n \n", $offsets[$i]);
-        }
-        $pdf .= "trailer<< /Size 6 /Root 1 0 R >>\nstartxref\n{$xref}\n%%EOF";
 
-        return $pdf;
+        $applicant = PersonDisplayName::of($letter->application?->person) ?: 'Applicant';
+        $reference = (string) ($letter->reference_code ?? 'Pending');
+        $issuedOn = $letter->issued_at?->format('d/m/Y') ?? now()->format('d/m/Y');
+        $body = trim((string) ($letter->letter_body ?? ''));
+        if ($body === '') {
+            $resolver = app(ResolveKcaApplicationChurchName::class);
+            $body = $resolver->defaultLetterBody(
+                $applicant,
+                $resolver->fromApplicationData($letter->application?->application_data),
+                $letter->batch_label,
+            );
+        }
+
+        $y = 500;
+        $operations[] = 'BT /F1 10 Tf';
+        $operations[] = "72 {$y} Td (Date: ".SimplePdfDocument::escapeText($issuedOn).') Tj';
+        $operations[] = '0 -16 Td (Ref: '.SimplePdfDocument::escapeText($reference).') Tj';
+        $operations[] = '0 -24 Td /F1 11 Tf (Dear '.SimplePdfDocument::escapeText($applicant).',) Tj';
+        $operations[] = 'ET';
+
+        $y = 444;
+        foreach (preg_split("/\R\R+/", $body) ?: [] as $paragraph) {
+            $paragraph = trim((string) $paragraph);
+            if ($paragraph === '') {
+                continue;
+            }
+            foreach ($this->wrapText($paragraph, 88) as $line) {
+                $operations[] = 'BT /F1 10 Tf 72 '.$y.' Td ('.SimplePdfDocument::escapeText($line).') Tj ET';
+                $y -= 14;
+                if ($y < 170) {
+                    break 2;
+                }
+            }
+            $y -= 6;
+        }
+
+        $signatureY = 130;
+        if ($letter->signatureFile instanceof FileAsset) {
+            $signatureJpeg = $this->jpegBytes($letter->signatureFile);
+            if ($signatureJpeg !== null) {
+                $info = getimagesizefromstring($signatureJpeg);
+                if (is_array($info)) {
+                    $pdf->addJpegImage('Signature', $signatureJpeg, (int) $info[0], (int) $info[1]);
+                    $drawWidth = 140;
+                    $drawHeight = 48;
+                    $operations[] = 'q';
+                    $operations[] = "{$drawWidth} 0 0 {$drawHeight} 72 {$signatureY} cm";
+                    $operations[] = '/Signature Do';
+                    $operations[] = 'Q';
+                    $signatureY -= 56;
+                }
+            }
+        }
+
+        $operations[] = 'BT /F1 11 Tf 72 '.$signatureY.' Td ('.SimplePdfDocument::escapeText((string) ($letter->signer_name ?? 'Provost, KCA')).') Tj';
+        $operations[] = '0 -14 Td /F1 9 Tf ('.SimplePdfDocument::escapeText((string) ($letter->signer_title ?? '')).') Tj ET';
+
+        $pdf->addPage($operations);
+
+        return $pdf->build();
     }
 
-    private function sanitize(string $value): string
+    /** @return array<int, string> */
+    private function wrapText(string $text, int $maxChars): array
     {
-        $clean = preg_replace('/[^\x20-\x7E]/', ' ', $value) ?? '';
+        $words = preg_split('/\s+/', trim($text)) ?: [];
+        $lines = [];
+        $current = '';
+        foreach ($words as $word) {
+            $candidate = $current === '' ? $word : "{$current} {$word}";
+            if (strlen($candidate) > $maxChars && $current !== '') {
+                $lines[] = $current;
+                $current = $word;
+            } else {
+                $current = $candidate;
+            }
+        }
+        if ($current !== '') {
+            $lines[] = $current;
+        }
 
-        return trim($clean) === '' ? '—' : $clean;
+        return $lines;
     }
 
-    private function pdfText(string $value): string
+    private function jpegBytes(FileAsset $asset): ?string
     {
-        return str_replace(['\\', '(', ')'], ['\\\\', '\\(', '\\)'], $value);
+        try {
+            $stream = $this->fileAssetStreams->handle($asset);
+        } catch (\Throwable) {
+            return null;
+        }
+
+        $bytes = stream_get_contents($stream);
+        if (is_resource($stream)) {
+            fclose($stream);
+        }
+        if (! is_string($bytes) || $bytes === '') {
+            return null;
+        }
+
+        $mime = strtolower((string) $asset->detected_mime_type);
+        if (str_contains($mime, 'jpeg') || str_contains($mime, 'jpg')) {
+            return $bytes;
+        }
+
+        if (! function_exists('imagecreatefromstring') || ! function_exists('imagejpeg')) {
+            return null;
+        }
+
+        $image = @imagecreatefromstring($bytes);
+        if ($image === false) {
+            return null;
+        }
+
+        ob_start();
+        imagejpeg($image, null, 90);
+        imagedestroy($image);
+        $jpeg = ob_get_clean();
+
+        return is_string($jpeg) && $jpeg !== '' ? $jpeg : null;
     }
 }
