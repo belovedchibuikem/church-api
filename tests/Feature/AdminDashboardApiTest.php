@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Communication\CommunicationChannel;
 use App\Communication\CommunicationDeliveryStatus;
+use App\Models\AdministrativeLevel;
+use App\Models\AdministrativeUnit;
 use App\Models\Church;
 use App\Models\ChurchMembership;
 use App\Models\CommunicationBroadcast;
@@ -25,6 +27,7 @@ use App\Support\Authorization\AssignScopeToRoleAssignmentAction;
 use App\Support\Authorization\GrantPermissionToRoleAction;
 use App\Support\Authorization\ScopeReference;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class AdminDashboardApiTest extends TestCase
@@ -233,6 +236,93 @@ class AdminDashboardApiTest extends TestCase
             ->assertJsonPath('data.breakdown.0.label', 'Email')
             ->assertJsonPath('data.recent_rows.0.Campaign', 'Sunday Service Reminder')
             ->assertJsonMissing(['data.breakdown.0.label' => 'communications.ministry_updates']);
+    }
+
+    public function test_geography_dashboard_counts_places_with_churches_not_the_catalogue(): void
+    {
+        Country::factory()->count(3)->create();
+        $nigeria = Country::factory()->create(['name' => 'Nigeria']);
+        $ghana = Country::factory()->create(['name' => 'Ghana']);
+        $nigeriaStateLevel = AdministrativeLevel::factory()->create([
+            'country_id' => $nigeria->getKey(),
+            'code' => 'state',
+            'sort_order' => 10,
+        ]);
+        $nigeriaLgaLevel = AdministrativeLevel::factory()->create([
+            'country_id' => $nigeria->getKey(),
+            'code' => 'lga',
+            'sort_order' => 20,
+        ]);
+        $ghanaStateLevel = AdministrativeLevel::factory()->create([
+            'country_id' => $ghana->getKey(),
+            'code' => 'region',
+            'sort_order' => 10,
+        ]);
+        $lagos = AdministrativeUnit::factory()->create([
+            'country_id' => $nigeria->getKey(),
+            'administrative_level_id' => $nigeriaStateLevel->getKey(),
+            'name' => 'Lagos',
+        ]);
+        $ogun = AdministrativeUnit::factory()->create([
+            'country_id' => $nigeria->getKey(),
+            'administrative_level_id' => $nigeriaStateLevel->getKey(),
+            'name' => 'Ogun',
+        ]);
+        $accra = AdministrativeUnit::factory()->create([
+            'country_id' => $ghana->getKey(),
+            'administrative_level_id' => $ghanaStateLevel->getKey(),
+            'name' => 'Greater Accra',
+        ]);
+        AdministrativeUnit::factory()->count(4)->create();
+        $ikeja = AdministrativeUnit::factory()->create([
+            'country_id' => $nigeria->getKey(),
+            'administrative_level_id' => $nigeriaLgaLevel->getKey(),
+            'parent_id' => $lagos->getKey(),
+            'name' => 'Ikeja',
+        ]);
+        AdministrativeUnit::factory()->create([
+            'country_id' => $nigeria->getKey(),
+            'administrative_level_id' => $nigeriaLgaLevel->getKey(),
+            'parent_id' => $lagos->getKey(),
+            'name' => 'Alimosho',
+        ]);
+        Church::factory()->create(['administrative_unit_id' => $ikeja->getKey()]);
+        Church::factory()->create(['administrative_unit_id' => $ogun->getKey()]);
+        Church::factory()->create(['administrative_unit_id' => $accra->getKey()]);
+
+        $churchUnits = Church::query()
+            ->join('administrative_units', 'administrative_units.id', '=', 'churches.administrative_unit_id');
+        $expectedCountries = (int) (clone $churchUnits)
+            ->join('countries', 'countries.id', '=', 'administrative_units.country_id')
+            ->distinct()
+            ->count('countries.id');
+        $expectedStates = (int) (clone $churchUnits)
+            ->distinct()
+            ->count(DB::raw('COALESCE(administrative_units.parent_id, administrative_units.id)'));
+        $expectedLocalAreas = (int) (clone $churchUnits)
+            ->whereNotNull('administrative_units.parent_id')
+            ->distinct()
+            ->count('administrative_units.id');
+        $expectedChurches = Church::query()->count();
+
+        $this->assertGreaterThan($expectedCountries, Country::query()->count());
+        $this->assertGreaterThan($expectedStates, AdministrativeUnit::query()->whereNull('parent_id')->count());
+        $this->assertGreaterThan($expectedLocalAreas, AdministrativeUnit::query()->whereNotNull('parent_id')->count());
+
+        $actor = $this->actorWithPermissions(['organization.countries.view']);
+        $this->authenticate($actor);
+
+        $this->withHeaders($this->headers())
+            ->getJson('/api/v1/admin/dashboards/geography')
+            ->assertOk()
+            ->assertJsonPath('data.metrics.0.label', 'Countries')
+            ->assertJsonPath('data.metrics.0.value', number_format($expectedCountries))
+            ->assertJsonPath('data.metrics.1.label', 'Regions / States')
+            ->assertJsonPath('data.metrics.1.value', number_format($expectedStates))
+            ->assertJsonPath('data.metrics.2.label', 'Local Areas')
+            ->assertJsonPath('data.metrics.2.value', number_format($expectedLocalAreas))
+            ->assertJsonPath('data.metrics.3.label', 'Churches')
+            ->assertJsonPath('data.metrics.3.value', number_format($expectedChurches));
     }
 
     public function test_reports_dashboard_counts_countries_with_churches_not_the_country_table(): void

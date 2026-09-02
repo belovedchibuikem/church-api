@@ -7,8 +7,10 @@ use App\Exceptions\KcaEvidenceUnavailableException;
 use App\Exceptions\KcaIdempotencyConflictException;
 use App\Http\Controllers\Api\V1\User\Concerns\ResolvesAuthenticatedPerson;
 use App\Http\Controllers\Controller;
+use App\Kca\KcaApplicationState;
 use App\Kca\KcaAssignmentState;
 use App\Models\FileAsset;
+use App\Models\KcaApplication;
 use App\Models\KcaAssignment;
 use App\Models\KcaAttendance;
 use App\Models\KcaChapterProgress;
@@ -24,16 +26,19 @@ use App\Support\Api\ApiResponse;
 use App\Support\Identity\PersonDisplayName;
 use App\Support\Kca\CompleteKcaChapterAction;
 use App\Support\Kca\CompleteKcaLessonAction;
+use App\Support\Kca\CompleteKcaOrientationAction;
 use App\Support\Kca\KcaCertificatePdfRenderer;
 use App\Support\Kca\KcaLessonUnlockToken;
 use App\Support\Kca\KcaSoulTreeService;
 use App\Support\Kca\KcaStudentActivityQuery;
+use App\Support\Kca\RecordKcaOrientationStageAction;
 use App\Support\Kca\RecordKcaSoulWinAction;
 use App\Support\Kca\SubmitKcaEvidenceAction;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use InvalidArgumentException;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
@@ -110,6 +115,17 @@ class KcaCurriculumController extends Controller
     {
         $person = $this->person($request);
         $enrollment = $this->activeEnrollment($person);
+        $application = KcaApplication::query()
+            ->where('person_id', $person->getKey())
+            ->latest('id')
+            ->first();
+        $applicationStatus = $application?->status instanceof KcaApplicationState
+            ? $application->status
+            : ($application !== null ? KcaApplicationState::from((string) $application->status) : null);
+        $orientationProgress = collect($application?->orientation_progress ?? [])
+            ->filter(fn (mixed $value): bool => is_string($value))
+            ->values()
+            ->all();
         $modules = KcaModule::query()
             ->where('is_active', true)
             ->whereNotNull('published_at')
@@ -136,48 +152,114 @@ class KcaCurriculumController extends Controller
         return ApiResponse::success($request, [
             'enrolled' => $enrollment !== null,
             'enrollment' => $enrollment === null ? null : $this->enrollmentPayload($enrollment),
-            'welcome' => $enrollment === null
-                ? 'Orientation opens after your KCA enrollment is activated.'
-                : 'Welcome to KCA. Walk through each stage of orientation.',
-            'stages' => [
-                [
-                    'key' => 'overview',
-                    'title' => 'Program Overview',
-                    'subtitle' => $first?->title ?? 'About the training',
-                    'body' => $firstLesson?->summary ?: $firstLesson?->body,
-                    'module_id' => $first?->public_id,
-                    'lesson_id' => $firstLesson?->public_id,
-                ],
-                [
-                    'key' => 'rules',
-                    'title' => 'Rules & Guidelines',
-                    'subtitle' => $second?->title ?? 'What you need to know',
-                    'body' => $secondLesson?->summary ?: $secondLesson?->body,
-                    'module_id' => $second?->public_id,
-                    'lesson_id' => $secondLesson?->public_id,
-                ],
-                [
-                    'key' => 'path',
-                    'title' => 'Learning Path',
-                    'subtitle' => 'Your journey ahead',
-                    'body' => null,
-                    'module_id' => null,
-                    'lesson_id' => null,
-                    'modules' => $learningPath,
-                ],
-                [
-                    'key' => 'mentors',
-                    'title' => 'Meet Your Mentors',
-                    'subtitle' => $mentorName === null ? 'Connect with your mentors' : $mentorName,
-                    'body' => $mentor === null
-                        ? 'A mentor is assigned after enrollment is activated.'
-                        : null,
-                    'module_id' => null,
-                    'lesson_id' => null,
-                    'mentor' => $mentor,
-                ],
-            ],
+            'application_status' => $applicationStatus?->value,
+            'orientation_completed_at' => $application?->orientation_completed_at?->utc()->toIso8601String(),
+            'stages_completed' => $orientationProgress,
+            'can_complete' => $applicationStatus === KcaApplicationState::Interview
+                && $application?->orientation_completed_at === null,
+            'welcome' => match (true) {
+                $enrollment !== null => 'Welcome to KCA. Walk through each stage of orientation.',
+                $applicationStatus === KcaApplicationState::Interview => 'Complete each orientation stage, then submit to continue your admission review.',
+                $applicationStatus === KcaApplicationState::Reviewed => 'Orientation is complete. Your application is awaiting a final admission decision.',
+                default => 'Orientation is available after you are invited to interview.',
+            },
+            'stages' => $this->orientationStages(
+                $first,
+                $firstLesson,
+                $second,
+                $secondLesson,
+                $learningPath,
+                $mentor,
+                $mentorName,
+                $orientationProgress,
+            ),
         ]);
+    }
+
+    public function completeOrientationStage(Request $request, string $stage, RecordKcaOrientationStageAction $action): JsonResponse
+    {
+        $person = $this->person($request);
+        $application = $action->handle($person, $stage);
+
+        return ApiResponse::success($request, [
+            'application_id' => $application->public_id,
+            'status' => $application->status->value,
+            'stages_completed' => $application->orientation_progress ?? [],
+        ]);
+    }
+
+    public function completeOrientation(Request $request, CompleteKcaOrientationAction $action): JsonResponse
+    {
+        $person = $this->person($request);
+        $user = $request->user();
+        if ($user === null) {
+            throw new AccessDeniedHttpException('Authentication required.');
+        }
+        $application = $action->handleForApplicant($person, $user);
+
+        return ApiResponse::success($request, [
+            'application_id' => $application->public_id,
+            'status' => $application->status->value,
+            'orientation_completed_at' => $application->orientation_completed_at?->utc()->toIso8601String(),
+            'destination' => $application->status->destination(),
+        ]);
+    }
+
+    /** @param  list<string>  $completedStages */
+    private function orientationStages(
+        ?KcaModule $first,
+        ?KcaLesson $firstLesson,
+        ?KcaModule $second,
+        ?KcaLesson $secondLesson,
+        array $learningPath,
+        mixed $mentor,
+        ?string $mentorName,
+        array $completedStages,
+    ): array {
+        $completed = static fn (string $key): bool => in_array($key, $completedStages, true);
+
+        return [
+            [
+                'key' => 'overview',
+                'title' => 'Program Overview',
+                'subtitle' => $first?->title ?? 'About the training',
+                'body' => $firstLesson?->summary ?: $firstLesson?->body,
+                'module_id' => $first?->public_id,
+                'lesson_id' => $firstLesson?->public_id,
+                'completed' => $completed('overview'),
+            ],
+            [
+                'key' => 'rules',
+                'title' => 'Rules & Guidelines',
+                'subtitle' => $second?->title ?? 'What you need to know',
+                'body' => $secondLesson?->summary ?: $secondLesson?->body,
+                'module_id' => $second?->public_id,
+                'lesson_id' => $secondLesson?->public_id,
+                'completed' => $completed('rules'),
+            ],
+            [
+                'key' => 'path',
+                'title' => 'Learning Path',
+                'subtitle' => 'Your journey ahead',
+                'body' => null,
+                'module_id' => null,
+                'lesson_id' => null,
+                'modules' => $learningPath,
+                'completed' => $completed('path'),
+            ],
+            [
+                'key' => 'mentors',
+                'title' => 'Meet Your Mentors',
+                'subtitle' => $mentorName === null ? 'Connect with your mentors' : $mentorName,
+                'body' => $mentor === null
+                    ? 'A mentor is assigned after enrollment is activated.'
+                    : null,
+                'module_id' => null,
+                'lesson_id' => null,
+                'mentor' => $mentor,
+                'completed' => $completed('mentors'),
+            ],
+        ];
     }
 
     public function practicalService(Request $request): JsonResponse

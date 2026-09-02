@@ -27,6 +27,13 @@ class KcaApplicationFactory extends Factory
         ];
     }
 
+    public function interview(): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'status' => KcaApplicationState::Interview,
+        ]);
+    }
+
     public function reviewed(): static
     {
         return $this->state(fn (array $attributes): array => [

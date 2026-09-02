@@ -10,7 +10,11 @@ use Illuminate\Support\Collection;
 class ListUserCapabilitiesQuery
 {
     /**
-     * @return array{permissions: list<string>, scopes: list<array{type: string, key: string}>}
+     * @return array{
+     *     permissions: list<string>,
+     *     scopes: list<array{type: string, key: string}>,
+     *     roles: list<array{code: string, name: string, scopes: list<array{type: string, key: string}>}>
+     * }
      */
     public function handle(User $user, ?Carbon $at = null): array
     {
@@ -44,9 +48,26 @@ class ListUserCapabilitiesQuery
             ->unique(fn (array $scope): string => $scope['type'].':'.$scope['key'])
             ->values();
 
+        $roles = $assignments
+            ->filter(fn (RoleAssignment $assignment) => $assignment->role !== null)
+            ->map(fn (RoleAssignment $assignment) => [
+                'code' => (string) $assignment->role->code,
+                'name' => (string) $assignment->role->name,
+                'scopes' => $assignment->scopeAssignments
+                    ->map(fn ($scope) => [
+                        'type' => $scope->scope_type,
+                        'key' => $scope->scope_key,
+                    ])
+                    ->values()
+                    ->all(),
+            ])
+            ->values()
+            ->all();
+
         return [
             'permissions' => $permissions->all(),
             'scopes' => $scopes->all(),
+            'roles' => $roles,
         ];
     }
 }

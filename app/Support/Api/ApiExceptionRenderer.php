@@ -117,7 +117,7 @@ class ApiExceptionRenderer
         Request $request,
         HttpExceptionInterface $exception,
     ): JsonResponse {
-        [$code, $message] = match ($exception->getStatusCode()) {
+        [$code, $defaultMessage] = match ($exception->getStatusCode()) {
             400 => ['INVALID_REQUEST', 'The request could not be processed.'],
             401 => ['AUTH_UNAUTHENTICATED', 'Authentication is required.'],
             403 => ['AUTH_PERMISSION_DENIED', 'You are not authorized to perform this action.'],
@@ -131,6 +131,7 @@ class ApiExceptionRenderer
             503 => ['SERVICE_UNAVAILABLE', 'The service is temporarily unavailable.'],
             default => ['HTTP_ERROR', 'The request could not be completed.'],
         };
+        $message = trim($exception->getMessage()) !== '' ? $exception->getMessage() : $defaultMessage;
 
         return ApiResponse::error(
             $request,

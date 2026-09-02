@@ -10,6 +10,7 @@ use App\Models\ChurchDepartment;
 use App\Models\ChurchGroup;
 use App\Models\ChurchMembership;
 use App\Models\ChurchRoleAssignment;
+use App\Support\Church\PersonChurchAdminAccessQuery;
 use App\Models\Convert;
 use App\Models\CounsellingCase;
 use App\Models\Crusade;
@@ -338,6 +339,7 @@ class ProtectedDomainRecordResource extends JsonResource
             'assigned_to_name' => PersonDisplayName::of($this->assignedTo),
             'assigned_at' => $this->assigned_at?->utc()->toIso8601String(),
             'subject' => $this->subject,
+            'body' => $this->body,
             'status' => $this->status,
             'created_at' => $this->created_at?->utc()->toIso8601String(),
         ];
@@ -346,13 +348,29 @@ class ProtectedDomainRecordResource extends JsonResource
     /** @return array<string, mixed> */
     private function pastoralNeed(): array
     {
+        $scopeType = $this->scopeType();
+        $scopeLabel = match ($scopeType) {
+            'home_church' => 'Home church',
+            'church' => 'Church',
+            default => 'Personal',
+        };
+
         return [
             'id' => $this->public_id,
             'person_id' => $this->person?->public_id,
             'person_name' => PersonDisplayName::of($this->person),
+            'church_id' => $this->church?->public_id,
+            'church_name' => $this->church?->name,
+            'home_church_id' => $this->homeChurch?->public_id,
+            'home_church_name' => $this->homeChurch?->name,
             'category' => $this->category,
+            'summary' => $this->summary,
+            'title' => $this->displayTitle(),
+            'scope_type' => $scopeType,
+            'scope_label' => $scopeLabel,
             'status' => $this->status,
             'created_at' => $this->created_at?->utc()->toIso8601String(),
+            'name' => $this->displayTitle(),
         ];
     }
 
@@ -416,20 +434,27 @@ class ProtectedDomainRecordResource extends JsonResource
     private function churchRoleAssignment(): array
     {
         $person = $this->person;
+        $church = $this->church;
+        $adminAccessGranted = $this->role_type === 'leader'
+            && $person !== null
+            && $church instanceof Church
+            && app(PersonChurchAdminAccessQuery::class)->handle($person, $church);
 
         return [
             'id' => $this->public_id,
-            'church_id' => $this->church?->public_id,
-            'church_name' => $this->church?->name,
+            'church_id' => $church?->public_id,
+            'church_name' => $church?->name,
             'person_id' => $person?->public_id,
             'person_name' => PersonDisplayName::of($person),
             'person_phone' => PersonDisplayName::phone($person),
+            'person_email' => PersonDisplayName::email($person),
             'department_id' => $this->department?->public_id,
             'department_name' => $this->department?->name,
             'role_type' => $this->role_type,
             'title' => $this->title,
             'name' => $this->title,
             'status' => $this->status,
+            'admin_access_granted' => $adminAccessGranted,
             'started_at' => $this->started_at?->utc()->toIso8601String(),
             'ended_at' => $this->ended_at?->utc()->toIso8601String(),
         ];
@@ -472,7 +497,12 @@ class ProtectedDomainRecordResource extends JsonResource
     /** @return array<string, mixed> */
     private function homeChurchAttendance(): array
     {
-        $total = (int) $this->adults + (int) $this->children + (int) $this->first_timers;
+        $males = (int) ($this->males ?? 0);
+        $females = (int) ($this->females ?? 0);
+        if ($males === 0 && $females === 0) {
+            $males = (int) $this->adults;
+        }
+        $total = $males + $females + (int) $this->children;
 
         return [
             'id' => $this->public_id,
@@ -480,7 +510,11 @@ class ProtectedDomainRecordResource extends JsonResource
             'home_church_name' => $this->homeChurch?->name,
             'church_name' => $this->homeChurch?->name,
             'service_date' => $this->service_date?->toDateString(),
-            'adults' => $this->adults,
+            'males' => $males,
+            'females' => $females,
+            'male' => $males,
+            'female' => $females,
+            'adults' => $males + $females,
             'children' => $this->children,
             'first_timers' => $this->first_timers,
             'total' => $total,

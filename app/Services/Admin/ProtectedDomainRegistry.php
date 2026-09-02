@@ -27,6 +27,7 @@ use App\Models\KcaChapter;
 use App\Models\KcaMentorAssignment;
 use App\Models\KcaModule;
 use App\Models\KcaModulePrerequisite;
+use App\Models\KcaOrientationSession;
 use App\Models\KcaYear;
 use App\Models\MinistryEvent;
 use App\Models\PaymentDispute;
@@ -152,7 +153,21 @@ class ProtectedDomainRegistry
                 'operation_id' => 'listAdminCatalogKcaCohorts',
                 'model' => KcaCohort::class,
                 'with' => ['year:id,public_id,name,code'],
+                'with_count' => ['enrollments'],
                 'order_column' => 'starts_on',
+                'order_direction' => 'desc',
+                'search_column' => 'name',
+            ],
+            'kca.orientation' => [
+                'permission' => 'kca.orientation.view',
+                'path' => 'kca/orientation-sessions',
+                'operation_id' => 'listAdminCatalogKcaOrientationSessions',
+                'model' => KcaOrientationSession::class,
+                'with' => [
+                    'cohort' => fn ($query) => $query->select('id', 'public_id', 'name')->withCount('enrollments'),
+                    'location:id,public_id,name',
+                ],
+                'order_column' => 'starts_at',
                 'order_direction' => 'desc',
                 'search_column' => 'name',
             ],
@@ -161,6 +176,7 @@ class ProtectedDomainRegistry
                 'path' => 'kca/modules',
                 'operation_id' => 'listAdminCatalogKcaModules',
                 'model' => KcaModule::class,
+                'with_count' => ['lessons'],
                 'order_column' => 'sequence',
                 'order_direction' => 'asc',
                 'search_column' => 'title',
@@ -543,6 +559,10 @@ class ProtectedDomainRegistry
 
         if (isset($definition['with'])) {
             $query->with($definition['with']);
+        }
+
+        if (isset($definition['with_count'])) {
+            $query->withCount($definition['with_count']);
         }
 
         if (isset($filters['search']) && trim((string) $filters['search']) !== '') {

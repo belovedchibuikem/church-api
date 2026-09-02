@@ -72,7 +72,7 @@ trait ExecutesDomainMutations
             MissionJourneyStateException|
             MissionSoulAlreadyLinkedException $exception
         ) {
-            throw new UnprocessableEntityHttpException(previous: $exception);
+            throw new UnprocessableEntityHttpException($exception->getMessage(), $exception);
         }
     }
 }

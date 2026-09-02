@@ -30,6 +30,7 @@ use App\Models\KcaLecturerAssignment;
 use App\Models\KcaLesson;
 use App\Models\KcaMentorAssignment;
 use App\Models\KcaModule;
+use App\Models\KcaOrientationSession;
 use App\Models\KcaModulePrerequisite;
 use App\Models\KcaYear;
 use App\Models\MinistryEvent;
@@ -76,6 +77,8 @@ class ProtectedCatalogRecordResource extends JsonResource
                     ?? data_get($this->application_data, 'year_name'),
                 'received_at' => $this->received_at?->utc()->toIso8601String(),
                 'reviewed_at' => $this->reviewed_at?->utc()->toIso8601String(),
+                'orientation_completed_at' => $this->orientation_completed_at?->utc()->toIso8601String(),
+                'orientation_progress' => $this->orientation_progress ?? [],
                 'recommendation_id' => $this->leadershipRecommendation?->public_id,
                 'recommendation_status' => $this->leadershipRecommendation?->status,
             ],
@@ -154,6 +157,27 @@ class ProtectedCatalogRecordResource extends JsonResource
                 'name' => $this->name,
                 'starts_on' => $this->starts_on?->toDateString(),
                 'ends_on' => $this->ends_on?->toDateString(),
+                'timezone' => $this->timezone,
+                'students_count' => $this->enrollments_count ?? $this->enrollments()->count(),
+                'status' => $this->lifecycleStatus(),
+            ],
+            $this->resource instanceof KcaOrientationSession => [
+                'id' => $this->public_id,
+                'name' => $this->name,
+                'cohort_id' => $this->cohort?->public_id,
+                'cohort_name' => $this->cohort?->name,
+                'location_id' => $this->location?->public_id,
+                'location_name' => $this->location?->name,
+                'venue' => $this->venueDisplay(),
+                'venue_label' => $this->venue_label,
+                'starts_at' => $this->starts_at?->utc()->toIso8601String(),
+                'ends_at' => $this->ends_at?->utc()->toIso8601String(),
+                'capacity' => $this->capacity,
+                'notes' => $this->notes,
+                'published_at' => $this->published_at?->utc()->toIso8601String(),
+                'students_count' => $this->cohort?->enrollments_count,
+                'status' => $this->lifecycleStatus()->value,
+                'updated_at' => $this->updated_at?->utc()->toIso8601String(),
             ],
             $this->resource instanceof KcaModule => [
                 'id' => $this->public_id,
@@ -162,7 +186,9 @@ class ProtectedCatalogRecordResource extends JsonResource
                 'sequence' => $this->sequence,
                 'duration_days' => $this->duration_days,
                 'is_active' => $this->is_active,
+                'lessons_count' => $this->lessons_count ?? $this->lessons()->count(),
                 'published_at' => $this->published_at?->utc()->toIso8601String(),
+                'status' => $this->published_at ? 'published' : 'draft',
             ],
             $this->resource instanceof KcaLesson => [
                 'id' => $this->public_id,
@@ -315,11 +341,17 @@ class ProtectedCatalogRecordResource extends JsonResource
                 'name' => $this->name,
                 'category_code' => $this->category_code,
                 'location_id' => $this->location?->public_id,
+                'location_name' => $this->location?->name,
                 'starts_at' => $this->starts_at?->utc()->toIso8601String(),
                 'ends_at' => $this->ends_at?->utc()->toIso8601String(),
+                'registration_opens_at' => $this->registration_opens_at?->utc()->toIso8601String(),
+                'registration_closes_at' => $this->registration_closes_at?->utc()->toIso8601String(),
                 'published_at' => $this->published_at?->utc()->toIso8601String(),
                 'fee_amount_minor' => $this->fee_amount_minor,
                 'fee_currency' => $this->fee_currency,
+                'capacity' => $this->capacity,
+                'status' => \App\Events\MinistryEventLifecycleStatus::forEvent($this->resource)->value,
+                'updated_at' => $this->updated_at?->utc()->toIso8601String(),
             ],
             $this->resource instanceof EventRegistration => [
                 'id' => $this->public_id,

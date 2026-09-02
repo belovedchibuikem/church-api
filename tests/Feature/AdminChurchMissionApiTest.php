@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Church\FollowUpTaskStatus;
+use App\Church\FollowUpTaskType;
 use App\Church\HomeChurchApplicationStatus;
 use App\Church\HomeChurchStatus;
 use App\Models\AdministrativeUnit;
@@ -9,6 +11,7 @@ use App\Models\AuditEvent;
 use App\Models\Church;
 use App\Models\Crusade;
 use App\Models\FirstTimer;
+use App\Models\FollowUpTask;
 use App\Models\HomeChurch;
 use App\Models\HomeChurchApplication;
 use App\Models\Location;
@@ -348,6 +351,73 @@ class AdminChurchMissionApiTest extends TestCase
             ])
             ->assertOk()
             ->assertJsonPath('data.status', 'approved');
+    }
+
+    public function test_prayer_pastoral_and_follow_up_records_can_be_updated(): void
+    {
+        $person = Person::factory()->withProfile()->create();
+        $person->profile->forceFill([
+            'given_name' => 'Mary',
+            'family_name' => 'Okafor',
+            'preferred_name' => null,
+        ])->save();
+        $church = Church::factory()->create();
+        $firstTimer = FirstTimer::factory()->for($church)->for($person)->create();
+        $prayer = new PrayerRequest;
+        $prayer->forceFill([
+            'person_id' => $person->getKey(),
+            'subject' => 'Healing for my mother',
+            'body' => 'Please pray for complete healing.',
+            'status' => 'open',
+        ])->save();
+        $need = new PastoralNeed;
+        $need->forceFill([
+            'person_id' => $person->getKey(),
+            'category' => 'education',
+            'summary' => 'School fees support',
+            'status' => 'open',
+        ])->save();
+        $task = new FollowUpTask;
+        $task->forceFill([
+            'first_timer_id' => $firstTimer->getKey(),
+            'type' => FollowUpTaskType::FirstTimerContact,
+            'status' => FollowUpTaskStatus::Pending,
+            'due_at' => now()->utc()->addDays(2),
+        ])->save();
+
+        $scope = new ScopeReference('global', 'platform');
+        $actor = $this->actorWithPermissions(['church.follow_up.view', 'church.follow_up.complete'], $scope);
+        $this->authenticate($actor);
+        $headers = $this->headers($scope);
+
+        $this->withHeaders($headers)
+            ->putJson("/api/v1/admin/church/prayer-requests/{$prayer->public_id}", [
+                'subject' => 'Updated prayer subject',
+                'body' => 'Updated prayer body.',
+                'status' => 'answered',
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.subject', 'Updated prayer subject')
+            ->assertJsonPath('data.status', 'answered');
+
+        $this->withHeaders($headers)
+            ->putJson("/api/v1/admin/church/pastoral-needs/{$need->public_id}", [
+                'category' => 'medical',
+                'summary' => 'Hospital bill support',
+                'status' => 'closed',
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.category', 'medical')
+            ->assertJsonPath('data.status', 'closed');
+
+        $assignee = Person::factory()->withProfile()->create();
+        $this->withHeaders($headers)
+            ->putJson("/api/v1/admin/church/follow-up-tasks/{$task->public_id}", [
+                'assigned_to_person_id' => $assignee->public_id,
+                'due_at' => now()->utc()->addDays(5)->toIso8601String(),
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.assigned_to_person_id', $assignee->public_id);
     }
 
     /** @param array<int, string> $permissionCodes */

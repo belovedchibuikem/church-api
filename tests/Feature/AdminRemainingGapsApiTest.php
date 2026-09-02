@@ -8,13 +8,18 @@ use App\Communication\CommunicationChannel;
 use App\Files\FileAssetStatus;
 use App\Models\Church;
 use App\Models\FileAsset;
+use App\Models\KcaApplication;
+use App\Models\KcaCohort;
 use App\Models\KcaEnrollment;
+use App\Models\KcaYear;
+use App\Models\MinistryEvent;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\SecuritySession;
 use App\Models\User;
 use App\Support\Authorization\AssignRoleToUserAction;
 use App\Support\Authorization\AssignScopeToRoleAssignmentAction;
+use App\Support\Authorization\AuthorizationBundleCatalog;
 use App\Support\Authorization\GrantPermissionToRoleAction;
 use App\Support\Authorization\ScopeReference;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
@@ -80,6 +85,225 @@ class AdminRemainingGapsApiTest extends TestCase
             ->assertJsonPath('data.name', '2026 KCA Year');
     }
 
+    public function test_kca_operator_can_update_a_cohort(): void
+    {
+        $scope = new ScopeReference('global', 'platform');
+        $actor = $this->actorWithPermissions(['kca.cohorts.manage'], $scope);
+        $this->authenticate($actor);
+        $year = KcaYear::factory()->create(['name' => 'KCA 2026']);
+        $cohort = KcaCohort::factory()->for($year, 'year')->create([
+            'code' => 'KCA001',
+            'name' => '1st Batch 2026',
+            'timezone' => 'Africa/Lagos',
+        ]);
+
+        $this->withHeaders($this->headers($scope))
+            ->patchJson("/api/v1/admin/kca/cohorts/{$cohort->public_id}", [
+                'code' => 'KCA001',
+                'name' => '1st Batch 2026 Updated',
+                'starts_on' => $cohort->starts_on?->toDateString(),
+                'ends_on' => $cohort->ends_on?->toDateString(),
+                'timezone' => 'Africa/Lagos',
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.name', '1st Batch 2026 Updated')
+            ->assertJsonPath('data.year_name', 'KCA 2026')
+            ->assertJsonPath('data.timezone', 'Africa/Lagos');
+    }
+
+    public function test_kca_operator_can_update_a_lesson(): void
+    {
+        $scope = new ScopeReference('global', 'platform');
+        $actor = $this->actorWithPermissions(['kca.lessons.manage'], $scope);
+        $this->authenticate($actor);
+        $module = \App\Models\KcaModule::factory()->create(['title' => 'Identity in Christ']);
+        $lesson = \App\Models\KcaLesson::factory()->for($module, 'module')->create([
+            'code' => 'L01',
+            'title' => 'Who Am I?',
+            'sequence' => 1,
+            'body' => 'Original body',
+        ]);
+
+        $this->withHeaders($this->headers($scope))
+            ->patchJson("/api/v1/admin/kca/lessons/{$lesson->public_id}", [
+                'code' => 'L01',
+                'title' => 'Who Am I in Christ?',
+                'sequence' => 1,
+                'lesson_type' => 'text',
+                'summary' => 'Updated summary',
+                'body' => 'Updated lesson body.',
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.title', 'Who Am I in Christ?')
+            ->assertJsonPath('data.summary', 'Updated summary');
+    }
+
+    public function test_kca_operator_can_add_multiple_lessons_to_a_module(): void
+    {
+        $scope = new ScopeReference('global', 'platform');
+        $actor = $this->actorWithPermissions(['kca.lessons.manage'], $scope);
+        $this->authenticate($actor);
+        $module = \App\Models\KcaModule::factory()->create(['title' => 'Identity in Christ']);
+
+        $this->withHeaders($this->headers($scope))
+            ->postJson("/api/v1/admin/kca/modules/{$module->public_id}/lessons", [
+                'code' => 'L01',
+                'title' => 'Lesson one',
+                'sequence' => 1,
+                'lesson_type' => 'text',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.code', 'L01')
+            ->assertJsonPath('data.sequence', 1);
+
+        $this->withHeaders($this->headers($scope))
+            ->postJson("/api/v1/admin/kca/modules/{$module->public_id}/lessons", [
+                'code' => 'L02',
+                'title' => 'Lesson two',
+                'sequence' => 2,
+                'lesson_type' => 'text',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.code', 'L02')
+            ->assertJsonPath('data.sequence', 2);
+    }
+
+    public function test_kca_lesson_creation_returns_duplicate_sequence_message(): void
+    {
+        $scope = new ScopeReference('global', 'platform');
+        $actor = $this->actorWithPermissions(['kca.lessons.manage'], $scope);
+        $this->authenticate($actor);
+        $module = \App\Models\KcaModule::factory()->create(['title' => 'Identity in Christ']);
+        \App\Models\KcaLesson::factory()->for($module, 'module')->create([
+            'code' => 'L01',
+            'title' => 'Lesson one',
+            'sequence' => 1,
+        ]);
+
+        $this->withHeaders($this->headers($scope))
+            ->postJson("/api/v1/admin/kca/modules/{$module->public_id}/lessons", [
+                'code' => 'L02',
+                'title' => 'Lesson two',
+                'sequence' => 1,
+                'lesson_type' => 'text',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonPath(
+                'error.message',
+                'A KCA lesson with this code or sequence already exists for the module.',
+            );
+    }
+
+    public function test_kca_operator_can_register_a_student_application_on_behalf_of_applicant(): void
+    {
+        $scope = new ScopeReference('global', 'platform');
+        $actor = $this->actorWithPermissions(['kca.applications.transition'], $scope);
+        $this->authenticate($actor);
+
+        $this->withHeaders($this->headers($scope))
+            ->postJson('/api/v1/admin/kca/applications', [
+                'given_name' => 'Ada',
+                'family_name' => 'Okafor',
+                'email' => 'ada.okafor@example.org',
+                'phone' => '+2348012345678',
+                'finalize' => true,
+                'application_data' => [
+                    'fullName' => 'Ada Okafor',
+                    'email' => 'ada.okafor@example.org',
+                    'why' => 'To grow in ministry leadership.',
+                    'recommender_name' => 'Pastor Daniel',
+                    'recommender_email' => 'pastor.daniel@example.org',
+                ],
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.status', 'received');
+
+        $this->assertDatabaseHas('kca_applications', [
+            'status' => 'received',
+        ]);
+        $this->assertSame(1, KcaApplication::query()->count());
+    }
+
+    public function test_kca_operator_can_save_and_resume_a_draft_application(): void
+    {
+        $scope = new ScopeReference('global', 'platform');
+        $actor = $this->actorWithPermissions(['kca.applications.transition'], $scope);
+        $this->authenticate($actor);
+
+        $draftResponse = $this->withHeaders($this->headers($scope))
+            ->postJson('/api/v1/admin/kca/applications', [
+                'given_name' => 'Draft',
+                'family_name' => 'Student',
+                'finalize' => false,
+                'application_data' => [
+                    'fullName' => 'Draft Student',
+                    'church_id' => 'placeholder',
+                ],
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.status', 'draft');
+
+        $applicationId = $draftResponse->json('data.id');
+        $this->assertIsString($applicationId);
+
+        $this->withHeaders($this->headers($scope))
+            ->postJson('/api/v1/admin/kca/applications', [
+                'application_id' => $applicationId,
+                'finalize' => false,
+                'application_data' => [
+                    'fullName' => 'Draft Student',
+                    'church_id' => 'placeholder',
+                    'why' => 'Saved for later completion.',
+                ],
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.status', 'draft')
+            ->assertJsonPath('data.id', $applicationId);
+
+        $this->assertDatabaseHas('kca_applications', [
+            'public_id' => $applicationId,
+            'status' => 'draft',
+        ]);
+    }
+
+    public function test_kca_operator_can_register_student_with_login_account(): void
+    {
+        Role::query()->firstOrCreate(
+            ['code' => AuthorizationBundleCatalog::MEMBER_SECURITY_ROLE],
+            ['name' => 'Member self service'],
+        );
+        $scope = new ScopeReference('global', 'platform');
+        $actor = $this->actorWithPermissions(['kca.applications.transition'], $scope);
+        $this->authenticate($actor);
+
+        $this->withHeaders($this->headers($scope))
+            ->postJson('/api/v1/admin/kca/applications', [
+                'given_name' => 'Chidi',
+                'family_name' => 'Nwosu',
+                'email' => 'chidi.nwosu@example.org',
+                'create_login' => true,
+                'password' => 'StudentPass123',
+                'password_confirmation' => 'StudentPass123',
+                'finalize' => true,
+                'application_data' => [
+                    'fullName' => 'Chidi Nwosu',
+                    'email' => 'chidi.nwosu@example.org',
+                    'why' => 'To serve in media ministry.',
+                    'recommender_name' => 'Pastor Grace',
+                    'recommender_email' => 'pastor.grace@example.org',
+                ],
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.status', 'received');
+
+        $this->assertDatabaseHas('users', [
+            'email' => 'chidi.nwosu@example.org',
+        ]);
+        $this->assertDatabaseHas('kca_applications', [
+            'status' => 'received',
+        ]);
+    }
+
     public function test_kca_operator_can_record_an_assessment_for_one_student(): void
     {
         $scope = new ScopeReference('global', 'platform');
@@ -116,6 +340,90 @@ class AdminRemainingGapsApiTest extends TestCase
             ->assertCreated()
             ->assertJsonPath('data.name', 'Leaders Retreat')
             ->assertJsonPath('data.category_code', 'training');
+    }
+
+    public function test_events_operator_can_show_update_and_delete_an_event(): void
+    {
+        $scope = new ScopeReference('global', 'platform');
+        $actor = $this->actorWithPermissions(['events.events.view', 'events.events.manage'], $scope);
+        $this->authenticate($actor);
+        $event = MinistryEvent::factory()->create([
+            'name' => 'Youth Summit',
+            'category_code' => 'youth',
+            'starts_at' => now()->addWeek()->utc(),
+            'ends_at' => now()->addWeek()->addDay()->utc(),
+        ]);
+
+        $this->withHeaders($this->headers($scope))
+            ->getJson("/api/v1/admin/events/{$event->public_id}")
+            ->assertOk()
+            ->assertJsonPath('data.id', $event->public_id)
+            ->assertJsonPath('data.name', 'Youth Summit')
+            ->assertJsonPath('data.status', 'draft')
+            ->assertJsonPath('data.can_delete', true);
+
+        $this->withHeaders($this->headers($scope))
+            ->putJson("/api/v1/admin/events/{$event->public_id}", [
+                'name' => 'Youth Summit Updated',
+                'published_at' => now()->utc()->toIso8601String(),
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.name', 'Youth Summit Updated')
+            ->assertJsonPath('data.status', 'published');
+
+        $this->withHeaders($this->headers($scope))
+            ->deleteJson("/api/v1/admin/events/{$event->public_id}")
+            ->assertOk()
+            ->assertJsonPath('data.deleted', true);
+
+        $this->withHeaders($this->headers($scope))
+            ->getJson("/api/v1/admin/events/{$event->public_id}")
+            ->assertNotFound();
+    }
+
+    public function test_kca_operator_can_create_show_update_and_delete_orientation_session(): void
+    {
+        $scope = new ScopeReference('global', 'platform');
+        $actor = $this->actorWithPermissions(['kca.orientation.view', 'kca.orientation.manage'], $scope);
+        $this->authenticate($actor);
+        $cohort = KcaCohort::factory()->create();
+
+        $create = $this->withHeaders($this->headers($scope))
+            ->postJson('/api/v1/admin/kca/orientation-sessions', [
+                'cohort_id' => $cohort->public_id,
+                'name' => 'Batch Orientation Day 1',
+                'starts_at' => now()->addWeek()->utc()->toIso8601String(),
+                'ends_at' => now()->addWeek()->addHours(3)->utc()->toIso8601String(),
+                'venue_label' => 'Main Auditorium',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.name', 'Batch Orientation Day 1')
+            ->assertJsonPath('data.cohort_id', $cohort->public_id);
+
+        $sessionId = (string) $create->json('data.id');
+
+        $this->withHeaders($this->headers($scope))
+            ->getJson("/api/v1/admin/kca/orientation-sessions/{$sessionId}")
+            ->assertOk()
+            ->assertJsonPath('data.id', $sessionId)
+            ->assertJsonPath('data.status', 'draft')
+            ->assertJsonPath('data.can_delete', true);
+
+        $this->withHeaders($this->headers($scope))
+            ->putJson("/api/v1/admin/kca/orientation-sessions/{$sessionId}", [
+                'name' => 'Batch Orientation — Updated',
+                'published_at' => now()->utc()->toIso8601String(),
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.name', 'Batch Orientation — Updated')
+            ->assertJsonPath('data.status', 'scheduled');
+
+        $this->withHeaders($this->headers($scope))
+            ->deleteJson("/api/v1/admin/kca/orientation-sessions/{$sessionId}")
+            ->assertOk()
+            ->assertJsonPath('data.deleted', true);
+
+        $this->assertDatabaseMissing('kca_orientation_sessions', ['public_id' => $sessionId]);
     }
 
     public function test_platform_admin_can_approve_a_quarantined_file_asset(): void

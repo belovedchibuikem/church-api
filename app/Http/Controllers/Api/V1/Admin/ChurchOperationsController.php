@@ -61,6 +61,7 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
 
@@ -561,21 +562,60 @@ class ChurchOperationsController extends Controller
     public function storePastoralNeed(Request $request, ProtectedAdminContext $context): JsonResponse
     {
         $data = $request->validate([
-            'person_id' => ['required', 'ulid', 'exists:people,public_id'],
+            'person_id' => ['nullable', 'ulid', 'exists:people,public_id'],
+            'church_id' => ['nullable', 'ulid', 'exists:churches,public_id'],
+            'home_church_id' => ['nullable', 'ulid', 'exists:home_churches,public_id'],
             'category' => ['required', 'string', 'max:100'],
             'summary' => ['required', 'string', 'max:2000'],
         ]);
-        $person = Person::query()->where('public_id', $data['person_id'])->firstOrFail();
-        $this->ensurePersonInChurchScope($request, $context, $person);
-        $need = $this->execute(fn (): PastoralNeed => tap(new PastoralNeed, function (PastoralNeed $record) use ($person, $data): void {
+
+        if (empty($data['person_id']) && empty($data['church_id']) && empty($data['home_church_id'])) {
+            throw ValidationException::withMessages([
+                'summary' => 'A need must be linked to a person, church, or home church.',
+            ]);
+        }
+
+        if (! empty($data['home_church_id']) && ! empty($data['church_id'])) {
+            throw ValidationException::withMessages([
+                'home_church_id' => 'Link the need to either a church or a home church, not both.',
+            ]);
+        }
+
+        $person = null;
+        $churchId = null;
+        $homeChurchId = null;
+
+        if (! empty($data['home_church_id'])) {
+            $homeChurch = HomeChurch::query()->with('church')->where('public_id', $data['home_church_id'])->firstOrFail();
+            $context->ensureContains($request, $homeChurch->church->scopeReference());
+            $homeChurchId = $homeChurch->getKey();
+            $churchId = $homeChurch->church_id;
+        } elseif (! empty($data['church_id'])) {
+            $church = Church::query()->where('public_id', $data['church_id'])->firstOrFail();
+            $context->ensureContains($request, $church->scopeReference());
+            $churchId = $church->getKey();
+        }
+
+        if (! empty($data['person_id'])) {
+            $person = Person::query()->where('public_id', $data['person_id'])->firstOrFail();
+            $this->ensurePersonInChurchScope($request, $context, $person);
+        }
+
+        $need = $this->execute(fn (): PastoralNeed => tap(new PastoralNeed, function (PastoralNeed $record) use ($person, $churchId, $homeChurchId, $data): void {
             $record->forceFill([
-                'person_id' => $person->getKey(),
+                'person_id' => $person?->getKey(),
+                'church_id' => $churchId,
+                'home_church_id' => $homeChurchId,
                 'category' => $data['category'],
                 'summary' => $data['summary'],
                 'status' => 'open',
             ])->save();
         }));
-        $need->load(PersonDisplayName::eager());
+        $need->load([
+            ...PersonDisplayName::eager(),
+            'church:id,public_id,name',
+            'homeChurch:id,public_id,name,church_id',
+        ]);
 
         return ApiResponse::success($request, (new ProtectedDomainRecordResource($need))->resolve($request), status: 201);
     }
@@ -584,10 +624,153 @@ class ChurchOperationsController extends Controller
     {
         $status = (string) $request->validated('status');
         $this->assertPastoralStatus($status, ['open', 'approved', 'rejected', 'closed']);
-        $target = PastoralNeed::query()->with(['person.memberships.church', 'person.firstTimers.church'])->where('public_id', $need)->firstOrFail();
-        $this->ensurePersonInChurchScope($request, $context, $target->person);
+        $target = PastoralNeed::query()
+            ->with([
+                'person.memberships.church',
+                'person.firstTimers.church',
+                'church',
+                'homeChurch.church',
+            ])
+            ->where('public_id', $need)
+            ->firstOrFail();
+        $this->ensurePastoralNeedInScope($request, $context, $target);
         $target->forceFill(['status' => $status])->save();
+        $target->load([
+            ...PersonDisplayName::eager(),
+            'church:id,public_id,name',
+            'homeChurch:id,public_id,name,church_id',
+        ]);
+
+        return ApiResponse::success($request, (new ProtectedDomainRecordResource($target))->resolve($request));
+    }
+
+    public function updateFollowUpTask(Request $request, string $task, ProtectedAdminContext $context): JsonResponse
+    {
+        $target = FollowUpTask::query()->with('firstTimer.church')->where('public_id', $task)->firstOrFail();
+        $context->ensureContains($request, $target->firstTimer->church->scopeReference());
+        if ($target->status === FollowUpTaskStatus::Completed) {
+            abort(422, 'Completed follow-up tasks cannot be edited.');
+        }
+        $data = $request->validate([
+            'assigned_to_person_id' => ['nullable', 'ulid', 'exists:people,public_id'],
+            'due_at' => ['nullable', 'date'],
+        ]);
+        $this->execute(function () use ($target, $data): void {
+            if (array_key_exists('assigned_to_person_id', $data)) {
+                $target->assigned_to_person_id = $data['assigned_to_person_id'] === null
+                    ? null
+                    : Person::query()->where('public_id', $data['assigned_to_person_id'])->value('id');
+            }
+            if (array_key_exists('due_at', $data)) {
+                $target->due_at = $data['due_at'] === null
+                    ? null
+                    : CarbonImmutable::parse($data['due_at']);
+            }
+            $target->save();
+        });
+        $target->load([
+            'firstTimer.church:id,public_id,name',
+            ...PersonDisplayName::eager('firstTimer.person'),
+            ...PersonDisplayName::eager('assignedTo'),
+        ]);
+
+        return ApiResponse::success($request, (new ProtectedDomainRecordResource($target))->resolve($request));
+    }
+
+    public function updatePrayerRequest(Request $request, string $prayer, ProtectedAdminContext $context): JsonResponse
+    {
+        $target = PrayerRequest::query()
+            ->with(['person.memberships.church', 'person.firstTimers.church'])
+            ->where('public_id', $prayer)
+            ->firstOrFail();
+        $this->ensurePersonInChurchScope($request, $context, $target->person);
+        $data = $request->validate([
+            'subject' => ['required', 'string', 'max:191'],
+            'body' => ['required', 'string', 'max:5000'],
+            'status' => ['nullable', 'string', 'in:open,assigned,rejected,answered'],
+        ]);
+        if (isset($data['status'])) {
+            $this->assertPastoralStatus($data['status'], ['open', 'assigned', 'rejected', 'answered']);
+        }
+        $this->execute(function () use ($target, $data): void {
+            $target->forceFill([
+                'subject' => $data['subject'],
+                'body' => $data['body'],
+                'status' => $data['status'] ?? $target->status,
+            ])->save();
+        });
         $target->load(PersonDisplayName::eager());
+
+        return ApiResponse::success($request, (new ProtectedDomainRecordResource($target))->resolve($request));
+    }
+
+    public function updatePastoralNeed(Request $request, string $need, ProtectedAdminContext $context): JsonResponse
+    {
+        $target = PastoralNeed::query()
+            ->with([
+                'person.memberships.church',
+                'person.firstTimers.church',
+                'church',
+                'homeChurch.church',
+            ])
+            ->where('public_id', $need)
+            ->firstOrFail();
+        $this->ensurePastoralNeedInScope($request, $context, $target);
+        $data = $request->validate([
+            'person_id' => ['nullable', 'ulid', 'exists:people,public_id'],
+            'church_id' => ['nullable', 'ulid', 'exists:churches,public_id'],
+            'home_church_id' => ['nullable', 'ulid', 'exists:home_churches,public_id'],
+            'category' => ['required', 'string', 'max:100'],
+            'summary' => ['required', 'string', 'max:2000'],
+            'status' => ['nullable', 'string', 'in:open,approved,rejected,closed'],
+        ]);
+        if (isset($data['status'])) {
+            $this->assertPastoralStatus($data['status'], ['open', 'approved', 'rejected', 'closed']);
+        }
+
+        $person = null;
+        $churchId = $target->church_id;
+        $homeChurchId = $target->home_church_id;
+
+        if (! empty($data['home_church_id'])) {
+            $homeChurch = HomeChurch::query()->with('church')->where('public_id', $data['home_church_id'])->firstOrFail();
+            $context->ensureContains($request, $homeChurch->church->scopeReference());
+            $homeChurchId = $homeChurch->getKey();
+            $churchId = $homeChurch->church_id;
+        } elseif (! empty($data['church_id'])) {
+            $church = Church::query()->where('public_id', $data['church_id'])->firstOrFail();
+            $context->ensureContains($request, $church->scopeReference());
+            $churchId = $church->getKey();
+            $homeChurchId = null;
+        } elseif (array_key_exists('home_church_id', $data) && $data['home_church_id'] === null && array_key_exists('church_id', $data) && $data['church_id'] === null) {
+            $churchId = null;
+            $homeChurchId = null;
+        }
+
+        if (! empty($data['person_id'])) {
+            $person = Person::query()->where('public_id', $data['person_id'])->firstOrFail();
+            $this->ensurePersonInChurchScope($request, $context, $person);
+        } elseif (array_key_exists('person_id', $data) && $data['person_id'] === null) {
+            $person = null;
+        } else {
+            $person = $target->person;
+        }
+
+        $this->execute(function () use ($target, $data, $person, $churchId, $homeChurchId): void {
+            $target->forceFill([
+                'person_id' => $person?->getKey(),
+                'church_id' => $churchId,
+                'home_church_id' => $homeChurchId,
+                'category' => $data['category'],
+                'summary' => $data['summary'],
+                'status' => $data['status'] ?? $target->status,
+            ])->save();
+        });
+        $target->load([
+            ...PersonDisplayName::eager(),
+            'church:id,public_id,name',
+            'homeChurch:id,public_id,name,church_id',
+        ]);
 
         return ApiResponse::success($request, (new ProtectedDomainRecordResource($target))->resolve($request));
     }
@@ -616,6 +799,23 @@ class ChurchOperationsController extends Controller
         if (! $context->isGlobal($context->scope($request))) {
             throw new NotFoundHttpException;
         }
+    }
+
+    private function ensurePastoralNeedInScope(Request $request, ProtectedAdminContext $context, PastoralNeed $need): void
+    {
+        if ($need->homeChurch !== null) {
+            $context->ensureContains($request, $need->homeChurch->church->scopeReference());
+
+            return;
+        }
+
+        if ($need->church !== null) {
+            $context->ensureContains($request, $need->church->scopeReference());
+
+            return;
+        }
+
+        $this->ensurePersonInChurchScope($request, $context, $need->person);
     }
 
     private function page(ListProtectedDomainRecordsRequest $request, LengthAwarePaginator $paginator): JsonResponse

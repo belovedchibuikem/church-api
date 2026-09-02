@@ -24,10 +24,14 @@ use App\Support\Api\ApiResponse;
 use App\Support\Audit\AuditEventData;
 use App\Support\Audit\RecordAuditEventAction;
 use App\Support\Identity\PersonDisplayName;
+use App\Support\Church\AppointChurchLeaderAction;
+use App\Support\Church\ChurchLeadershipCatalog;
+use App\Support\Church\EndChurchLeaderAssignmentAction;
 use App\Support\People\ArchivePersonAction;
 use App\Support\People\CreatePersonAction;
 use App\Support\People\MatchPeopleQuery;
 use App\Support\People\MergePeopleAction;
+use Illuminate\Validation\Rule;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Http\JsonResponse;
@@ -461,8 +465,11 @@ class ChurchMinistryOperationsController extends Controller
         return $this->page($request, $catalog->roleAssignments($context->scope($request), $request->validated('filter', []), (int) $request->validated('per_page', 25), 'disciple'));
     }
 
-    public function storeRoleAssignment(Request $request, ProtectedAdminContext $context): JsonResponse
-    {
+    public function storeRoleAssignment(
+        Request $request,
+        ProtectedAdminContext $context,
+        AppointChurchLeaderAction $appointLeader,
+    ): JsonResponse {
         $data = $request->validate([
             'church_id' => ['required', 'ulid', 'exists:churches,public_id'],
             'person_id' => ['required', 'ulid', 'exists:people,public_id'],
@@ -471,10 +478,35 @@ class ChurchMinistryOperationsController extends Controller
             'title' => ['required', 'string', 'max:191'],
             'status' => ['nullable', 'string', 'max:40'],
             'started_at' => ['nullable', 'date'],
+            'grant_admin_access' => ['sometimes', 'boolean'],
+            'admin_email' => ['nullable', 'email', 'max:191'],
         ]);
         $church = Church::query()->where('public_id', $data['church_id'])->firstOrFail();
         $context->ensureContains($request, $church->scopeReference());
         $person = Person::query()->where('public_id', $data['person_id'])->firstOrFail();
+
+        if ($data['role_type'] === 'leader') {
+            $request->validate([
+                'title' => ['required', 'string', Rule::in(ChurchLeadershipCatalog::TITLES)],
+                'grant_admin_access' => ['sometimes', 'boolean'],
+                'admin_email' => ['nullable', 'email', 'max:191'],
+            ]);
+            $assignment = $this->execute(fn (): ChurchRoleAssignment => $appointLeader->handle(
+                $person,
+                $church,
+                [
+                    'title' => $data['title'],
+                    'started_at' => isset($data['started_at']) ? CarbonImmutable::parse($data['started_at']) : null,
+                    'grant_admin_access' => $request->boolean('grant_admin_access'),
+                    'admin_email' => $data['admin_email'] ?? null,
+                ],
+                $context->actor($request),
+            ));
+            $assignment->load(['church:id,public_id,name', 'department:id,public_id,name', ...PersonDisplayName::eager()]);
+
+            return ApiResponse::success($request, (new ProtectedDomainRecordResource($assignment))->resolve($request), status: 201);
+        }
+
         $assignment = $this->execute(function () use ($data, $church, $person): ChurchRoleAssignment {
             $duplicate = ChurchRoleAssignment::query()
                 ->where('church_id', $church->getKey())
@@ -504,8 +536,12 @@ class ChurchMinistryOperationsController extends Controller
         return ApiResponse::success($request, (new ProtectedDomainRecordResource($assignment))->resolve($request), status: 201);
     }
 
-    public function updateRoleAssignment(Request $request, string $assignment, ProtectedAdminContext $context): JsonResponse
-    {
+    public function updateRoleAssignment(
+        Request $request,
+        string $assignment,
+        ProtectedAdminContext $context,
+        EndChurchLeaderAssignmentAction $endLeader,
+    ): JsonResponse {
         $target = ChurchRoleAssignment::query()->with('church')->where('public_id', $assignment)->firstOrFail();
         $context->ensureContains($request, $target->church->scopeReference());
         $data = $request->validate([
@@ -519,6 +555,22 @@ class ChurchMinistryOperationsController extends Controller
             'ended_at' => ['nullable', 'date'],
         ]);
         $church = Church::query()->where('public_id', $data['church_id'])->firstOrFail();
+
+        if (
+            $target->role_type === 'leader'
+            && ($data['status'] ?? $target->status) === 'ended'
+            && $target->status !== 'ended'
+        ) {
+            $this->execute(fn (): ChurchRoleAssignment => $endLeader->handle(
+                $target,
+                isset($data['ended_at']) ? CarbonImmutable::parse($data['ended_at']) : null,
+                $context->actor($request),
+            ));
+            $target->refresh()->load(['church:id,public_id,name', 'department:id,public_id,name', ...PersonDisplayName::eager()]);
+
+            return ApiResponse::success($request, (new ProtectedDomainRecordResource($target))->resolve($request));
+        }
+
         $this->execute(function () use ($target, $data, $church): void {
             $target->forceFill([
                 'church_id' => $church->getKey(),
@@ -717,6 +769,10 @@ class ChurchMinistryOperationsController extends Controller
         $data = $request->validate([
             'home_church_id' => ['required', 'ulid', 'exists:home_churches,public_id'],
             'service_date' => ['required', 'date'],
+            'males' => ['nullable', 'integer', 'min:0'],
+            'females' => ['nullable', 'integer', 'min:0'],
+            'male' => ['nullable', 'integer', 'min:0'],
+            'female' => ['nullable', 'integer', 'min:0'],
             'adults' => ['nullable', 'integer', 'min:0'],
             'children' => ['nullable', 'integer', 'min:0'],
             'first_timers' => ['nullable', 'integer', 'min:0'],
@@ -724,15 +780,18 @@ class ChurchMinistryOperationsController extends Controller
         ]);
         $homeChurch = HomeChurch::query()->with('church')->where('public_id', $data['home_church_id'])->firstOrFail();
         $context->ensureContains($request, $homeChurch->church->scopeReference());
+        $existing = HomeChurchAttendanceRecord::query()
+            ->where('home_church_id', $homeChurch->getKey())
+            ->whereDate('service_date', $data['service_date'])
+            ->first();
+        $counts = HomeChurchAttendanceRecord::countsFromPayload($data, $existing);
         $record = $this->execute(fn (): HomeChurchAttendanceRecord => HomeChurchAttendanceRecord::query()->updateOrCreate(
             [
                 'home_church_id' => $homeChurch->getKey(),
                 'service_date' => $data['service_date'],
             ],
             [
-                'adults' => $data['adults'] ?? 0,
-                'children' => $data['children'] ?? 0,
-                'first_timers' => $data['first_timers'] ?? 0,
+                ...$counts,
                 'notes' => $data['notes'] ?? null,
             ],
         ));
@@ -747,17 +806,20 @@ class ChurchMinistryOperationsController extends Controller
         $context->ensureContains($request, $target->homeChurch->church->scopeReference());
         $data = $request->validate([
             'service_date' => ['required', 'date'],
+            'males' => ['nullable', 'integer', 'min:0'],
+            'females' => ['nullable', 'integer', 'min:0'],
+            'male' => ['nullable', 'integer', 'min:0'],
+            'female' => ['nullable', 'integer', 'min:0'],
             'adults' => ['nullable', 'integer', 'min:0'],
             'children' => ['nullable', 'integer', 'min:0'],
             'first_timers' => ['nullable', 'integer', 'min:0'],
             'notes' => ['nullable', 'string', 'max:500'],
         ]);
-        $this->execute(function () use ($target, $data): void {
+        $counts = HomeChurchAttendanceRecord::countsFromPayload($data, $target);
+        $this->execute(function () use ($target, $data, $counts): void {
             $target->forceFill([
                 'service_date' => $data['service_date'],
-                'adults' => $data['adults'] ?? $target->adults,
-                'children' => $data['children'] ?? $target->children,
-                'first_timers' => $data['first_timers'] ?? $target->first_timers,
+                ...$counts,
                 'notes' => $data['notes'] ?? $target->notes,
             ])->save();
         });

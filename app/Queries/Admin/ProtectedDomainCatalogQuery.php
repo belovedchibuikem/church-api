@@ -251,16 +251,29 @@ class ProtectedDomainCatalogQuery
     /** @return LengthAwarePaginator<PastoralNeed> */
     public function pastoralNeeds(ScopeReference $scope, array $filters, int $perPage): LengthAwarePaginator
     {
-        $query = PastoralNeed::query()->with(PersonDisplayName::eager());
-        $this->applyPersonChurchScope($query, $scope);
+        $query = PastoralNeed::query()->with([
+            ...PersonDisplayName::eager(),
+            'church:id,public_id,name',
+            'homeChurch:id,public_id,name,church_id',
+        ]);
+        $this->applyPastoralNeedScope($query, $scope);
         $this->applyStatus($query, $filters);
         $this->applySearch($query, $filters, 'summary');
+        if (isset($filters['church_id'])) {
+            $churchId = Church::query()->where('public_id', $filters['church_id'])->value('id');
+            $query->where(function (Builder $scoped) use ($churchId): void {
+                $scoped->where('church_id', $churchId ?? 0)
+                    ->orWhereHas('homeChurch', fn (Builder $homeChurch) => $homeChurch->where('church_id', $churchId ?? 0));
+            });
+        }
         if (isset($filters['home_church_id'])) {
             $homeChurchId = HomeChurch::query()->where('public_id', $filters['home_church_id'])->value('id');
-            $query->whereHas(
-                'person.memberships',
-                fn (Builder $membership) => $membership->where('home_church_id', $homeChurchId ?? 0),
-            );
+            $query->where('home_church_id', $homeChurchId ?? 0);
+        }
+        if (filter_var($filters['organizational'] ?? false, FILTER_VALIDATE_BOOL)) {
+            $query->where(function (Builder $scoped): void {
+                $scoped->whereNotNull('church_id')->orWhereNotNull('home_church_id');
+            });
         }
 
         return $query->latest()->paginate($perPage);
@@ -484,6 +497,26 @@ class ProtectedDomainCatalogQuery
                 $inner->whereHas('memberships', fn (Builder $membershipQuery) => $membershipQuery->whereIn('church_id', $churchIds))
                     ->orWhereHas('firstTimers', fn (Builder $firstTimerQuery) => $firstTimerQuery->whereIn('church_id', $churchIds));
             });
+        });
+    }
+
+    private function applyPastoralNeedScope(Builder $query, ScopeReference $scope): void
+    {
+        $churchIds = $this->churchIds($scope);
+
+        if ($churchIds === null) {
+            return;
+        }
+
+        $query->where(function (Builder $scoped) use ($churchIds): void {
+            $scoped->whereIn('church_id', $churchIds)
+                ->orWhereHas('homeChurch', fn (Builder $homeChurch) => $homeChurch->whereIn('church_id', $churchIds))
+                ->orWhereHas('person', function (Builder $personQuery) use ($churchIds): void {
+                    $personQuery->where(function (Builder $inner) use ($churchIds): void {
+                        $inner->whereHas('memberships', fn (Builder $membershipQuery) => $membershipQuery->whereIn('church_id', $churchIds))
+                            ->orWhereHas('firstTimers', fn (Builder $firstTimerQuery) => $firstTimerQuery->whereIn('church_id', $churchIds));
+                    });
+                });
         });
     }
 

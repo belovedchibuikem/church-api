@@ -120,6 +120,8 @@ return new class extends Migration
                 $table->foreignId('home_church_id')->constrained()->cascadeOnDelete();
                 $table->date('service_date');
                 $table->unsignedInteger('adults')->default(0);
+                $table->unsignedInteger('males')->default(0);
+                $table->unsignedInteger('females')->default(0);
                 $table->unsignedInteger('children')->default(0);
                 $table->unsignedInteger('first_timers')->default(0);
                 $table->string('notes', 500)->nullable();

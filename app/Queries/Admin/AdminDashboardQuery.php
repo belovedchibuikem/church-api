@@ -19,7 +19,6 @@ use App\Models\ChurchRoleAssignment;
 use App\Models\CommunicationBroadcast;
 use App\Models\CommunicationDeliveryAttempt;
 use App\Models\Convert;
-use App\Models\Country;
 use App\Models\Crusade;
 use App\Models\EvangelismActivity;
 use App\Models\EventAttendance;
@@ -29,7 +28,6 @@ use App\Models\HomeChurchApplication;
 use App\Models\HomeChurchAttendanceRecord;
 use App\Models\KcaApplication;
 use App\Models\KcaEnrollment;
-use App\Models\Location;
 use App\Models\MissionSoulJourney;
 use App\Models\PastoralNeed;
 use App\Models\PaymentIntent;
@@ -90,14 +88,15 @@ class AdminDashboardQuery
         $churchQuery = $this->churchQuery($scope);
         $homeChurchQuery = $this->homeChurchQuery($scope);
         $membershipQuery = $this->membershipQuery($scope);
-        $countryQuery = Country::query();
+        $countriesWithChurches = $this->churchUnitsQuery($scope)
+            ->join('countries', 'countries.id', '=', 'administrative_units.country_id');
 
         return [
             'metrics' => [
                 $this->metric('Total Churches', (clone $churchQuery)->count(), (clone $churchQuery), 'created_at', period: $period),
                 $this->metric('Home Churches', (clone $homeChurchQuery)->count(), (clone $homeChurchQuery), 'created_at', period: $period),
                 $this->metric('Members', (clone $membershipQuery)->count(), (clone $membershipQuery), 'joined_at', period: $period),
-                $this->metric('Countries', (clone $countryQuery)->count(), (clone $countryQuery), 'created_at', period: $period),
+                $this->presenceMetric('Countries', $countriesWithChurches, 'countries.id', $period),
             ],
             'breakdown' => $this->topCountriesByChurches($scope, 5),
             'series' => $this->monthlySeries((clone $churchQuery), 'created_at', $period),
@@ -107,19 +106,23 @@ class AdminDashboardQuery
 
     private function geography(ScopeReference $scope, DashboardPeriod $period): array
     {
-        $countryQuery = Country::query();
-        $this->applyCountryScope($countryQuery, $scope);
-        $unitQuery = AdministrativeUnit::query();
-        $this->applyAdministrativeUnitScope($unitQuery, $scope);
-        $locationQuery = Location::query();
-        $this->applyLocationScope($locationQuery, $scope);
         $churchQuery = $this->churchQuery($scope);
+        $units = $this->churchUnitsQuery($scope);
+        $countriesWithChurches = (clone $units)
+            ->join('countries', 'countries.id', '=', 'administrative_units.country_id');
+        $localAreasWithChurches = (clone $units)
+            ->whereNotNull('administrative_units.parent_id');
 
         return [
             'metrics' => [
-                $this->metric('Countries', (clone $countryQuery)->count(), (clone $countryQuery), 'created_at', period: $period),
-                $this->metric('Regions / States', (clone $unitQuery)->count(), (clone $unitQuery), 'created_at', period: $period),
-                $this->metric('Local Areas', (clone $locationQuery)->count(), (clone $locationQuery), 'created_at', period: $period),
+                $this->presenceMetric('Countries', $countriesWithChurches, 'countries.id', $period),
+                $this->presenceMetric(
+                    'Regions / States',
+                    $units,
+                    'COALESCE(administrative_units.parent_id, administrative_units.id)',
+                    $period,
+                ),
+                $this->presenceMetric('Local Areas', $localAreasWithChurches, 'administrative_units.id', $period),
                 $this->metric('Churches', (clone $churchQuery)->count(), (clone $churchQuery), 'created_at', period: $period),
             ],
             'breakdown' => $this->topCountriesByChurches($scope, 5),
@@ -536,7 +539,10 @@ class AdminDashboardQuery
         $homeChurchQuery = $this->homeChurchQuery($scope);
         $membershipQuery = $this->membershipQuery($scope);
 
-        $countryCount = $this->countriesWithChurchesCount($scope);
+        $countryCount = $this->distinctChurchGeographyCount(
+            $this->churchUnitsQuery($scope)->join('countries', 'countries.id', '=', 'administrative_units.country_id'),
+            'countries.id',
+        );
         $peopleCount = (clone $membershipQuery)->count();
         $churchCount = (clone $churchQuery)->count();
         $homeChurchCount = (clone $homeChurchQuery)->count();
@@ -772,6 +778,27 @@ class AdminDashboardQuery
         return $query->count();
     }
 
+    /**
+     * Distinct countries, states, or local areas that currently have churches.
+     *
+     * @param  Builder<Church>  $query
+     * @return array{label: string, value: string, trend?: string}
+     */
+    private function presenceMetric(string $label, Builder $query, string $distinctExpression, DashboardPeriod $period): array
+    {
+        $metric = [
+            'label' => $label,
+            'value' => $this->formatNumber($this->distinctChurchGeographyCount($query, $distinctExpression)),
+        ];
+
+        $trend = $this->distinctPeriodTrend($query, $distinctExpression, 'churches.created_at', $period);
+        if ($trend !== null) {
+            $metric['trend'] = $trend;
+        }
+
+        return $metric;
+    }
+
     /** @return array<int, array{label: string, value: string, trend?: string}> */
     private function metric(
         string $label,
@@ -880,18 +907,24 @@ class AdminDashboardQuery
         )->all();
     }
 
-    private function countriesWithChurchesCount(ScopeReference $scope): int
+    /** @return Builder<Church> */
+    private function churchUnitsQuery(ScopeReference $scope): Builder
     {
         $query = Church::query()
-            ->join('administrative_units', 'administrative_units.id', '=', 'churches.administrative_unit_id')
-            ->join('countries', 'countries.id', '=', 'administrative_units.country_id');
+            ->join('administrative_units', 'administrative_units.id', '=', 'churches.administrative_unit_id');
 
         $churchIds = $this->churchIds($scope);
         if ($churchIds !== null) {
             $query->whereIn('churches.id', $churchIds);
         }
 
-        return (int) $query->distinct()->count('countries.id');
+        return $query;
+    }
+
+    /** @param Builder<Church> $query */
+    private function distinctChurchGeographyCount(Builder $query, string $expression): int
+    {
+        return (int) (clone $query)->distinct()->count(DB::raw($expression));
     }
 
     /** @return list<array{title: string, detail?: string, occurred_at: string}> */
@@ -998,6 +1031,28 @@ class AdminDashboardQuery
           : "DATE_FORMAT({$column}, '%Y-%m') as period";
     }
 
+    /** @param Builder<Church> $query */
+    private function distinctPeriodTrend(Builder $query, string $distinctExpression, string $column, DashboardPeriod $period): ?string
+    {
+        $previous = $period->previous();
+        $current = $this->distinctChurchGeographyCount(
+            (clone $query)->whereBetween($column, [$period->from, $period->to]),
+            $distinctExpression,
+        );
+        $prior = $this->distinctChurchGeographyCount(
+            (clone $query)->whereBetween($column, [$previous->from, $previous->to]),
+            $distinctExpression,
+        );
+
+        if ($prior === 0) {
+            return $current > 0 ? '+'.$this->formatNumber($current) : null;
+        }
+
+        $delta = round((($current - $prior) / $prior) * 100, 1);
+
+        return ($delta >= 0 ? '+' : '').$delta.'%';
+    }
+
     private function periodTrend(Builder $query, string $column, ?DashboardPeriod $period = null): ?string
     {
         if ($period !== null) {
@@ -1098,35 +1153,6 @@ class AdminDashboardQuery
         }
 
         return array_values(array_unique($ids));
-    }
-
-    private function applyCountryScope(Builder $query, ScopeReference $scope): void
-    {
-        if ($scope->type === 'country') {
-            $query->where('public_id', $scope->key);
-        }
-    }
-
-    private function applyAdministrativeUnitScope(Builder $query, ScopeReference $scope): void
-    {
-        if ($scope->type === 'country') {
-            $query->whereHas('country', fn (Builder $countryQuery) => $countryQuery->where('public_id', $scope->key));
-        }
-
-        if ($scope->type === 'administrative_unit') {
-            $query->whereIn('id', $this->administrativeUnitSubtreeIds($scope->key));
-        }
-    }
-
-    private function applyLocationScope(Builder $query, ScopeReference $scope): void
-    {
-        if ($scope->type === 'country') {
-            $query->whereHas('country', fn (Builder $countryQuery) => $countryQuery->where('public_id', $scope->key));
-        }
-
-        if ($scope->type === 'administrative_unit') {
-            $query->whereIn('administrative_unit_id', $this->administrativeUnitSubtreeIds($scope->key));
-        }
     }
 
     /** @param Builder<Model> $query */

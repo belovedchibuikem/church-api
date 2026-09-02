@@ -85,6 +85,8 @@ class ResolveKcaAccessQuery
             'label' => $status->publicLabel(),
             'received_at' => $application->received_at?->utc()->toIso8601String(),
             'reviewed_at' => $application->reviewed_at?->utc()->toIso8601String(),
+            'orientation_completed_at' => $application->orientation_completed_at?->utc()->toIso8601String(),
+            'orientation_progress' => $application->orientation_progress ?? [],
             'recommendation' => $this->recommendationPayload($application),
         ];
         if ($includeAnswers) {
@@ -140,7 +142,8 @@ class ResolveKcaAccessQuery
         return match ($status) {
             KcaApplicationState::Draft => ['resume', 'withdraw'],
             KcaApplicationState::InformationRequired => ['correct', 'withdraw'],
-            KcaApplicationState::Received, KcaApplicationState::Reviewed, KcaApplicationState::Interview => ['view_progress'],
+            KcaApplicationState::Received, KcaApplicationState::Reviewed => ['view_progress'],
+            KcaApplicationState::Interview => ['view_progress', 'complete_orientation'],
             KcaApplicationState::ProvisionallyAccepted => ['view_conditions'],
             KcaApplicationState::Accepted => ['view_letter'],
             default => ['view_decision'],
@@ -153,7 +156,9 @@ class ResolveKcaAccessQuery
             KcaApplicationState::Draft => 'Resume your application at the last saved step.',
             KcaApplicationState::Received, KcaApplicationState::Reviewed => 'Track admission progress. Reviewers will contact you if more information is needed.',
             KcaApplicationState::InformationRequired => 'Provide the requested information to continue review.',
-            KcaApplicationState::Interview => 'Complete orientation or interview requirements.',
+            KcaApplicationState::Interview => $application->orientation_completed_at !== null
+                ? 'Orientation is complete. Your application is awaiting a final admission decision.'
+                : 'Complete orientation requirements, then submit to continue review.',
             KcaApplicationState::ProvisionallyAccepted => 'Review outstanding conditions on your provisional offer.',
             KcaApplicationState::Accepted => 'Read your admission letter. Learning unlocks after activation.',
             KcaApplicationState::Deferred => 'See the next review window and reapply rules.',

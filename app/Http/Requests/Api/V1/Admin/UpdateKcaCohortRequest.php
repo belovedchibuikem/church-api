@@ -1,0 +1,29 @@
+<?php
+
+namespace App\Http\Requests\Api\V1\Admin;
+
+use Illuminate\Contracts\Validation\ValidationRule;
+use Illuminate\Foundation\Http\FormRequest;
+
+class UpdateKcaCohortRequest extends FormRequest
+{
+    public function authorize(): bool
+    {
+        return true;
+    }
+
+    /**
+     * @return array<string, ValidationRule|array<mixed>|string>
+     */
+    public function rules(): array
+    {
+        return [
+            'year_id' => ['sometimes', 'string', 'size:26'],
+            'code' => ['required', 'string', 'max:50'],
+            'name' => ['required', 'string', 'max:150'],
+            'starts_on' => ['required', 'date'],
+            'ends_on' => ['required', 'date', 'after_or_equal:starts_on'],
+            'timezone' => ['sometimes', 'nullable', 'string', 'max:64'],
+        ];
+    }
+}

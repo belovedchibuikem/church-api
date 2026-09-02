@@ -222,6 +222,25 @@ class PressOperationsController extends Controller
         return ApiResponse::success($request, (new ProtectedCatalogRecordResource($author))->resolve($request), status: 201);
     }
 
+    public function updateAuthor(Request $request, string $author, UpsertPressAuthorAction $action, ProtectedAdminContext $context): JsonResponse
+    {
+        $context->ensureGlobal($request);
+        $data = $request->validate([
+            'display_name' => ['required', 'string', 'max:191'],
+            'bio' => ['nullable', 'string', 'max:10000'],
+        ]);
+        $target = PressAuthor::query()->with('person')->where('public_id', $author)->firstOrFail();
+        $updated = $this->execute(fn (): PressAuthor => $action->handle(
+            $target->person,
+            $data['display_name'],
+            $context->actor($request),
+            $data['bio'] ?? null,
+        ));
+        $updated->load(PersonDisplayName::eager());
+
+        return ApiResponse::success($request, (new ProtectedCatalogRecordResource($updated))->resolve($request));
+    }
+
     public function storeTranslation(CreatePressTranslationRequest $request, string $publication, CreateMachinePressTranslationAction $action, ProtectedAdminContext $context): JsonResponse
     {
         $context->ensureGlobal($request);

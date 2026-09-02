@@ -37,6 +37,11 @@ class CreateKcaLessonAction
 
         return DB::transaction(function () use ($module, $normalizedCode, $normalizedTitle, $sequence, $actor, $content): KcaLesson {
             $lockedModule = KcaModule::query()->lockForUpdate()->findOrFail($module->getKey());
+
+            if ($lockedModule->published_at !== null) {
+                throw new InvalidArgumentException('Lessons cannot be added to a published module.');
+            }
+
             $duplicate = KcaLesson::query()
                 ->whereBelongsTo($lockedModule, 'module')
                 ->where(function ($query) use ($normalizedCode, $sequence): void {

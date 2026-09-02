@@ -572,12 +572,32 @@ class SeedDemoDatasetAction
         $attendance = HomeChurchAttendanceRecord::query()->create([
             'home_church_id' => $homeChurch->getKey(),
             'service_date' => now()->toDateString(),
+            'males' => 11,
+            'females' => 7,
             'adults' => 18,
             'children' => 7,
-            'first_timers' => 2,
+            'first_timers' => 0,
             'notes' => 'Demo attendance record',
         ]);
         $this->remember($attendance);
+
+        $churchNeed = PastoralNeed::query()->create([
+            'church_id' => $church->getKey(),
+            'category' => 'equipment',
+            'summary' => 'Replace sanctuary projector and HDMI switcher',
+            'status' => 'open',
+        ]);
+        $this->remember($churchNeed);
+
+        $homeChurchNeed = PastoralNeed::query()->create([
+            'church_id' => $church->getKey(),
+            'home_church_id' => $homeChurch->getKey(),
+            'person_id' => $pastor->getKey(),
+            'category' => 'materials',
+            'summary' => 'Bibles and study manuals for new members',
+            'status' => 'open',
+        ]);
+        $this->remember($homeChurchNeed);
     }
 
     /**

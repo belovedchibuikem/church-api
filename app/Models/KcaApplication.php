@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
-#[Fillable(['person_id', 'application_data', 'received_at'])]
+#[Fillable(['person_id', 'application_data', 'received_at', 'orientation_progress'])]
 class KcaApplication extends Model
 {
     /** @use HasFactory<KcaApplicationFactory> */
@@ -56,6 +56,8 @@ class KcaApplication extends Model
             'application_data' => 'array',
             'received_at' => 'immutable_datetime',
             'reviewed_at' => 'immutable_datetime',
+            'orientation_progress' => 'array',
+            'orientation_completed_at' => 'immutable_datetime',
         ];
     }
 }
