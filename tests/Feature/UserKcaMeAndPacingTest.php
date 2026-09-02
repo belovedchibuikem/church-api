@@ -160,6 +160,34 @@ class UserKcaMeAndPacingTest extends TestCase
             ->assertJsonPath('data.departments_count', 0);
     }
 
+    public function test_module_with_fewer_lessons_than_duration_days_can_map_and_publish(): void
+    {
+        $module = KcaModule::factory()->create(['duration_days' => 7, 'sequence' => 1]);
+        for ($i = 1; $i <= 2; $i++) {
+            KcaLesson::factory()->create([
+                'kca_module_id' => $module->getKey(),
+                'code' => 'L'.$i,
+                'sequence' => $i,
+            ]);
+        }
+
+        $actor = User::factory()->create();
+        $this->app->make(MapKcaModuleDaysAction::class)->handle($module, null, $actor);
+        $this->app->make(PublishKcaModuleAction::class)->handle($module->fresh(), $actor);
+
+        $module->refresh();
+        $this->assertNotNull($module->published_at);
+        $this->assertSame(
+            [1, 2],
+            KcaLesson::query()
+                ->where('kca_module_id', $module->getKey())
+                ->orderBy('sequence')
+                ->pluck('day_index')
+                ->map(fn ($day): int => (int) $day)
+                ->all(),
+        );
+    }
+
     private function authenticate(User $user): void
     {
         $session = SecuritySession::factory()->for($user)->create();

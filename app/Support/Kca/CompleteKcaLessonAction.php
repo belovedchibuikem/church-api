@@ -143,12 +143,18 @@ class CompleteKcaLessonAction
             return;
         }
 
-        $previousLessons = KcaLesson::query()
-            ->where('kca_module_id', $module->getKey())
-            ->where('day_index', $dayIndex - 1)
-            ->pluck('id');
+        $previousLessons = collect();
+        for ($previousDay = $dayIndex - 1; $previousDay >= 1; $previousDay--) {
+            $previousLessons = KcaLesson::query()
+                ->where('kca_module_id', $module->getKey())
+                ->where('day_index', $previousDay)
+                ->pluck('id');
+            if ($previousLessons->isNotEmpty()) {
+                break;
+            }
+        }
         if ($previousLessons->isEmpty()) {
-            throw new AccessDeniedHttpException('Previous daily bundle is not configured.');
+            return;
         }
         $completed = KcaLessonProgress::query()
             ->where('kca_enrollment_id', $enrollment->getKey())

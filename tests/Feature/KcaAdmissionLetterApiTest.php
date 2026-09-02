@@ -18,6 +18,7 @@ use App\Support\Authorization\AssignScopeToRoleAssignmentAction;
 use App\Support\Authorization\GrantPermissionToRoleAction;
 use App\Support\Authorization\ScopeReference;
 use App\Support\Identity\PersonDisplayName;
+use App\Support\Kca\GenerateKcaAdmissionReferenceCodeAction;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Tests\TestCase;
 
@@ -289,6 +290,18 @@ class KcaAdmissionLetterApiTest extends TestCase
             ->assertOk();
 
         $this->assertSame('Living Word Assembly', $response->json('data.0.church_name'));
+    }
+
+    public function test_reference_code_does_not_duplicate_year_when_prefix_includes_year(): void
+    {
+        KcaGovernanceConfiguration::factory()->create([
+            'admission_reference_prefix' => 'KCA/ADM/2026',
+        ]);
+
+        $code = app(GenerateKcaAdmissionReferenceCodeAction::class)->handle();
+
+        $this->assertSame('KCA/ADM/2026/00001', $code);
+        $this->assertStringNotContainsString('/2026/2026/', $code);
     }
 
     /** @param array<int, string> $permissionCodes */

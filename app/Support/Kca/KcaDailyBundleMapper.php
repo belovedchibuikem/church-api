@@ -21,7 +21,12 @@ final class KcaDailyBundleMapper
             throw new InvalidArgumentException('Module duration_days must be at least 1.');
         }
         if ($lessonCount < $durationDays) {
-            throw new InvalidArgumentException('When duration_days exceeds the lesson count, map reflection or assessment days explicitly.');
+            $mapping = [];
+            for ($lesson = 1; $lesson <= $lessonCount; $lesson++) {
+                $mapping[] = $lesson;
+            }
+
+            return $mapping;
         }
 
         $base = intdiv($lessonCount, $durationDays);

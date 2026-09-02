@@ -40,9 +40,11 @@ class MapKcaModuleDaysAction
                 }
                 $usedDays[$day] = true;
             }
-            for ($day = 1; $day <= (int) $locked->duration_days; $day++) {
-                if (! isset($usedDays[$day])) {
-                    throw new InvalidArgumentException("Day {$day} has no required lesson. Add a lesson or activity before publishing.");
+            if ($lessons->count() >= (int) $locked->duration_days) {
+                for ($day = 1; $day <= (int) $locked->duration_days; $day++) {
+                    if (! isset($usedDays[$day])) {
+                        throw new InvalidArgumentException("Day {$day} has no required lesson. Add a lesson or activity before publishing.");
+                    }
                 }
             }
             foreach ($lessons->values() as $index => $lesson) {

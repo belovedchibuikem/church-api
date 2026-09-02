@@ -14,7 +14,12 @@ final class GenerateKcaAdmissionReferenceCodeAction
         $count = KcaAdmissionLetter::query()->whereYear('issued_at', $year)->count() + 1;
         $prefix = trim((string) ($governance->admission_reference_prefix ?? 'KCA/ADM'));
         $prefix = $prefix !== '' ? $prefix : 'KCA/ADM';
+        $prefix = rtrim($prefix, '/');
 
-        return sprintf('%s/%d/%05d', rtrim($prefix, '/'), $year, $count);
+        if (preg_match('/\/\d{4}$/', $prefix) === 1) {
+            return sprintf('%s/%05d', $prefix, $count);
+        }
+
+        return sprintf('%s/%d/%05d', $prefix, $year, $count);
     }
 }
