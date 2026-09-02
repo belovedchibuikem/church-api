@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\V1\Admin\EventOperationsController;
 use App\Http\Controllers\Api\V1\Admin\FileOperationsController;
 use App\Http\Controllers\Api\V1\Admin\FinanceOperationsController;
 use App\Http\Controllers\Api\V1\Admin\KcaGovernanceController;
+use App\Http\Controllers\Api\V1\Admin\KcaOrientationStepController;
 use App\Http\Controllers\Api\V1\Admin\KcaAdmissionLetterController;
 use App\Http\Controllers\Api\V1\Admin\KcaOperationsController;
 use App\Http\Controllers\Api\V1\Admin\KcaOrientationSessionController;
@@ -567,6 +568,7 @@ Route::prefix('kca')->name('kca.')->controller(KcaOperationsController::class)->
     Route::delete('/mentor-assignments/{assignment}', 'destroyMentorAssignment')->whereUlid('assignment')->middleware(RequirePermissionAndScope::class.':kca.enrollments.manage')->name('mentor_assignments.destroy');
     Route::delete('/prerequisites/{prerequisite}', 'destroyPrerequisite')->whereUlid('prerequisite')->middleware(RequirePermissionAndScope::class.':kca.modules.manage')->name('prerequisites.destroy');
     Route::post('/enrollments/{enrollment}/attendance', 'recordAttendance')->whereUlid('enrollment')->middleware(RequirePermissionAndScope::class.':kca.attendance.record')->name('enrollments.attendance.store');
+    Route::get('/enrollments/registration-number-preview', 'previewRegistrationNumber')->middleware(RequirePermissionAndScope::class.':kca.enrollments.manage')->name('enrollments.registration_number.preview');
     Route::post('/assessment-results', 'recordAssessmentResults')->middleware(RequirePermissionAndScope::class.':kca.enrollments.manage')->name('assessment_results.store');
     Route::post('/applications', 'storeApplication')->middleware(RequirePermissionAndScope::class.':kca.applications.transition')->name('applications.store');
     Route::post('/applications/{application}/transitions', 'transitionApplication')->whereUlid('application')->middleware(RequirePermissionAndScope::class.':kca.applications.transition')->name('applications.transitions.store');
@@ -584,6 +586,8 @@ Route::prefix('kca')->name('kca.')->controller(KcaOperationsController::class)->
     Route::post('/certificates/{certificate}/revocation', 'revokeCertificate')->whereUlid('certificate')->middleware(RequirePermissionAndScope::class.':kca.certificates.revoke')->name('certificates.revocation.store');
     Route::get('/governance', [KcaGovernanceController::class, 'show'])->middleware(RequirePermissionAndScope::class.':kca.governance.view')->name('governance.show');
     Route::put('/governance', [KcaGovernanceController::class, 'configure'])->middleware(RequirePermissionAndScope::class.':kca.governance.manage')->name('governance.update');
+    Route::get('/orientation-steps', [KcaOrientationStepController::class, 'index'])->middleware(RequirePermissionAndScope::class.':kca.governance.view')->name('orientation_steps.index');
+    Route::put('/orientation-steps', [KcaOrientationStepController::class, 'sync'])->middleware(RequirePermissionAndScope::class.':kca.governance.manage')->name('orientation_steps.sync');
     Route::post('/orientation-sessions', [KcaOrientationSessionController::class, 'store'])->middleware(RequirePermissionAndScope::class.':kca.orientation.manage')->name('orientation_sessions.store');
     Route::get('/orientation-sessions/{session}', [KcaOrientationSessionController::class, 'show'])->whereUlid('session')->middleware(RequirePermissionAndScope::class.':kca.orientation.view')->name('orientation_sessions.show');
     Route::put('/orientation-sessions/{session}', [KcaOrientationSessionController::class, 'update'])->whereUlid('session')->middleware(RequirePermissionAndScope::class.':kca.orientation.manage')->name('orientation_sessions.update');

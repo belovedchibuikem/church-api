@@ -19,7 +19,7 @@ class EnrollKcaStudentRequest extends FormRequest
     {
         return [
             'cohort_id' => ['required', 'ulid', 'exists:kca_cohorts,public_id'],
-            'registration_number' => ['required', 'string', 'max:100'],
+            'registration_number' => ['nullable', 'string', 'max:100'],
             'starts_on' => ['required', 'date'],
         ];
     }

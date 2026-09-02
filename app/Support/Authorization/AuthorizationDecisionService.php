@@ -2,6 +2,7 @@
 
 namespace App\Support\Authorization;
 
+use App\Models\Role;
 use App\Models\RoleAssignment;
 use App\Models\ScopeAssignment;
 use App\Models\User;
@@ -34,6 +35,22 @@ class AuthorizationDecisionService
                     permission: $permission,
                     requestedScope: $requestedScope,
                     reason: AccessDecisionReason::AccountSuspended,
+                );
+            }
+
+            $superAdministratorAssignment = $this->superAdministratorAssignment(
+                $lockedActor,
+                $requestedScope,
+                $decidedAt,
+            );
+
+            if ($superAdministratorAssignment !== null) {
+                return $this->recordResult(
+                    actor: $lockedActor,
+                    permission: $permission,
+                    requestedScope: $requestedScope,
+                    reason: AccessDecisionReason::Allowed,
+                    matchedRoleAssignment: $superAdministratorAssignment,
                 );
             }
 
@@ -96,6 +113,40 @@ class AuthorizationDecisionService
                     : AccessDecisionReason::ScopeNotAssigned,
             );
         }, attempts: 3);
+    }
+
+    private function superAdministratorAssignment(
+        User $actor,
+        ScopeReference $requestedScope,
+        \DateTimeInterface $decidedAt,
+    ): ?RoleAssignment {
+        $superRoleId = Role::query()
+            ->where('code', AuthorizationBundleCatalog::SUPER_ADMINISTRATOR_ROLE)
+            ->value('id');
+
+        if ($superRoleId === null) {
+            return null;
+        }
+
+        $assignments = RoleAssignment::query()
+            ->select(['id', 'public_id', 'user_id', 'role_id'])
+            ->whereBelongsTo($actor)
+            ->where('role_id', $superRoleId)
+            ->active($decidedAt)
+            ->with(['scopeAssignments:id,role_assignment_id,scope_type,scope_key'])
+            ->get();
+
+        foreach ($assignments as $assignment) {
+            foreach ($assignment->scopeAssignments as $scopeAssignment) {
+                $assignedScope = ScopeReference::fromAssignment($scopeAssignment);
+
+                if ($this->scopeContainmentResolver->contains($assignedScope, $requestedScope, $actor)) {
+                    return $assignment;
+                }
+            }
+        }
+
+        return null;
     }
 
     private function recordResult(

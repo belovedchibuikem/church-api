@@ -29,6 +29,8 @@ class KcaGovernanceConfigurationResource extends JsonResource
             'admission_programme_venue' => $this->admission_programme_venue,
             'admission_programme_schedule' => $this->admission_programme_schedule,
             'admission_programme_mentor' => $this->admission_programme_mentor,
+            'orientation_welcome' => $this->orientation_welcome,
+            'orientation_review_welcome' => $this->orientation_review_welcome,
             'admission_letterhead_file_asset_id' => $this->admissionLetterheadFile?->public_id,
             'admission_signature_file_asset_id' => $this->admissionSignatureFile?->public_id,
             'configuration_revision' => $this->configuration_revision,

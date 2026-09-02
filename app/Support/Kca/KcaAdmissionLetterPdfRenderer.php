@@ -57,6 +57,9 @@ class KcaAdmissionLetterPdfRenderer
             );
         }
 
+        $referenceCode = trim((string) ($letter->reference_code ?? ''));
+        $body = SyncKcaAdmissionLetterReference::inBody($body, $referenceCode);
+
         $hasLetterhead = $letter->letterheadFile instanceof FileAsset && $operations !== [];
         $structured = $this->isStructuredTemplate($body);
         $signerName = trim((string) ($letter->signer_name ?? ''));
@@ -64,7 +67,13 @@ class KcaAdmissionLetterPdfRenderer
         $signatureInserted = false;
         $y = $hasLetterhead || $structured ? self::CONTENT_TOP_Y : 468;
 
-        if (! $hasLetterhead && ! $structured) {
+        if ($hasLetterhead && ! $structured) {
+            $applicant = PersonDisplayName::of($letter->application?->person) ?: 'Applicant';
+            $reference = $referenceCode !== '' ? $referenceCode : 'Pending';
+            $issuedOn = $letter->issued_at?->format('d/m/Y') ?? now()->format('d/m/Y');
+            $operations = array_merge($operations, $this->simplePreamble($issuedOn, $reference, $applicant));
+            $y = 412;
+        } elseif (! $hasLetterhead && ! $structured) {
             $applicant = PersonDisplayName::of($letter->application?->person) ?: 'Applicant';
             $reference = (string) ($letter->reference_code ?? 'Pending');
             $issuedOn = $letter->issued_at?->format('d/m/Y') ?? now()->format('d/m/Y');
@@ -79,6 +88,10 @@ class KcaAdmissionLetterPdfRenderer
             }
 
             if ($hasLetterhead && $this->shouldSkipLetterheadBannerBlock($paragraph)) {
+                continue;
+            }
+
+            if ($hasLetterhead && ! $structured && $this->shouldSkipOverlayPreambleLine($paragraph)) {
                 continue;
             }
 
@@ -261,7 +274,23 @@ class KcaAdmissionLetterPdfRenderer
         return strlen($body) > 400
             || str_contains($body, 'ADMISSION & ACCEPTANCE LETTER')
             || str_contains($body, 'YOUR KCA COMMITMENT')
-            || str_contains($body, 'YOUR COMMITMENT');
+            || str_contains($body, 'YOUR COMMITMENT')
+            || str_contains($body, '12-SESSION JOURNEY');
+    }
+
+    private function shouldSkipOverlayPreambleLine(string $paragraph): bool
+    {
+        $normalized = trim($paragraph);
+
+        if (preg_match('/^Ref\.?\s*No\.?\s*:/i', $normalized) === 1) {
+            return true;
+        }
+
+        if (preg_match('/^Date\s*:/i', $normalized) === 1) {
+            return true;
+        }
+
+        return preg_match('/^Dear\s+/i', $normalized) === 1;
     }
 
     private function shouldStopRendering(string $paragraph): bool

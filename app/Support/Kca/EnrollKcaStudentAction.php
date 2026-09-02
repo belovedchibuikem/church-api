@@ -19,31 +19,39 @@ use InvalidArgumentException;
 
 class EnrollKcaStudentAction
 {
-    public function __construct(private RecordAuditEventAction $recordAuditEvent) {}
+    public function __construct(
+        private RecordAuditEventAction $recordAuditEvent,
+        private GenerateKcaRegistrationNumberAction $registrationNumbers,
+    ) {}
 
     public function handle(
         KcaApplication $application,
         KcaCohort $cohort,
-        string $registrationNumber,
+        ?string $registrationNumber,
         CarbonInterface $startsOn,
         User $actor,
     ): KcaEnrollment {
-        if ($registrationNumber === '' || Str::length($registrationNumber) > 100) {
-            throw new InvalidArgumentException('KCA registration numbers must contain 1 to 100 characters.');
-        }
-
         $startsOn = $startsOn->toImmutable()->startOfDay();
+        $requestedRegistrationNumber = trim((string) ($registrationNumber ?? ''));
 
         return DB::transaction(function () use (
             $application,
             $cohort,
-            $registrationNumber,
+            $requestedRegistrationNumber,
             $startsOn,
             $actor,
         ): KcaEnrollment {
             $lockedApplication = KcaApplication::query()->lockForUpdate()->findOrFail($application->getKey());
             $lockedCohort = KcaCohort::query()->lockForUpdate()->findOrFail($cohort->getKey());
             $lockedYear = KcaYear::query()->lockForUpdate()->findOrFail($lockedCohort->kca_year_id);
+            $registrationNumber = $requestedRegistrationNumber;
+            if ($registrationNumber === '') {
+                $registrationNumber = $this->registrationNumbers->handle($lockedYear);
+            }
+
+            if ($registrationNumber === '' || Str::length($registrationNumber) > 100) {
+                throw new InvalidArgumentException('KCA registration numbers must contain 1 to 100 characters.');
+            }
             $decision = KcaAdmissionDecision::query()
                 ->whereBelongsTo($lockedApplication, 'application')
                 ->lockForUpdate()

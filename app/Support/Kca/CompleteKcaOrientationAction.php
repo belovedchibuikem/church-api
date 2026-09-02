@@ -37,7 +37,7 @@ class CompleteKcaOrientationAction
       throw new ConflictHttpException('Orientation can only be completed during interview / orientation.');
     }
 
-    foreach (KcaOrientationStages::ALL as $stage) {
+    foreach (KcaOrientationStages::all() as $stage) {
       $application = $this->recordStage->handle($person, $stage);
     }
 
@@ -56,7 +56,7 @@ class CompleteKcaOrientationAction
 
     return DB::transaction(function () use ($application, $actor): KcaApplication {
       $locked = KcaApplication::query()->lockForUpdate()->findOrFail($application->getKey());
-      $locked->orientation_progress = KcaOrientationStages::ALL;
+      $locked->orientation_progress = KcaOrientationStages::all();
       $locked->save();
 
       return $this->finalize($locked, $actor);
@@ -71,7 +71,7 @@ class CompleteKcaOrientationAction
       ->values()
       ->all();
 
-    $missing = array_diff(KcaOrientationStages::ALL, $progress);
+    $missing = array_diff(KcaOrientationStages::all(), $progress);
     if ($missing !== []) {
       throw new ConflictHttpException('Complete all orientation stages before submitting.');
     }

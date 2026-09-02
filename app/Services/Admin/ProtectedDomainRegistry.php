@@ -15,6 +15,7 @@ use App\Models\EventRegistration;
 use App\Models\FileAsset;
 use App\Models\GuardianRelationship;
 use App\Models\KcaApplication;
+use App\Models\KcaAssignment;
 use App\Models\KcaAssessmentResult;
 use App\Models\KcaAttendance;
 use App\Models\KcaCertificate;
@@ -238,6 +239,20 @@ class ProtectedDomainRegistry
                 ],
                 'order_column' => 'starts_at',
                 'order_direction' => 'desc',
+            ],
+            'kca.assignments' => [
+                'permission' => 'kca.enrollments.view',
+                'path' => 'kca/assignments',
+                'operation_id' => 'listAdminCatalogKcaAssignments',
+                'model' => KcaAssignment::class,
+                'with' => [
+                    'enrollment:id,public_id,registration_number',
+                    ...PersonDisplayName::eager('enrollment.person'),
+                    'module:id,public_id,title,code',
+                ],
+                'order_column' => 'assigned_at',
+                'order_direction' => 'desc',
+                'status_column' => 'state',
             ],
             'press.publications' => [
                 'permission' => 'press.publications.view',

@@ -45,10 +45,6 @@ class UpdateKcaLessonAction
             $locked = KcaLesson::query()->lockForUpdate()->findOrFail($lesson->getKey());
             $lockedModule = KcaModule::query()->lockForUpdate()->findOrFail($locked->kca_module_id);
 
-            if ($lockedModule->published_at !== null) {
-                throw new InvalidArgumentException('Lessons in published modules cannot be edited.');
-            }
-
             $duplicate = KcaLesson::query()
                 ->whereBelongsTo($lockedModule, 'module')
                 ->whereKeyNot($locked->getKey())

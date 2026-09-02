@@ -79,7 +79,7 @@ final class ResolveKcaApplicationChurchName
         $church = $churchName ?: 'your church';
 
         return implode("\n\n", [
-            "We are pleased to inform you that you have been accepted into the Kingdom Citizens Academy ({$batch}).",
+            "We are pleased to inform you that you have been accepted into the Kingdom Change Agents programme ({$batch}).",
             "Your admission reflects our confidence in your potential, character, and commitment to Christian leadership through {$church}.",
             'Please attend the orientation program, complete registration, and prepare for the training journey ahead.',
             'Congratulations and welcome to KCA.',
@@ -90,7 +90,7 @@ final class ResolveKcaApplicationChurchName
     {
         return KcaGovernanceConfiguration::query()->first() ?? new KcaGovernanceConfiguration([
             'admission_signer_name' => 'Provost, KCA',
-            'admission_signer_title' => 'Kingdom Citizens Academy',
+            'admission_signer_title' => 'Kingdom Change Agents',
         ]);
     }
 

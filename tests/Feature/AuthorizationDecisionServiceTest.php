@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Support\Authorization\AccessDecisionReason;
 use App\Support\Authorization\AssignRoleToUserAction;
 use App\Support\Authorization\AssignScopeToRoleAssignmentAction;
+use App\Support\Authorization\AuthorizationBundleCatalog;
 use App\Support\Authorization\AuthorizationDecisionService;
 use App\Support\Authorization\Contracts\ScopeContainmentResolver;
 use App\Support\Authorization\GrantPermissionToRoleAction;
@@ -51,6 +52,29 @@ class AuthorizationDecisionServiceTest extends TestCase
         $this->assertSame('church', $result->record->scope_type);
         $this->assertSame('01JCHURCH00000000000000001', $result->record->scope_key);
         $this->assertSame($correlationId, $result->record->correlation_id);
+    }
+
+    public function test_super_administrator_is_allowed_without_an_explicit_permission_grant(): void
+    {
+        $actor = User::factory()->create();
+        $superRole = Role::factory()->create([
+            'code' => AuthorizationBundleCatalog::SUPER_ADMINISTRATOR_ROLE,
+        ]);
+        $roleAssignment = $this->app->make(AssignRoleToUserAction::class)->handle($actor, $superRole);
+        $this->app->make(AssignScopeToRoleAssignmentAction::class)->handle(
+            $roleAssignment,
+            new ScopeReference('global', 'platform'),
+        );
+
+        $result = $this->app->make(AuthorizationDecisionService::class)->decide(
+            $actor,
+            'kca.orientation.view',
+            new ScopeReference('global', 'platform'),
+        );
+
+        $this->assertTrue($result->allowed);
+        $this->assertSame(AccessDecisionReason::Allowed, $result->reason);
+        $this->assertSame($roleAssignment->getKey(), $result->record->matched_role_assignment_id);
     }
 
     public function test_denies_and_records_a_missing_permission(): void

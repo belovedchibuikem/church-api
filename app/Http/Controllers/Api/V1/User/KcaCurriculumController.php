@@ -26,7 +26,7 @@ use App\Models\KcaStudyNote;
 use App\Models\Person;
 use App\Support\Api\ApiResponse;
 use App\Support\Identity\PersonDisplayName;
-use App\Support\Kca\CompleteKcaChapterAction;
+use App\Support\Kca\BuildKcaOrientationProgramAction;
 use App\Support\Kca\CompleteKcaLessonAction;
 use App\Support\Kca\CompleteKcaOrientationAction;
 use App\Support\Kca\KcaCertificatePdfRenderer;
@@ -115,7 +115,7 @@ class KcaCurriculumController extends Controller
         ]);
     }
 
-    public function orientation(Request $request): JsonResponse
+    public function orientation(Request $request, BuildKcaOrientationProgramAction $program): JsonResponse
     {
         $person = $this->person($request);
         $enrollment = $this->activeEnrollment($person);
@@ -123,6 +123,11 @@ class KcaCurriculumController extends Controller
             ->where('person_id', $person->getKey())
             ->latest('id')
             ->first();
+
+        if ($application === null && $enrollment === null) {
+            throw new AccessDeniedHttpException('Orientation is not available yet.');
+        }
+
         $applicationStatus = $application?->status instanceof KcaApplicationState
             ? $application->status
             : ($application !== null ? KcaApplicationState::from((string) $application->status) : null);
@@ -130,53 +135,28 @@ class KcaCurriculumController extends Controller
             ->filter(fn (mixed $value): bool => is_string($value))
             ->values()
             ->all();
-        $modules = KcaModule::query()
-            ->where('is_active', true)
-            ->whereNotNull('published_at')
-            ->with(['lessons' => fn ($q) => $q->orderBy('sequence')->with(['chapters' => fn ($c) => $c->orderBy('sequence')])])
-            ->orderBy('sequence')
-            ->get();
+        $orientationCompletedAt = $application?->orientation_completed_at?->utc()->toIso8601String();
+        $canComplete = $orientationCompletedAt === null
+            && $applicationStatus === KcaApplicationState::Interview
+            && $application !== null;
 
-        $first = $modules->first();
-        $second = $modules->skip(1)->first() ?? $first;
-        $firstLesson = $first?->lessons->first();
-        $secondLesson = $second?->lessons->skip(1)->first() ?? $second?->lessons->first();
-        $mentor = $enrollment === null ? null : $this->currentMentor($enrollment);
-        $mentorName = $this->mentorDisplayName($mentor);
-
-        $learningPath = $modules->map(fn (KcaModule $module): array => [
-            'id' => $module->public_id,
-            'title' => $module->title,
-            'code' => $module->code,
-            'sequence' => $module->sequence,
-            'lessons_count' => $module->lessons->count(),
-            'duration_days' => $module->duration_days,
-        ])->values()->all();
+        $programPayload = $program->handle(
+            $person,
+            $enrollment,
+            $applicationStatus?->value,
+            $orientationCompletedAt,
+            $orientationProgress,
+            $canComplete,
+        );
 
         return ApiResponse::success($request, [
             'enrolled' => $enrollment !== null,
             'enrollment' => $enrollment === null ? null : $this->enrollmentPayload($enrollment),
             'application_status' => $applicationStatus?->value,
-            'orientation_completed_at' => $application?->orientation_completed_at?->utc()->toIso8601String(),
+            'orientation_completed_at' => $orientationCompletedAt,
             'stages_completed' => $orientationProgress,
-            'can_complete' => $applicationStatus === KcaApplicationState::Interview
-                && $application?->orientation_completed_at === null,
-            'welcome' => match (true) {
-                $enrollment !== null => 'Welcome to KCA. Walk through each stage of orientation.',
-                $applicationStatus === KcaApplicationState::Interview => 'Complete each orientation stage, then submit to continue your admission review.',
-                $applicationStatus === KcaApplicationState::Reviewed => 'Orientation is complete. Your application is awaiting a final admission decision.',
-                default => 'Orientation is available after you are invited to interview.',
-            },
-            'stages' => $this->orientationStages(
-                $first,
-                $firstLesson,
-                $second,
-                $secondLesson,
-                $learningPath,
-                $mentor,
-                $mentorName,
-                $orientationProgress,
-            ),
+            'can_complete' => $canComplete,
+            ...$programPayload,
         ]);
     }
 
@@ -207,63 +187,6 @@ class KcaCurriculumController extends Controller
             'orientation_completed_at' => $application->orientation_completed_at?->utc()->toIso8601String(),
             'destination' => $application->status->destination(),
         ]);
-    }
-
-    /** @param  list<string>  $completedStages */
-    private function orientationStages(
-        ?KcaModule $first,
-        ?KcaLesson $firstLesson,
-        ?KcaModule $second,
-        ?KcaLesson $secondLesson,
-        array $learningPath,
-        mixed $mentor,
-        ?string $mentorName,
-        array $completedStages,
-    ): array {
-        $completed = static fn (string $key): bool => in_array($key, $completedStages, true);
-
-        return [
-            [
-                'key' => 'overview',
-                'title' => 'Program Overview',
-                'subtitle' => $first?->title ?? 'About the training',
-                'body' => $firstLesson?->summary ?: $firstLesson?->body,
-                'module_id' => $first?->public_id,
-                'lesson_id' => $firstLesson?->public_id,
-                'completed' => $completed('overview'),
-            ],
-            [
-                'key' => 'rules',
-                'title' => 'Rules & Guidelines',
-                'subtitle' => $second?->title ?? 'What you need to know',
-                'body' => $secondLesson?->summary ?: $secondLesson?->body,
-                'module_id' => $second?->public_id,
-                'lesson_id' => $secondLesson?->public_id,
-                'completed' => $completed('rules'),
-            ],
-            [
-                'key' => 'path',
-                'title' => 'Learning Path',
-                'subtitle' => 'Your journey ahead',
-                'body' => null,
-                'module_id' => null,
-                'lesson_id' => null,
-                'modules' => $learningPath,
-                'completed' => $completed('path'),
-            ],
-            [
-                'key' => 'mentors',
-                'title' => 'Meet Your Mentors',
-                'subtitle' => $mentorName === null ? 'Connect with your mentors' : $mentorName,
-                'body' => $mentor === null
-                    ? 'A mentor is assigned after enrollment is activated.'
-                    : null,
-                'module_id' => null,
-                'lesson_id' => null,
-                'mentor' => $mentor,
-                'completed' => $completed('mentors'),
-            ],
-        ];
     }
 
     public function practicalService(Request $request): JsonResponse

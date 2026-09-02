@@ -26,6 +26,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'admission_programme_venue',
     'admission_programme_schedule',
     'admission_programme_mentor',
+    'orientation_welcome',
+    'orientation_review_welcome',
 ])]
 class KcaGovernanceConfiguration extends Model
 {

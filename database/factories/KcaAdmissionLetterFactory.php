@@ -20,7 +20,7 @@ class KcaAdmissionLetterFactory extends Factory
             'batch_label' => 'Batch '.now()->year,
             'letter_body' => null,
             'signer_name' => 'Provost KCA',
-            'signer_title' => 'Provost, Kingdom Citizens Academy',
+            'signer_title' => 'Provost, Kingdom Change Agents',
             'issued_by_user_id' => User::factory(),
             'issued_at' => now()->utc(),
         ];

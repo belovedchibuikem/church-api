@@ -138,6 +138,80 @@ class AdminRemainingGapsApiTest extends TestCase
             ->assertJsonPath('data.summary', 'Updated summary');
     }
 
+    public function test_kca_operator_can_update_lesson_in_published_module(): void
+    {
+        $scope = new ScopeReference('global', 'platform');
+        $actor = $this->actorWithPermissions(['kca.lessons.manage'], $scope);
+        $this->authenticate($actor);
+        $module = \App\Models\KcaModule::factory()->create([
+            'title' => 'Identity in Christ',
+            'published_at' => now(),
+        ]);
+        $lesson = \App\Models\KcaLesson::factory()->for($module, 'module')->create([
+            'code' => 'L01',
+            'title' => 'Who Am I?',
+            'sequence' => 1,
+            'body' => 'Original body',
+            'day_index' => 1,
+        ]);
+
+        $this->withHeaders($this->headers($scope))
+            ->patchJson("/api/v1/admin/kca/lessons/{$lesson->public_id}", [
+                'code' => 'L01',
+                'title' => 'Who Am I in Christ?',
+                'sequence' => 1,
+                'lesson_type' => 'text',
+                'summary' => 'Updated after publish',
+                'body' => 'Updated lesson body.',
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.title', 'Who Am I in Christ?')
+            ->assertJsonPath('data.summary', 'Updated after publish');
+    }
+
+    public function test_kca_operator_can_remap_days_on_published_module(): void
+    {
+        $scope = new ScopeReference('global', 'platform');
+        $actor = $this->actorWithPermissions(['kca.modules.manage'], $scope);
+        $this->authenticate($actor);
+        $module = \App\Models\KcaModule::factory()->create([
+            'title' => 'Identity in Christ',
+            'duration_days' => 7,
+            'published_at' => now(),
+        ]);
+        \App\Models\KcaLesson::factory()->for($module, 'module')->create([
+            'code' => 'L01',
+            'title' => 'Lesson one',
+            'sequence' => 1,
+            'day_index' => 1,
+        ]);
+        \App\Models\KcaLesson::factory()->for($module, 'module')->create([
+            'code' => 'L02',
+            'title' => 'Lesson two',
+            'sequence' => 2,
+            'day_index' => 1,
+        ]);
+        \App\Models\KcaLesson::factory()->for($module, 'module')->create([
+            'code' => 'L03',
+            'title' => 'Lesson three',
+            'sequence' => 3,
+            'day_index' => null,
+        ]);
+
+        $this->withHeaders($this->headers($scope))
+            ->postJson("/api/v1/admin/kca/modules/{$module->public_id}/day-map", [])
+            ->assertOk();
+
+        $dayIndexes = \App\Models\KcaLesson::query()
+            ->where('kca_module_id', $module->getKey())
+            ->orderBy('sequence')
+            ->pluck('day_index')
+            ->map(fn ($day) => (int) $day)
+            ->all();
+
+        $this->assertSame([1, 2, 3], $dayIndexes);
+    }
+
     public function test_kca_operator_can_add_multiple_lessons_to_a_module(): void
     {
         $scope = new ScopeReference('global', 'platform');
@@ -166,6 +240,30 @@ class AdminRemainingGapsApiTest extends TestCase
             ->assertCreated()
             ->assertJsonPath('data.code', 'L02')
             ->assertJsonPath('data.sequence', 2);
+    }
+
+    public function test_kca_operator_can_add_lesson_to_published_module(): void
+    {
+        $scope = new ScopeReference('global', 'platform');
+        $actor = $this->actorWithPermissions(['kca.lessons.manage'], $scope);
+        $this->authenticate($actor);
+        $module = \App\Models\KcaModule::factory()->create([
+            'title' => 'Identity in Christ',
+            'published_at' => now(),
+        ]);
+
+        $this->withHeaders($this->headers($scope))
+            ->postJson("/api/v1/admin/kca/modules/{$module->public_id}/lessons", [
+                'code' => 'L03',
+                'title' => 'New lesson after publish',
+                'sequence' => 1,
+                'day_index' => 1,
+                'lesson_type' => 'text',
+                'body' => 'Added while module is published.',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.code', 'L03')
+            ->assertJsonPath('data.title', 'New lesson after publish');
     }
 
     public function test_kca_lesson_creation_returns_duplicate_sequence_message(): void

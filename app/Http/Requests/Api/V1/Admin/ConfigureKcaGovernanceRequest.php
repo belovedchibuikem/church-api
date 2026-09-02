@@ -33,6 +33,8 @@ class ConfigureKcaGovernanceRequest extends FormRequest
             'admission_programme_venue' => ['nullable', 'string', 'max:160'],
             'admission_programme_schedule' => ['nullable', 'string', 'max:160'],
             'admission_programme_mentor' => ['nullable', 'string', 'max:160'],
+            'orientation_welcome' => ['nullable', 'string'],
+            'orientation_review_welcome' => ['nullable', 'string'],
             'admission_letterhead_file_asset_id' => ['nullable', 'string', 'ulid', 'exists:file_assets,public_id'],
             'admission_signature_file_asset_id' => ['nullable', 'string', 'ulid', 'exists:file_assets,public_id'],
         ];

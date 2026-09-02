@@ -82,7 +82,7 @@ final class RenderKcaAdmissionLetterTemplateAction
             'training_day_time' => $this->programmeValue($data, 'training_schedule', $governance->admission_programme_schedule),
             'assigned_mentor' => $this->programmeValue($data, 'assigned_mentor', $governance->admission_programme_mentor),
             'signer_name' => (string) ($letter?->signer_name ?: $governance->admission_signer_name ?: 'Provost, KCA'),
-            'signer_title' => (string) ($letter?->signer_title ?: $governance->admission_signer_title ?: 'Kingdom Citizens Academy'),
+            'signer_title' => (string) ($letter?->signer_title ?: $governance->admission_signer_title ?: 'Kingdom Change Agents'),
             'applicant_signature' => $letter?->applicant_signature_name ?: '______________________________',
             'applicant_acceptance_date' => $letter?->applicant_accepted_at?->format('d/m/Y') ?: '______________________________',
             'guardian_name' => $letter?->guardian_name ?: (string) (data_get($data, 'guardian_name') ?: '______________________________'),

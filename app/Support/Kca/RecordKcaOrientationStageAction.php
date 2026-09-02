@@ -30,16 +30,16 @@ class RecordKcaOrientationStageAction
         throw new AccessDeniedHttpException('No KCA application found.');
       }
 
+      if ($application->orientation_completed_at !== null) {
+        return $application;
+      }
+
       $status = $application->status instanceof KcaApplicationState
         ? $application->status
         : KcaApplicationState::from((string) $application->status);
 
       if ($status !== KcaApplicationState::Interview) {
         throw new ConflictHttpException('Orientation stages can only be recorded during interview / orientation.');
-      }
-
-      if ($application->orientation_completed_at !== null) {
-        return $application;
       }
 
       $progress = collect($application->orientation_progress ?? [])

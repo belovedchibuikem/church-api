@@ -21,9 +21,6 @@ class MapKcaModuleDaysAction
     {
         return DB::transaction(function () use ($module, $dayIndexes, $actor): KcaModule {
             $locked = KcaModule::query()->lockForUpdate()->findOrFail($module->getKey());
-            if ($locked->published_at !== null) {
-                throw new InvalidArgumentException('Published KCA modules cannot change duration or daily mapping. Create a new version.');
-            }
             $lessons = KcaLesson::query()->whereBelongsTo($locked, 'module')->orderBy('sequence')->lockForUpdate()->get();
             if ($lessons->isEmpty()) {
                 throw new InvalidArgumentException('Map days after creating at least one lesson.');

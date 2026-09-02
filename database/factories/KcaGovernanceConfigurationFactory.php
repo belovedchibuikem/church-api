@@ -18,7 +18,7 @@ class KcaGovernanceConfigurationFactory extends Factory
             'require_final_assessment' => true,
             'require_signed_pdf' => false,
             'certificate_signer_name' => 'Academic Registrar',
-            'certificate_signer_title' => 'Registrar, Kingdom Citizens Academy',
+            'certificate_signer_title' => 'Registrar, Kingdom Change Agents',
             'is_active' => true,
             'configuration_revision' => 1,
         ];

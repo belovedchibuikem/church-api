@@ -95,7 +95,7 @@ class ContentPagesSeeder extends Seeder
                     ['kind' => 'faq', 'title' => 'How do I find a church near me?', 'body' => 'Use Find a Church to search by city, region, or your current location. You can filter by conventional church, home church, online church, or mission location.'],
                     ['kind' => 'faq', 'title' => 'Can I start a church in my home?', 'body' => 'Yes. Begin at Start a Home Church, confirm eligibility, and complete the guided application.'],
                     ['kind' => 'faq', 'title' => 'How can I give securely?', 'body' => 'Use Give to choose an amount, fund, and payment method. Receipts and recurring giving are available in your member account after sign-in.'],
-                    ['kind' => 'faq', 'title' => 'What is Kingdom Citizens Academy?', 'body' => 'KCA is Family House training for discipleship and ministry. Apply from the KCA gate, complete modules with a mentor, and earn a verifiable certificate.'],
+                    ['kind' => 'faq', 'title' => 'What is Kingdom Change Agents?', 'body' => 'KCA is Family House training for discipleship and ministry. Apply from the KCA gate, complete modules with a mentor, and earn a verifiable certificate.'],
                     ['kind' => 'faq', 'title' => 'How do I join Online Church?', 'body' => 'Open Online Church for the Sunday celebration stream, sermon archive, and midweek prayer. Create an account to save your journey and giving.'],
                     ['kind' => 'faq', 'title' => 'Can I verify a KCA certificate?', 'body' => 'Yes. Use Verify a Certificate and enter the public verification code printed on the certificate.'],
                 ],
@@ -180,7 +180,7 @@ class ContentPagesSeeder extends Seeder
             ],
             [
                 'slug' => 'kca',
-                'title' => 'Kingdom Citizens Academy',
+                'title' => 'Kingdom Change Agents',
                 'summary' => 'Kingdom-minded learning and practical ministry training.',
                 'body' => 'KCA forms leaders through modules, mentoring, evidence, and certification.',
                 'items' => [

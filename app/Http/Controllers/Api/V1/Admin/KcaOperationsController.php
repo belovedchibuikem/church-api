@@ -62,6 +62,7 @@ use App\Support\Kca\CreateKcaMentorAssignmentAction;
 use App\Support\Kca\CreateKcaModuleAction;
 use App\Support\Kca\CreateKcaYearAction;
 use App\Support\Kca\EnrollKcaStudentAction;
+use App\Support\Kca\GenerateKcaRegistrationNumberAction;
 use App\Support\Kca\IssueKcaCertificateAction;
 use App\Support\Kca\MapKcaModuleDaysAction;
 use App\Support\Kca\PublishKcaModuleAction;
@@ -147,13 +148,37 @@ class KcaOperationsController extends Controller
         $enrollment = $this->execute(fn (): KcaEnrollment => $action->handle(
             $target,
             $cohort,
-            (string) $request->validated('registration_number'),
+            $request->validated('registration_number'),
             CarbonImmutable::parse((string) $request->validated('starts_on')),
             $context->actor($request),
         ));
         $enrollment->load(['application:id,public_id', 'person:id,public_id', 'year:id,public_id', 'cohort:id,public_id']);
 
         return ApiResponse::success($request, (new ProtectedCatalogRecordResource($enrollment))->resolve($request), status: 201);
+    }
+
+    public function previewRegistrationNumber(
+        Request $request,
+        GenerateKcaRegistrationNumberAction $registrationNumbers,
+        ProtectedAdminContext $context,
+    ): JsonResponse {
+        $context->ensureGlobal($request);
+        $validated = $request->validate([
+            'cohort_id' => ['nullable', 'ulid', 'exists:kca_cohorts,public_id'],
+        ]);
+
+        $year = null;
+        if (isset($validated['cohort_id'])) {
+            $cohort = KcaCohort::query()
+                ->with('year:id,public_id,code,name,starts_on')
+                ->where('public_id', $validated['cohort_id'])
+                ->firstOrFail();
+            $year = $cohort->year;
+        }
+
+        return ApiResponse::success($request, [
+            'registration_number' => $registrationNumbers->handle($year),
+        ]);
     }
 
     public function verifyRecommendation(Request $request, string $recommendation, VerifyKcaLeadershipRecommendationAction $action, ProtectedAdminContext $context): JsonResponse

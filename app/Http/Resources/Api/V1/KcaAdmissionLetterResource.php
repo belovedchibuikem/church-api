@@ -5,6 +5,7 @@ namespace App\Http\Resources\Api\V1;
 use App\Models\KcaAdmissionLetter;
 use App\Support\Identity\PersonDisplayName;
 use App\Support\Kca\ResolveKcaApplicationChurchName;
+use App\Support\Kca\SyncKcaAdmissionLetterReference;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -28,7 +29,7 @@ class KcaAdmissionLetterResource extends JsonResource
             'applicant_name' => PersonDisplayName::of($application?->person) ?: 'Applicant',
             'church_name' => $resolver->fromApplicationData($applicationData),
             'batch_label' => $letter->batch_label,
-            'letter_body' => self::syncReferenceInBody(
+            'letter_body' => SyncKcaAdmissionLetterReference::inBody(
                 (string) ($letter->letter_body ?? ''),
                 (string) ($letter->reference_code ?? ''),
             ),
@@ -48,16 +49,5 @@ class KcaAdmissionLetterResource extends JsonResource
             'guardian_confirmed_at' => $letter->guardian_confirmed_at?->utc()->toIso8601String(),
             'requires_guardian_confirmation' => filled(data_get($applicationData, 'guardian_name')),
         ];
-    }
-
-    private static function syncReferenceInBody(string $body, string $referenceCode): string
-    {
-        if ($body === '' || $referenceCode === '' || strcasecmp($referenceCode, 'Pending') === 0) {
-            return $body;
-        }
-
-        $updated = preg_replace('/Ref\.?\s*No\.?\s*:\s*Pending/i', 'Ref. No.: '.$referenceCode, $body);
-
-        return is_string($updated) ? $updated : $body;
     }
 }

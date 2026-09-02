@@ -38,6 +38,8 @@ class KcaGovernanceController extends Controller
                 'admission_programme_venue' => null,
                 'admission_programme_schedule' => null,
                 'admission_programme_mentor' => null,
+                'orientation_welcome' => null,
+                'orientation_review_welcome' => null,
                 'admission_letterhead_file_asset_id' => null,
                 'admission_signature_file_asset_id' => null,
                 ...$this->admissionLetterTemplateDefaults(),
