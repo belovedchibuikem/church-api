@@ -4,11 +4,13 @@ namespace App\Http\Controllers\Api\V1\User;
 
 use App\Events\Actions\RecordEventFeedbackAction;
 use App\Events\Actions\RegisterForEventAction;
-use App\Exceptions\PaymentGovernanceDeniedException;
+use App\Files\Actions\ApproveFileAssetAction;
 use App\Files\Actions\StoreFileAssetAction;
 use App\Files\Data\StoreFileAssetData;
 use App\Files\FileAssetClassification;
+use App\Files\FileAssetStatus;
 use App\Files\FileAssetStreamResponse;
+use App\Http\Controllers\Api\V1\Admin\Concerns\ExecutesDomainMutations;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\User\ListUserRecordsRequest;
 use App\Http\Requests\Api\V1\User\UserRecordEventFeedbackRequest;
@@ -24,19 +26,20 @@ use App\Models\User;
 use App\Privacy\Actions\SubmitDataSubjectRequestAction;
 use App\Privacy\DataSubjectRequestType;
 use App\Support\Api\ApiResponse;
-use DomainException;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
-use InvalidArgumentException;
-use LogicException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
 
 class UserDomainOperationsController extends Controller
 {
+    use ExecutesDomainMutations;
+
+    private const PROFILE_AVATAR_PURPOSE = 'profile.avatar';
+
     public function registerForEvent(UserRegisterForEventRequest $request, string $event, RegisterForEventAction $action): JsonResponse
     {
         $user = $this->actor($request);
@@ -143,19 +146,45 @@ class UserDomainOperationsController extends Controller
         return ApiResponse::success($request, (new ProtectedCatalogRecordResource($result))->resolve($request), status: 201);
     }
 
-    public function storeFile(UserStoreFileAssetRequest $request, StoreFileAssetAction $action): JsonResponse
-    {
+    public function storeFile(
+        UserStoreFileAssetRequest $request,
+        StoreFileAssetAction $storeFile,
+        ApproveFileAssetAction $approveFile,
+    ): JsonResponse {
         $user = $this->actor($request);
+        $person = $user->person;
+        $purpose = (string) $request->validated('purpose');
+
+        if ($purpose === self::PROFILE_AVATAR_PURPOSE && $person === null) {
+            throw new UnprocessableEntityHttpException('The authenticated user is not linked to a person.');
+        }
+
         /** @var UploadedFile $file */
         $file = $request->file('file');
-        $asset = $this->execute(fn (): FileAsset => $action->handle(new StoreFileAssetData(
-            file: $file,
-            purpose: (string) $request->validated('purpose'),
-            classification: FileAssetClassification::from((string) $request->validated('classification')),
-            idempotencyKey: (string) $request->validated('idempotency_key'),
-            owner: $user->person,
-            actor: $user,
-        )));
+        $asset = $this->execute(function () use (
+            $request,
+            $file,
+            $storeFile,
+            $approveFile,
+            $user,
+            $person,
+            $purpose,
+        ): FileAsset {
+            $asset = $storeFile->handle(new StoreFileAssetData(
+                file: $file,
+                purpose: $purpose,
+                classification: FileAssetClassification::from((string) $request->validated('classification')),
+                idempotencyKey: (string) $request->validated('idempotency_key'),
+                owner: $person,
+                actor: $user,
+            ));
+
+            if ($purpose === self::PROFILE_AVATAR_PURPOSE && $asset->status !== FileAssetStatus::Rejected) {
+                $asset = $approveFile->handle($asset, $user);
+            }
+
+            return $asset;
+        });
         $asset->load(['owner:id,public_id']);
 
         return ApiResponse::success($request, (new ProtectedCatalogRecordResource($asset))->resolve($request), status: 201);
@@ -202,15 +231,6 @@ class UserDomainOperationsController extends Controller
         }
 
         return $user;
-    }
-
-    private function execute(callable $operation): mixed
-    {
-        try {
-            return $operation();
-        } catch (InvalidArgumentException|LogicException|DomainException|PaymentGovernanceDeniedException $exception) {
-            throw new UnprocessableEntityHttpException(previous: $exception);
-        }
     }
 
     private function page(ListUserRecordsRequest $request, LengthAwarePaginator $paginator): JsonResponse

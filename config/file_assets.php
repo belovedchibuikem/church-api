@@ -8,6 +8,8 @@ return [
         'image/jpeg',
         'image/png',
         'image/webp',
+        'image/heic',
+        'image/heif',
         'image/svg+xml',
         'image/x-icon',
         'image/vnd.microsoft.icon',
