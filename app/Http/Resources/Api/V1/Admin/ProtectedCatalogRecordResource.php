@@ -50,6 +50,7 @@ use App\Models\SafeguardingIncident;
 use App\Press\PressContributorRole;
 use App\Support\Communication\CommunicationCopy;
 use App\Support\Identity\PersonDisplayName;
+use App\Support\Kca\ResolveKcaApplicationChurchName;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use LogicException;
@@ -68,13 +69,10 @@ class ProtectedCatalogRecordResource extends JsonResource
                 'person_name' => PersonDisplayName::of($this->person),
                 'status' => $this->status->value,
                 'application_data' => $this->application_data,
-                'church_name' => data_get($this->application_data, 'church_name')
-                    ?? data_get($this->application_data, 'church')
-                    ?? data_get($this->application_data, 'home_church'),
-                'batch_name' => data_get($this->application_data, 'batch_name')
-                    ?? data_get($this->application_data, 'batch')
-                    ?? data_get($this->application_data, 'cohort_name')
-                    ?? data_get($this->application_data, 'year_name'),
+                'church_name' => app(ResolveKcaApplicationChurchName::class)->fromApplicationData($this->application_data),
+                'batch_name' => app(ResolveKcaApplicationChurchName::class)->batchLabel($this->resource),
+                'admission_letter_id' => $this->admissionLetter?->public_id,
+                'admission_letter_issued_at' => $this->admissionLetter?->issued_at?->utc()->toIso8601String(),
                 'received_at' => $this->received_at?->utc()->toIso8601String(),
                 'reviewed_at' => $this->reviewed_at?->utc()->toIso8601String(),
                 'orientation_completed_at' => $this->orientation_completed_at?->utc()->toIso8601String(),

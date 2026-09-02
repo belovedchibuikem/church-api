@@ -47,7 +47,7 @@ final class MobilePermissionAliasCatalog
         'kca.dashboard.view' => 'kca.enrollments.view',
         'kca.evidence.review' => 'kca.evidence.view',
         'kca.certification.view_own' => 'kca.certificates.view',
-        'kca.admission.view_own' => 'kca.applications.view',
+        'kca.admission.view_own' => self::MOBILE_APP_ACCESS,
         'kca.attendance.view' => 'kca.enrollments.view',
         'kca.mentoring.view' => 'kca.enrollments.view',
         'kca.assessment.view_own' => 'kca.assessments.view',

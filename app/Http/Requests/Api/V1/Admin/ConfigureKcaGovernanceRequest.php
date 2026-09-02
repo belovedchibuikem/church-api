@@ -24,6 +24,10 @@ class ConfigureKcaGovernanceRequest extends FormRequest
             'require_signed_pdf' => ['sometimes', 'boolean'],
             'certificate_signer_name' => ['nullable', 'string', 'max:120'],
             'certificate_signer_title' => ['nullable', 'string', 'max:120'],
+            'admission_signer_name' => ['nullable', 'string', 'max:120'],
+            'admission_signer_title' => ['nullable', 'string', 'max:120'],
+            'admission_letterhead_file_asset_id' => ['nullable', 'string', 'ulid', 'exists:file_assets,public_id'],
+            'admission_signature_file_asset_id' => ['nullable', 'string', 'ulid', 'exists:file_assets,public_id'],
         ];
     }
 }

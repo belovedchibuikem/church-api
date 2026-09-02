@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\V1\User\CurrentUserController;
 use App\Http\Controllers\Api\V1\User\DashboardController;
 use App\Http\Controllers\Api\V1\User\DeviceController;
 use App\Http\Controllers\Api\V1\User\KcaApplicationController;
+use App\Http\Controllers\Api\V1\User\KcaAdmissionLetterController;
 use App\Http\Controllers\Api\V1\User\KcaCurriculumController;
 use App\Http\Controllers\Api\V1\User\MessageController;
 use App\Http\Controllers\Api\V1\User\NotificationController;
@@ -73,6 +74,11 @@ Route::prefix('mission')->name('mission.')->controller(UserMissionController::cl
 
 Route::prefix('kca')->name('kca.')->group(function (): void {
     Route::get('/me', [KcaApplicationController::class, 'me'])->name('me');
+    Route::get('/admission-letter', [KcaAdmissionLetterController::class, 'show'])->name('admission_letter.show');
+    Route::get('/admission-letter/download', [KcaAdmissionLetterController::class, 'download'])->name('admission_letter.download');
+    Route::get('/admission-letter/assets/{file}', [KcaAdmissionLetterController::class, 'streamAsset'])
+        ->whereUlid('file')
+        ->name('admission_letter.assets.stream');
     Route::get('/applications/current', [KcaApplicationController::class, 'showCurrent'])->name('applications.current');
     Route::post('/applications', [KcaApplicationController::class, 'store'])->name('applications.store');
     Route::get('/dashboard', [KcaCurriculumController::class, 'dashboard'])->name('dashboard');

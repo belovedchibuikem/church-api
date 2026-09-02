@@ -79,7 +79,7 @@ class ProtectedDomainRegistry
                 'path' => 'kca/applications',
                 'operation_id' => 'listAdminCatalogKcaApplications',
                 'model' => KcaApplication::class,
-                'with' => [...PersonDisplayName::eager(), 'leadershipRecommendation'],
+                'with' => [...PersonDisplayName::eager(), 'leadershipRecommendation', 'enrollment.cohort:id,public_id,name', 'admissionLetter:id,public_id,kca_application_id,issued_at'],
                 'order_column' => 'received_at',
                 'status_column' => 'status',
             ],

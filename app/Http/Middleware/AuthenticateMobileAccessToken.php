@@ -45,6 +45,10 @@ class AuthenticateMobileAccessToken
         }
 
         $user = $accessToken->user;
+        if (! $user instanceof User) {
+            throw new AuthenticationException;
+        }
+
         Auth::guard('web')->setUser($user);
         $request->setUserResolver(fn (): User => $user);
         $request->attributes->set('security_session', $accessToken->securitySession);
@@ -58,15 +62,23 @@ class AuthenticateMobileAccessToken
 
     private function isUsable(MobileAccessToken $accessToken, string $deviceIdentifier): bool
     {
+        $user = $accessToken->user;
+        $device = $accessToken->device;
+        $securitySession = $accessToken->securitySession;
+
+        if ($user === null || $device === null || $securitySession === null) {
+            return false;
+        }
+
         return $accessToken->revoked_at === null
             && $accessToken->expires_at->isFuture()
-            && ! $accessToken->user->isSuspended()
-            && $accessToken->device->revoked_at === null
-            && hash_equals($accessToken->device->identifier_hash, $this->hasher->hash($deviceIdentifier))
-            && $accessToken->securitySession->revoked_at === null
-            && ($accessToken->securitySession->expires_at === null || $accessToken->securitySession->expires_at->isFuture())
-            && $accessToken->securitySession->user_id === $accessToken->user_id
-            && $accessToken->securitySession->device_id === $accessToken->device_id;
+            && ! $user->isSuspended()
+            && $device->revoked_at === null
+            && hash_equals($device->identifier_hash, $this->hasher->hash($deviceIdentifier))
+            && $securitySession->revoked_at === null
+            && ($securitySession->expires_at === null || $securitySession->expires_at->isFuture())
+            && $securitySession->user_id === $accessToken->user_id
+            && $securitySession->device_id === $accessToken->device_id;
     }
 
     private function recordUse(MobileAccessToken $accessToken): void

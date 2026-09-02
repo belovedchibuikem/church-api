@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\V1\Admin\EventOperationsController;
 use App\Http\Controllers\Api\V1\Admin\FileOperationsController;
 use App\Http\Controllers\Api\V1\Admin\FinanceOperationsController;
 use App\Http\Controllers\Api\V1\Admin\KcaGovernanceController;
+use App\Http\Controllers\Api\V1\Admin\KcaAdmissionLetterController;
 use App\Http\Controllers\Api\V1\Admin\KcaOperationsController;
 use App\Http\Controllers\Api\V1\Admin\KcaOrientationSessionController;
 use App\Http\Controllers\Api\V1\Admin\LivestreamOperationsController;
@@ -569,6 +570,10 @@ Route::prefix('kca')->name('kca.')->controller(KcaOperationsController::class)->
     Route::post('/assessment-results', 'recordAssessmentResults')->middleware(RequirePermissionAndScope::class.':kca.enrollments.manage')->name('assessment_results.store');
     Route::post('/applications', 'storeApplication')->middleware(RequirePermissionAndScope::class.':kca.applications.transition')->name('applications.store');
     Route::post('/applications/{application}/transitions', 'transitionApplication')->whereUlid('application')->middleware(RequirePermissionAndScope::class.':kca.applications.transition')->name('applications.transitions.store');
+    Route::get('/applications/{application}/admission-letter', [KcaAdmissionLetterController::class, 'show'])->whereUlid('application')->middleware(RequirePermissionAndScope::class.':kca.applications.view')->name('applications.admission_letter.show');
+    Route::post('/applications/{application}/admission-letter/issue', [KcaAdmissionLetterController::class, 'issue'])->whereUlid('application')->middleware(RequirePermissionAndScope::class.':kca.applications.transition')->name('applications.admission_letter.issue');
+    Route::get('/applications/{application}/admission-letter/download', [KcaAdmissionLetterController::class, 'download'])->whereUlid('application')->middleware(RequirePermissionAndScope::class.':kca.applications.view')->name('applications.admission_letter.download');
+    Route::get('/applications/{application}/admission-letter/assets/{file}', [KcaAdmissionLetterController::class, 'streamAsset'])->whereUlid('application')->whereUlid('file')->middleware(RequirePermissionAndScope::class.':kca.applications.view')->name('applications.admission_letter.assets.stream');
     Route::post('/applications/{application}/orientation/complete', 'completeOrientation')->whereUlid('application')->middleware(RequirePermissionAndScope::class.':kca.applications.transition')->name('applications.orientation.complete');
     Route::post('/applications/{application}/enrollments', 'enroll')->whereUlid('application')->middleware(RequirePermissionAndScope::class.':kca.enrollments.manage')->name('applications.enrollments.store');
     Route::post('/recommendations/{recommendation}/verify', 'verifyRecommendation')->whereUlid('recommendation')->middleware(RequirePermissionAndScope::class.':kca.applications.transition')->name('recommendations.verify');

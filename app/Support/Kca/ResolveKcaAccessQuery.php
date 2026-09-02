@@ -68,7 +68,7 @@ class ResolveKcaAccessQuery
             'enrollment' => null,
             'timeline' => $this->timeline($application),
             'permitted_actions' => $this->actions($status),
-            'next_step' => $this->nextStep($status),
+            'next_step' => $this->nextStep($status, $application),
         ];
     }
 
@@ -150,7 +150,7 @@ class ResolveKcaAccessQuery
         };
     }
 
-    private function nextStep(KcaApplicationState $status): string
+    private function nextStep(KcaApplicationState $status, KcaApplication $application): string
     {
         return match ($status) {
             KcaApplicationState::Draft => 'Resume your application at the last saved step.',

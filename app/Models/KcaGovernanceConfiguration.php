@@ -6,6 +6,7 @@ use Database\Factories\KcaGovernanceConfigurationFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
     'pass_threshold_percent',
@@ -14,6 +15,10 @@ use Illuminate\Database\Eloquent\Model;
     'require_signed_pdf',
     'certificate_signer_name',
     'certificate_signer_title',
+    'admission_signer_name',
+    'admission_signer_title',
+    'admission_letterhead_file_asset_id',
+    'admission_signature_file_asset_id',
 ])]
 class KcaGovernanceConfiguration extends Model
 {
@@ -28,6 +33,16 @@ class KcaGovernanceConfiguration extends Model
         'is_active' => true,
         'configuration_revision' => 1,
     ];
+
+    public function admissionLetterheadFile(): BelongsTo
+    {
+        return $this->belongsTo(FileAsset::class, 'admission_letterhead_file_asset_id');
+    }
+
+    public function admissionSignatureFile(): BelongsTo
+    {
+        return $this->belongsTo(FileAsset::class, 'admission_signature_file_asset_id');
+    }
 
     /**
      * @return array<string, string>

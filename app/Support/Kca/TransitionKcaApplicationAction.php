@@ -17,6 +17,7 @@ class TransitionKcaApplicationAction
     public function __construct(
         private KcaApplicationTransitionService $transitions,
         private RecordAuditEventAction $recordAuditEvent,
+        private IssueKcaAdmissionLetterAction $issueAdmissionLetter,
     ) {}
 
     public function handle(
@@ -70,6 +71,10 @@ class TransitionKcaApplicationAction
                     'reason_code' => $reasonCode,
                 ], static fn (mixed $value): bool => $value !== null),
             ));
+
+            if ($to === KcaApplicationState::Accepted) {
+                $this->issueAdmissionLetter->handle($lockedApplication->fresh(), $actor);
+            }
 
             return $lockedApplication;
         }, attempts: 3);

@@ -28,8 +28,14 @@ class KcaGovernanceController extends Controller
                 'require_signed_pdf' => false,
                 'certificate_signer_name' => null,
                 'certificate_signer_title' => null,
+                'admission_signer_name' => null,
+                'admission_signer_title' => null,
+                'admission_letterhead_file_asset_id' => null,
+                'admission_signature_file_asset_id' => null,
             ]);
         }
+
+        $configuration->load(['admissionLetterheadFile:id,public_id', 'admissionSignatureFile:id,public_id']);
 
         return ApiResponse::success($request, (new KcaGovernanceConfigurationResource($configuration))->resolve($request));
     }

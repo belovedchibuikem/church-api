@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable([])]
+#[Fillable(['person_id', 'cursor', 'updated_at'])]
 class SyncCheckpoint extends Model
 {
     public $timestamps = false;

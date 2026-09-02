@@ -2,6 +2,7 @@
 
 namespace App\Support\Kca;
 
+use App\Models\FileAsset;
 use App\Models\KcaGovernanceConfiguration;
 use App\Models\User;
 use App\Support\Audit\AuditEventData;
@@ -21,7 +22,7 @@ class ConfigureKcaGovernanceAction
             $configuration = KcaGovernanceConfiguration::query()->lockForUpdate()->first()
                 ?? new KcaGovernanceConfiguration;
 
-            $configuration->fill($input);
+            $configuration->fill($this->normalizeInput($input));
             $configuration->forceFill([
                 'is_active' => true,
                 'configuration_revision' => $configuration->exists ? $configuration->configuration_revision + 1 : 1,
@@ -45,5 +46,26 @@ class ConfigureKcaGovernanceAction
 
             return $configuration->refresh();
         });
+    }
+
+    /** @param  array<string, mixed>  $input */
+    private function normalizeInput(array $input): array
+    {
+        foreach (['admission_letterhead_file_asset_id', 'admission_signature_file_asset_id'] as $key) {
+            if (! array_key_exists($key, $input)) {
+                continue;
+            }
+
+            $value = $input[$key];
+            if ($value === null || $value === '') {
+                $input[$key] = null;
+
+                continue;
+            }
+
+            $input[$key] = FileAsset::query()->where('public_id', (string) $value)->value('id');
+        }
+
+        return $input;
     }
 }

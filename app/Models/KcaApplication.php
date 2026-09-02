@@ -39,6 +39,11 @@ class KcaApplication extends Model
         return $this->hasOne(KcaAdmissionDecision::class);
     }
 
+    public function admissionLetter(): HasOne
+    {
+        return $this->hasOne(KcaAdmissionLetter::class);
+    }
+
     public function enrollment(): HasOne
     {
         return $this->hasOne(KcaEnrollment::class);

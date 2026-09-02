@@ -399,6 +399,13 @@ class ChurchMinistryOperationsController extends Controller
         ]);
         $church = Church::query()->where('public_id', $data['church_id'])->firstOrFail();
         $context->ensureContains($request, $church->scopeReference());
+        $request->validate([
+            'name' => [
+                Rule::unique('church_departments', 'name')->where(
+                    fn ($query) => $query->where('church_id', $church->getKey()),
+                ),
+            ],
+        ]);
         $department = $this->execute(fn (): ChurchDepartment => ChurchDepartment::query()->create([
             'church_id' => $church->getKey(),
             'name' => $data['name'],
@@ -425,6 +432,13 @@ class ChurchMinistryOperationsController extends Controller
             'status' => ['nullable', 'string', 'max:40'],
         ]);
         $church = Church::query()->where('public_id', $data['church_id'])->firstOrFail();
+        $request->validate([
+            'name' => [
+                Rule::unique('church_departments', 'name')
+                    ->where(fn ($query) => $query->where('church_id', $church->getKey()))
+                    ->ignore($target->getKey()),
+            ],
+        ]);
         $this->execute(function () use ($target, $data, $church): void {
             $target->forceFill([
                 'church_id' => $church->getKey(),

@@ -20,6 +20,10 @@ class KcaGovernanceConfigurationResource extends JsonResource
             'require_signed_pdf' => $this->require_signed_pdf,
             'certificate_signer_name' => $this->certificate_signer_name,
             'certificate_signer_title' => $this->certificate_signer_title,
+            'admission_signer_name' => $this->admission_signer_name,
+            'admission_signer_title' => $this->admission_signer_title,
+            'admission_letterhead_file_asset_id' => $this->admissionLetterheadFile?->public_id,
+            'admission_signature_file_asset_id' => $this->admissionSignatureFile?->public_id,
             'configuration_revision' => $this->configuration_revision,
         ];
     }
