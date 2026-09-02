@@ -27,6 +27,24 @@ class UserAdministrationControllerTest extends TestCase
             ->assertUnauthorized();
     }
 
+    public function test_excludes_app_only_members_when_filter_is_enabled(): void
+    {
+        $actor = $this->actorWithPermissionAtScope('identity.users.view', new ScopeReference('global', 'platform'));
+        $memberRole = Role::factory()->create(['code' => \App\Support\Authorization\AuthorizationBundleCatalog::MEMBER_SECURITY_ROLE]);
+        $adminRole = Role::factory()->create(['code' => 'platform_administrator']);
+        $appMember = User::factory()->create(['email' => 'app.member@example.test']);
+        $adminUser = User::factory()->create(['email' => 'staff.admin@example.test']);
+        $this->app->make(AssignRoleToUserAction::class)->handle($appMember, $memberRole);
+        $this->app->make(AssignRoleToUserAction::class)->handle($adminUser, $adminRole);
+        $this->authenticate($actor);
+
+        $this->withHeaders($this->globalScopeHeaders())
+            ->getJson('/api/v1/admin/users?filter[exclude_app_members]=1')
+            ->assertOk()
+            ->assertJsonFragment(['email' => 'staff.admin@example.test'])
+            ->assertJsonMissing(['email' => 'app.member@example.test']);
+    }
+
     public function test_lists_users_with_opaque_ids_for_global_authority(): void
     {
         $actor = $this->actorWithPermissionAtScope('identity.users.view', new ScopeReference('global', 'platform'));

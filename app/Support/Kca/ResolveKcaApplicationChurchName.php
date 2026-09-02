@@ -100,6 +100,6 @@ final class ResolveKcaApplicationChurchName
             ? $application->status
             : KcaApplicationState::from((string) $application->status);
 
-        return $status === KcaApplicationState::Accepted;
+        return $status->permitsEnrollment();
     }
 }

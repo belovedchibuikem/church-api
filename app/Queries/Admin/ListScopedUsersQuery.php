@@ -3,6 +3,7 @@
 namespace App\Queries\Admin;
 
 use App\Models\User;
+use App\Support\Authorization\AuthorizationBundleCatalog;
 use App\Support\Authorization\ScopeDatabaseFilter;
 use App\Support\Authorization\ScopeReference;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -16,11 +17,13 @@ class ListScopedUsersQuery
     ) {}
 
     /**
-     * @param  array{search?: string, status?: string, email_verified?: bool}  $filters
+     * @param  array{search?: string, status?: string, email_verified?: bool, exclude_app_members?: bool}  $filters
      * @return LengthAwarePaginator<int, User>
      */
     public function paginate(User $actor, ScopeReference $scope, array $filters, string $sort, int $perPage): LengthAwarePaginator
     {
+        $now = now()->utc();
+
         return $this->baseQuery($actor, $scope)
             ->when(isset($filters['search']), function (Builder $query) use ($filters): void {
                 $search = addcslashes(trim($filters['search']), '\\%_');
@@ -31,6 +34,18 @@ class ListScopedUsersQuery
             ->when(isset($filters['status']), fn (Builder $query): Builder => $query->where('account_status', $filters['status']))
             ->when(array_key_exists('email_verified', $filters), function (Builder $query) use ($filters): void {
                 $filters['email_verified'] ? $query->whereNotNull('email_verified_at') : $query->whereNull('email_verified_at');
+            })
+            ->when(! empty($filters['exclude_app_members']), function (Builder $query) use ($now): void {
+                $memberRoleCode = AuthorizationBundleCatalog::MEMBER_SECURITY_ROLE;
+                $query->where(function (Builder $visibleQuery) use ($memberRoleCode, $now): void {
+                    $visibleQuery
+                        ->whereDoesntHave('roleAssignments', fn (Builder $assignmentQuery): Builder => $assignmentQuery->active($now))
+                        ->orWhereHas('roleAssignments', function (Builder $assignmentQuery) use ($memberRoleCode, $now): void {
+                            $assignmentQuery
+                                ->active($now)
+                                ->whereHas('role', fn (Builder $roleQuery): Builder => $roleQuery->where('code', '!=', $memberRoleCode));
+                        });
+                });
             })
             ->tap(fn (Builder $query): Builder => $this->applySort($query, $sort))
             ->paginate($perPage)

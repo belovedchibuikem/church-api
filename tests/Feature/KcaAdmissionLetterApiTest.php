@@ -2,8 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Files\FileAssetStatus;
 use App\Kca\KcaApplicationState;
 use App\Models\Church;
+use App\Models\FileAsset;
 use App\Models\KcaApplication;
 use App\Models\KcaGovernanceConfiguration;
 use App\Models\Permission;
@@ -22,6 +24,101 @@ use Tests\TestCase;
 class KcaAdmissionLetterApiTest extends TestCase
 {
     use DatabaseTransactions;
+
+    public function test_admin_preview_includes_governance_letter_assets(): void
+    {
+        $person = Person::factory()->withProfile()->create();
+        $application = KcaApplication::factory()->create([
+            'person_id' => $person->getKey(),
+            'status' => KcaApplicationState::Accepted,
+        ]);
+        $letterhead = FileAsset::factory()->create([
+            'purpose' => 'kca_admission_letterhead',
+            'status' => FileAssetStatus::Pending,
+        ]);
+        $signature = FileAsset::factory()->create([
+            'purpose' => 'kca_admission_signature',
+            'status' => FileAssetStatus::Pending,
+        ]);
+        KcaGovernanceConfiguration::factory()->create([
+            'admission_signer_name' => 'Provost Jane',
+            'admission_signer_title' => 'Provost, KCA',
+            'admission_letterhead_file_asset_id' => $letterhead->getKey(),
+            'admission_signature_file_asset_id' => $signature->getKey(),
+        ]);
+
+        $scope = new ScopeReference('global', 'platform');
+        $actor = $this->actorWithPermissions(['kca.applications.view'], $scope);
+        $this->authenticate($actor);
+
+        $this->withHeaders($this->headers($scope))
+            ->getJson("/api/v1/admin/kca/applications/{$application->public_id}/admission-letter")
+            ->assertOk()
+            ->assertJsonPath('data.status', 'draft')
+            ->assertJsonPath('data.letterhead_file_asset_id', $letterhead->public_id)
+            ->assertJsonPath('data.signature_file_asset_id', $signature->public_id);
+
+        $this->withHeaders($this->headers($scope))
+            ->get("/api/v1/admin/kca/applications/{$application->public_id}/admission-letter/assets/{$letterhead->public_id}")
+            ->assertOk();
+
+        $letterhead->refresh();
+        $this->assertSame(FileAssetStatus::Available, $letterhead->status);
+    }
+
+    public function test_admin_can_preview_admission_letter_before_issue(): void
+    {
+        $person = Person::factory()->withProfile()->create();
+        $person->profile?->forceFill([
+            'given_name' => 'John',
+            'family_name' => 'Onyeuwaoma',
+        ])->save();
+        $application = KcaApplication::factory()->create([
+            'person_id' => $person->getKey(),
+            'status' => KcaApplicationState::Accepted,
+            'application_data' => [
+                'church_id' => Church::factory()->create(['name' => 'Grace Chapel'])->public_id,
+            ],
+        ]);
+        KcaGovernanceConfiguration::factory()->create([
+            'admission_signer_name' => 'Provost Jane',
+            'admission_signer_title' => 'Provost, KCA',
+        ]);
+
+        $scope = new ScopeReference('global', 'platform');
+        $actor = $this->actorWithPermissions(['kca.applications.view'], $scope);
+        $this->authenticate($actor);
+
+        $this->withHeaders($this->headers($scope))
+            ->getJson("/api/v1/admin/kca/applications/{$application->public_id}/admission-letter")
+            ->assertOk()
+            ->assertJsonPath('data.status', 'draft')
+            ->assertJsonPath('data.applicant_name', 'John Onyeuwaoma')
+            ->assertJsonPath('data.signer_name', 'Provost Jane')
+            ->assertJsonPath('data.reference_code', null);
+    }
+
+    public function test_provisionally_accepted_application_can_be_issued_admission_letter(): void
+    {
+        $person = Person::factory()->create();
+        $application = KcaApplication::factory()->create([
+            'person_id' => $person->getKey(),
+            'status' => KcaApplicationState::ProvisionallyAccepted,
+        ]);
+        KcaGovernanceConfiguration::factory()->create([
+            'admission_signer_name' => 'Provost Jane',
+            'admission_signer_title' => 'Provost, KCA',
+        ]);
+
+        $scope = new ScopeReference('global', 'platform');
+        $actor = $this->actorWithPermissions(['kca.applications.transition'], $scope);
+        $this->authenticate($actor);
+
+        $this->withHeaders($this->headers($scope))
+            ->postJson("/api/v1/admin/kca/applications/{$application->public_id}/admission-letter/issue")
+            ->assertCreated()
+            ->assertJsonPath('data.status', 'issued');
+    }
 
     public function test_accepted_applicant_can_view_issued_admission_letter(): void
     {

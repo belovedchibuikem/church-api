@@ -26,10 +26,11 @@ class ListUsersRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'filter' => ['sometimes', 'array:search,status,email_verified'],
+            'filter' => ['sometimes', 'array:search,status,email_verified,exclude_app_members'],
             'filter.search' => ['sometimes', 'string', 'max:100'],
             'filter.status' => ['sometimes', Rule::enum(UserAccountStatus::class)],
             'filter.email_verified' => ['sometimes', 'boolean'],
+            'filter.exclude_app_members' => ['sometimes', 'boolean'],
             'sort' => ['sometimes', Rule::in(['name', '-name', 'email', '-email', 'created_at', '-created_at'])],
             'page' => ['sometimes', 'integer', 'min:1'],
             'per_page' => ['sometimes', 'integer', 'between:1,100'],
@@ -42,10 +43,10 @@ class ListUsersRequest extends FormRequest
         return [$this->rejectUnsupportedQueryParameters(...)];
     }
 
-    /** @return array{search?: string, status?: string, email_verified?: bool} */
+    /** @return array{search?: string, status?: string, email_verified?: bool, exclude_app_members?: bool} */
     public function filters(): array
     {
-        /** @var array{search?: string, status?: string, email_verified?: bool} $filters */
+        /** @var array{search?: string, status?: string, email_verified?: bool, exclude_app_members?: bool} $filters */
         $filters = $this->validated('filter', []);
 
         return $filters;
