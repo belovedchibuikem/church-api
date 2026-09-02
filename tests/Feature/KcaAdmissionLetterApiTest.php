@@ -95,7 +95,8 @@ class KcaAdmissionLetterApiTest extends TestCase
             ->assertJsonPath('data.status', 'draft')
             ->assertJsonPath('data.applicant_name', 'John Onyeuwaoma')
             ->assertJsonPath('data.signer_name', 'Provost Jane')
-            ->assertJsonPath('data.reference_code', null);
+            ->assertJsonPath('data.reference_code', fn (mixed $value): bool => is_string($value) && str_ends_with($value, '/00001'))
+            ->assertJsonPath('data.letter_body', fn (mixed $value): bool => is_string($value) && ! str_contains($value, 'Ref. No.: Pending'));
     }
 
     public function test_provisionally_accepted_application_can_be_issued_admission_letter(): void

@@ -28,7 +28,10 @@ class KcaAdmissionLetterResource extends JsonResource
             'applicant_name' => PersonDisplayName::of($application?->person) ?: 'Applicant',
             'church_name' => $resolver->fromApplicationData($applicationData),
             'batch_label' => $letter->batch_label,
-            'letter_body' => $letter->letter_body,
+            'letter_body' => self::syncReferenceInBody(
+                (string) ($letter->letter_body ?? ''),
+                (string) ($letter->reference_code ?? ''),
+            ),
             'signer_name' => $letter->signer_name,
             'signer_title' => $letter->signer_title,
             'letterhead_file_asset_id' => $letter->letterheadFile?->public_id,
@@ -45,5 +48,16 @@ class KcaAdmissionLetterResource extends JsonResource
             'guardian_confirmed_at' => $letter->guardian_confirmed_at?->utc()->toIso8601String(),
             'requires_guardian_confirmation' => filled(data_get($applicationData, 'guardian_name')),
         ];
+    }
+
+    private static function syncReferenceInBody(string $body, string $referenceCode): string
+    {
+        if ($body === '' || $referenceCode === '' || strcasecmp($referenceCode, 'Pending') === 0) {
+            return $body;
+        }
+
+        $updated = preg_replace('/Ref\.?\s*No\.?\s*:\s*Pending/i', 'Ref. No.: '.$referenceCode, $body);
+
+        return is_string($updated) ? $updated : $body;
     }
 }

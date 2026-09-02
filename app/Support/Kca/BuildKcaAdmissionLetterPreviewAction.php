@@ -12,6 +12,7 @@ final class BuildKcaAdmissionLetterPreviewAction
     public function __construct(
         private readonly ResolveKcaApplicationChurchName $resolver,
         private readonly RenderKcaAdmissionLetterTemplateAction $renderTemplate,
+        private readonly GenerateKcaAdmissionReferenceCodeAction $referenceCodes,
     ) {}
 
     /** @return array<string, mixed> */
@@ -24,9 +25,10 @@ final class BuildKcaAdmissionLetterPreviewAction
         $application->loadMissing(['person.profile', 'enrollment.cohort:id,name,public_id']);
         $governance = $this->resolver->governanceDefaults()
             ->loadMissing(['admissionLetterheadFile', 'admissionSignatureFile']);
+        $previewReference = $this->referenceCodes->handle($governance);
 
         $draftLetter = (new KcaAdmissionLetter)->forceFill([
-            'reference_code' => null,
+            'reference_code' => $previewReference,
             'signer_name' => $governance->admission_signer_name ?: $governance->certificate_signer_name,
             'signer_title' => $governance->admission_signer_title ?: $governance->certificate_signer_title,
             'batch_label' => $this->resolver->batchLabel($application),
@@ -37,7 +39,7 @@ final class BuildKcaAdmissionLetterPreviewAction
         return [
             'id' => null,
             'application_id' => $application->public_id,
-            'reference_code' => null,
+            'reference_code' => $previewReference,
             'applicant_name' => PersonDisplayName::of($application->person) ?: 'Applicant',
             'church_name' => $this->resolver->fromApplicationData($application->application_data),
             'batch_label' => $draftLetter->batch_label,

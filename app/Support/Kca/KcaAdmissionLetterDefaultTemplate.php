@@ -134,6 +134,7 @@ Living for Christ, Influencing the World.
 Yours faithfully,
 
 {signer_name}
+
 {signer_title}
 The Family House of God International
 

@@ -11,6 +11,7 @@ use App\Support\Pdf\SimplePdfDocument;
 class KcaAdmissionLetterPdfRenderer
 {
     private const PAGE_WIDTH = 612;
+
     private const PAGE_HEIGHT = 792;
 
     public function __construct(
@@ -55,19 +56,55 @@ class KcaAdmissionLetterPdfRenderer
             );
         }
 
-        $y = 500;
+        $y = 468;
         $operations[] = 'BT /F1 10 Tf';
         $operations[] = "72 {$y} Td (Date: ".SimplePdfDocument::escapeText($issuedOn).') Tj';
         $operations[] = '0 -16 Td (Ref: '.SimplePdfDocument::escapeText($reference).') Tj';
         $operations[] = '0 -24 Td /F1 11 Tf (Dear '.SimplePdfDocument::escapeText($applicant).',) Tj';
         $operations[] = 'ET';
 
-        $y = 444;
+        $signerName = (string) ($letter->signer_name ?? 'Provost, KCA');
+        $signerTitle = (string) ($letter->signer_title ?? '');
+
+        $y = 412;
         foreach (preg_split("/\R\R+/", $body) ?: [] as $paragraph) {
             $paragraph = trim((string) $paragraph);
             if ($paragraph === '') {
                 continue;
             }
+
+            if ($paragraph === $signerName) {
+                $operations[] = 'BT /F1 11 Tf 72 '.$y.' Td ('.SimplePdfDocument::escapeText($signerName).') Tj ET';
+                $y -= 18;
+
+                if ($letter->signatureFile instanceof FileAsset) {
+                    $signatureJpeg = $this->jpegBytes($letter->signatureFile);
+                    if ($signatureJpeg !== null) {
+                        $info = getimagesizefromstring($signatureJpeg);
+                        if (is_array($info)) {
+                            $pdf->addJpegImage('Signature', $signatureJpeg, (int) $info[0], (int) $info[1]);
+                            $drawWidth = 140;
+                            $drawHeight = 48;
+                            $signatureY = $y - $drawHeight;
+                            $operations[] = 'q';
+                            $operations[] = "{$drawWidth} 0 0 {$drawHeight} 72 {$signatureY} cm";
+                            $operations[] = '/Signature Do';
+                            $operations[] = 'Q';
+                            $y = $signatureY - 10;
+                        }
+                    }
+                }
+
+                continue;
+            }
+
+            if ($paragraph === $signerTitle) {
+                $operations[] = 'BT /F1 9 Tf 72 '.$y.' Td ('.SimplePdfDocument::escapeText($signerTitle).') Tj ET';
+                $y -= 18;
+
+                continue;
+            }
+
             foreach ($this->wrapText($paragraph, 88) as $line) {
                 $operations[] = 'BT /F1 10 Tf 72 '.$y.' Td ('.SimplePdfDocument::escapeText($line).') Tj ET';
                 $y -= 14;
@@ -78,26 +115,35 @@ class KcaAdmissionLetterPdfRenderer
             $y -= 6;
         }
 
-        $signatureY = 130;
-        if ($letter->signatureFile instanceof FileAsset) {
-            $signatureJpeg = $this->jpegBytes($letter->signatureFile);
-            if ($signatureJpeg !== null) {
-                $info = getimagesizefromstring($signatureJpeg);
-                if (is_array($info)) {
-                    $pdf->addJpegImage('Signature', $signatureJpeg, (int) $info[0], (int) $info[1]);
-                    $drawWidth = 140;
-                    $drawHeight = 48;
-                    $operations[] = 'q';
-                    $operations[] = "{$drawWidth} 0 0 {$drawHeight} 72 {$signatureY} cm";
-                    $operations[] = '/Signature Do';
-                    $operations[] = 'Q';
-                    $signatureY -= 56;
+        if (
+            $signerName !== ''
+            && ! str_contains($body, $signerName)
+        ) {
+            $operations[] = 'BT /F1 11 Tf 72 '.$y.' Td ('.SimplePdfDocument::escapeText($signerName).') Tj ET';
+            $y -= 18;
+
+            if ($letter->signatureFile instanceof FileAsset) {
+                $signatureJpeg = $this->jpegBytes($letter->signatureFile);
+                if ($signatureJpeg !== null) {
+                    $info = getimagesizefromstring($signatureJpeg);
+                    if (is_array($info)) {
+                        $pdf->addJpegImage('Signature', $signatureJpeg, (int) $info[0], (int) $info[1]);
+                        $drawWidth = 140;
+                        $drawHeight = 48;
+                        $signatureY = $y - $drawHeight;
+                        $operations[] = 'q';
+                        $operations[] = "{$drawWidth} 0 0 {$drawHeight} 72 {$signatureY} cm";
+                        $operations[] = '/Signature Do';
+                        $operations[] = 'Q';
+                        $y = $signatureY - 10;
+                    }
                 }
             }
-        }
 
-        $operations[] = 'BT /F1 11 Tf 72 '.$signatureY.' Td ('.SimplePdfDocument::escapeText((string) ($letter->signer_name ?? 'Provost, KCA')).') Tj';
-        $operations[] = '0 -14 Td /F1 9 Tf ('.SimplePdfDocument::escapeText((string) ($letter->signer_title ?? '')).') Tj ET';
+            if ($signerTitle !== '') {
+                $operations[] = 'BT /F1 9 Tf 72 '.$y.' Td ('.SimplePdfDocument::escapeText($signerTitle).') Tj ET';
+            }
+        }
 
         $pdf->addPage($operations);
 

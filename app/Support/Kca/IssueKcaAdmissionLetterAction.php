@@ -5,7 +5,6 @@ namespace App\Support\Kca;
 use App\Models\FileAsset;
 use App\Models\KcaAdmissionLetter;
 use App\Models\KcaApplication;
-use App\Models\KcaGovernanceConfiguration;
 use App\Models\User;
 use App\Support\Audit\AuditEventData;
 use App\Support\Audit\RecordAuditEventAction;
@@ -19,6 +18,7 @@ class IssueKcaAdmissionLetterAction
         private readonly ResolveKcaApplicationChurchName $resolver,
         private readonly RenderKcaAdmissionLetterTemplateAction $renderTemplate,
         private readonly RecordAuditEventAction $recordAuditEvent,
+        private readonly GenerateKcaAdmissionReferenceCodeAction $referenceCodes,
     ) {}
 
     public function handle(
@@ -66,9 +66,10 @@ class IssueKcaAdmissionLetterAction
             $governance = $this->resolver->governanceDefaults()
                 ->loadMissing(['admissionLetterheadFile', 'admissionSignatureFile']);
             $resolvedBatch = $batchLabel ?: $this->resolver->batchLabel($lockedApplication);
+            $referenceCode = $this->referenceCodes->handle($governance);
 
             $draftLetter = (new KcaAdmissionLetter)->forceFill([
-                'reference_code' => 'Pending',
+                'reference_code' => $referenceCode,
                 'batch_label' => $resolvedBatch,
                 'signer_name' => $signerName ?: $governance->admission_signer_name ?: $governance->certificate_signer_name,
                 'signer_title' => $signerTitle ?: $governance->admission_signer_title ?: $governance->certificate_signer_title,
@@ -78,7 +79,7 @@ class IssueKcaAdmissionLetterAction
 
             $letter = (new KcaAdmissionLetter)->forceFill([
                 'kca_application_id' => $lockedApplication->getKey(),
-                'reference_code' => $this->nextReferenceCode($governance),
+                'reference_code' => $referenceCode,
                 'batch_label' => $resolvedBatch,
                 'letter_body' => $letterBody ?: $this->renderTemplate->forApplication($lockedApplication, $draftLetter, $governance),
                 'signer_name' => $draftLetter->signer_name,
@@ -108,15 +109,5 @@ class IssueKcaAdmissionLetterAction
                 'signatureFile:id,public_id',
             ]);
         }, attempts: 3);
-    }
-
-    private function nextReferenceCode(KcaGovernanceConfiguration $governance): string
-    {
-        $year = now()->year;
-        $count = KcaAdmissionLetter::query()->whereYear('issued_at', $year)->count() + 1;
-        $prefix = trim((string) ($governance->admission_reference_prefix ?? 'KCA/ADM'));
-        $prefix = $prefix !== '' ? $prefix : 'KCA/ADM';
-
-        return sprintf('%s/%d/%04d', rtrim($prefix, '/'), $year, $count);
     }
 }
