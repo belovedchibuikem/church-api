@@ -10,6 +10,7 @@ use App\Models\KcaGovernanceConfiguration;
 use App\Services\Admin\ProtectedAdminContext;
 use App\Support\Api\ApiResponse;
 use App\Support\Kca\ConfigureKcaGovernanceAction;
+use App\Support\Kca\KcaAdmissionLetterDefaultTemplate;
 use Illuminate\Http\JsonResponse;
 
 class KcaGovernanceController extends Controller
@@ -30,14 +31,34 @@ class KcaGovernanceController extends Controller
                 'certificate_signer_title' => null,
                 'admission_signer_name' => null,
                 'admission_signer_title' => null,
+                'admission_reference_prefix' => 'KCA/ADM',
+                'admission_letter_body_template' => null,
+                'admission_programme_commencement' => null,
+                'admission_programme_completion' => null,
+                'admission_programme_venue' => null,
+                'admission_programme_schedule' => null,
+                'admission_programme_mentor' => null,
                 'admission_letterhead_file_asset_id' => null,
                 'admission_signature_file_asset_id' => null,
+                ...$this->admissionLetterTemplateDefaults(),
             ]);
         }
 
         $configuration->load(['admissionLetterheadFile:id,public_id', 'admissionSignatureFile:id,public_id']);
 
-        return ApiResponse::success($request, (new KcaGovernanceConfigurationResource($configuration))->resolve($request));
+        return ApiResponse::success($request, [
+            ...(new KcaGovernanceConfigurationResource($configuration))->resolve($request),
+            ...$this->admissionLetterTemplateDefaults(),
+        ]);
+    }
+
+    /** @return array<string, string> */
+    private function admissionLetterTemplateDefaults(): array
+    {
+        return [
+            'admission_letter_template_default' => KcaAdmissionLetterDefaultTemplate::body(),
+            'admission_letter_template_placeholders' => KcaAdmissionLetterDefaultTemplate::PLACEHOLDER_HELP,
+        ];
     }
 
     public function configure(

@@ -13,13 +13,15 @@ use App\Models\FileAsset;
 use App\Models\KcaApplication;
 use App\Models\KcaAssignment;
 use App\Models\KcaAttendance;
-use App\Models\KcaChapterProgress;
 use App\Models\KcaChapter;
+use App\Models\KcaChapterProgress;
 use App\Models\KcaDevotionalReading;
 use App\Models\KcaEnrollment;
 use App\Models\KcaLesson;
+use App\Models\KcaLessonProgress;
 use App\Models\KcaMentorAssignment;
 use App\Models\KcaModule;
+use App\Models\KcaSoulWin;
 use App\Models\KcaStudyNote;
 use App\Models\Person;
 use App\Support\Api\ApiResponse;
@@ -34,8 +36,10 @@ use App\Support\Kca\KcaStudentActivityQuery;
 use App\Support\Kca\RecordKcaOrientationStageAction;
 use App\Support\Kca\RecordKcaSoulWinAction;
 use App\Support\Kca\SubmitKcaEvidenceAction;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use InvalidArgumentException;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
@@ -331,13 +335,14 @@ class KcaCurriculumController extends Controller
             throw new NotFoundHttpException('KCA learning is available after admission and activation.');
         }
 
+        $completedLessonSet = $this->completedLessonSet($enrollment);
         $modules = KcaModule::query()
             ->where('is_active', true)
             ->whereNotNull('published_at')
             ->with(['lessons' => fn ($q) => $q->orderBy('sequence')->with(['chapters' => fn ($c) => $c->orderBy('sequence')])])
             ->orderBy('sequence')
             ->get()
-            ->map(fn (KcaModule $module) => $this->modulePayload($module, $enrollment));
+            ->map(fn (KcaModule $module) => $this->modulePayload($module, $enrollment, completedLessonSet: $completedLessonSet));
 
         return ApiResponse::success($request, $modules->values()->all());
     }
@@ -353,7 +358,13 @@ class KcaCurriculumController extends Controller
             ->with(['lessons' => fn ($q) => $q->orderBy('sequence')->with(['chapters' => fn ($c) => $c->orderBy('sequence')])])
             ->firstOrFail();
 
-        return ApiResponse::success($request, $this->modulePayload($row, $enrollment, detailed: true, complete: $complete));
+        return ApiResponse::success($request, $this->modulePayload(
+            $row,
+            $enrollment,
+            detailed: true,
+            complete: $complete,
+            completedLessonSet: $this->completedLessonSet($enrollment),
+        ));
     }
 
     public function lesson(Request $request, string $lesson, CompleteKcaLessonAction $complete, CompleteKcaChapterAction $completeChapter, KcaLessonUnlockToken $tokens): JsonResponse
@@ -362,7 +373,7 @@ class KcaCurriculumController extends Controller
         $enrollment = $this->requireEnrollment($person);
         $target = KcaLesson::query()->with(['module', 'chapters' => fn ($q) => $q->orderBy('sequence')])->where('public_id', $lesson)->firstOrFail();
         $complete->assertAccessible($enrollment, $target);
-                $completedChapterIds = KcaChapterProgress::query()
+        $completedChapterIds = KcaChapterProgress::query()
             ->where('kca_enrollment_id', $enrollment->getKey())
             ->whereIn('kca_chapter_id', $target->chapters->pluck('id'))
             ->whereNotNull('completed_at')
@@ -699,7 +710,7 @@ class KcaCurriculumController extends Controller
             'source' => $data['source'] ?? null,
             'publication_id' => $data['publication_id'] ?? null,
             'reflection' => $data['reflection'] ?? null,
-            'read_at' => isset($data['read_at']) ? \Carbon\CarbonImmutable::parse($data['read_at']) : now()->utc(),
+            'read_at' => isset($data['read_at']) ? CarbonImmutable::parse($data['read_at']) : now()->utc(),
         ]);
 
         return ApiResponse::success($request, [
@@ -728,7 +739,7 @@ class KcaCurriculumController extends Controller
             ->where('kca_enrollment_id', $enrollment->getKey())
             ->firstOrFail();
         $parent = isset($data['parent_id'])
-            ? \App\Models\KcaSoulWin::query()->where('public_id', $data['parent_id'])->where('kca_assignment_id', $target->getKey())->firstOrFail()
+            ? KcaSoulWin::query()->where('public_id', $data['parent_id'])->where('kca_assignment_id', $target->getKey())->firstOrFail()
             : null;
         $user = $request->user();
         if ($user === null) {
@@ -825,9 +836,26 @@ class KcaCurriculumController extends Controller
         ];
     }
 
-    /** @return array<string, mixed> */
-    private function modulePayload(KcaModule $module, ?KcaEnrollment $enrollment = null, bool $detailed = false, ?CompleteKcaLessonAction $complete = null): array
+    /** @return array<int, true> */
+    private function completedLessonSet(KcaEnrollment $enrollment): array
     {
+        $ids = KcaLessonProgress::query()
+            ->where('kca_enrollment_id', $enrollment->getKey())
+            ->whereNotNull('completed_at')
+            ->pluck('kca_lesson_id')
+            ->all();
+
+        return array_flip($ids);
+    }
+
+    /** @return array<string, mixed> */
+    private function modulePayload(
+        KcaModule $module,
+        ?KcaEnrollment $enrollment = null,
+        bool $detailed = false,
+        ?CompleteKcaLessonAction $complete = null,
+        ?array $completedLessonSet = null,
+    ): array {
         $payload = [
             'id' => $module->public_id,
             'code' => $module->code,
@@ -839,8 +867,23 @@ class KcaCurriculumController extends Controller
             'lessons_count' => $module->relationLoaded('lessons') ? $module->lessons->count() : null,
         ];
 
+        if ($enrollment !== null && $module->relationLoaded('lessons')) {
+            $lessonTotal = $module->lessons->count();
+            $lessonDone = $completedLessonSet === null
+                ? 0
+                : $module->lessons->filter(fn (KcaLesson $lesson): bool => isset($completedLessonSet[$lesson->getKey()]))->count();
+            $payload['lessons_total'] = $lessonTotal;
+            $payload['lessons_completed'] = $lessonDone;
+            $payload['percent'] = $lessonTotal === 0 ? 0 : (int) round(($lessonDone / $lessonTotal) * 100);
+            $payload['progress_state'] = match (true) {
+                $lessonTotal > 0 && $lessonDone >= $lessonTotal => 'completed',
+                $lessonDone > 0 => 'in_progress',
+                default => 'not_started',
+            };
+        }
+
         if ($detailed) {
-            $payload['lessons'] = $module->lessons->map(function ($lesson) use ($enrollment, $complete) {
+            $payload['lessons'] = $module->lessons->map(function ($lesson) use ($enrollment, $complete, $completedLessonSet) {
                 $unlocked = false;
                 if ($enrollment !== null && $complete !== null) {
                     try {
@@ -857,7 +900,9 @@ class KcaCurriculumController extends Controller
                     'sequence' => $lesson->sequence,
                     'day_index' => $lesson->day_index,
                     'lesson_type' => $lesson->lesson_type ?? 'text',
+                    'estimated_minutes' => $lesson->estimated_minutes,
                     'unlocked' => $unlocked,
+                    'completed' => $completedLessonSet !== null && isset($completedLessonSet[$lesson->getKey()]),
                     'chapters_count' => $lesson->relationLoaded('chapters') ? $lesson->chapters->count() : null,
                     'chapters' => $lesson->relationLoaded('chapters')
                         ? $lesson->chapters->map(fn (KcaChapter $chapter): array => [
@@ -924,7 +969,7 @@ class KcaCurriculumController extends Controller
     }
 
     /**
-     * @return \Illuminate\Support\Collection<int, KcaMentorAssignment>
+     * @return Collection<int, KcaMentorAssignment>
      */
     private function menteeAssignmentsFor(Person $person)
     {

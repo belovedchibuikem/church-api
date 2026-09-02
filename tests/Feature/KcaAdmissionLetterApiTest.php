@@ -148,6 +148,36 @@ class KcaAdmissionLetterApiTest extends TestCase
         $response->assertHeader('Content-Type', 'application/pdf');
     }
 
+    public function test_applicant_can_accept_issued_admission_letter(): void
+    {
+        $person = Person::factory()->withProfile()->create();
+        $user = User::factory()->create(['person_id' => $person->getKey()]);
+        $application = KcaApplication::factory()->create([
+            'person_id' => $person->getKey(),
+            'status' => KcaApplicationState::Accepted,
+        ]);
+        KcaGovernanceConfiguration::factory()->create([
+            'admission_signer_name' => 'Provost Jane',
+            'admission_signer_title' => 'Provost, KCA',
+        ]);
+
+        $scope = new ScopeReference('global', 'platform');
+        $actor = $this->actorWithPermissions(['kca.applications.transition'], $scope);
+        $this->authenticate($actor);
+        $this->withHeaders($this->headers($scope))
+            ->postJson("/api/v1/admin/kca/applications/{$application->public_id}/admission-letter/issue")
+            ->assertCreated()
+            ->assertJsonPath('data.reference_code', fn (mixed $value): bool => is_string($value) && str_starts_with($value, 'KCA/ADM/'));
+
+        $this->authenticate($user);
+        $this->postJson('/api/v1/user/kca/admission-letter/accept', [
+            'applicant_signature_name' => 'John Accepted',
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.acceptance_status', 'accepted')
+            ->assertJsonPath('data.applicant_signature_name', 'John Accepted');
+    }
+
     public function test_accepted_applicant_can_view_issued_admission_letter(): void
     {
         $person = Person::factory()->create();
@@ -180,6 +210,66 @@ class KcaAdmissionLetterApiTest extends TestCase
             ->assertJsonPath('data.reference_code', fn (mixed $value): bool => is_string($value) && str_starts_with($value, 'KCA/ADM/'))
             ->assertJsonPath('data.church_name', 'Grace Chapel')
             ->assertJsonPath('data.applicant_name', PersonDisplayName::of($person) ?: 'Applicant');
+    }
+
+    public function test_kca_access_keeps_admitted_applicant_on_letter_until_acceptance(): void
+    {
+        $person = Person::factory()->create();
+        $user = User::factory()->create(['person_id' => $person->getKey()]);
+        $application = KcaApplication::factory()->create([
+            'person_id' => $person->getKey(),
+            'status' => KcaApplicationState::Accepted,
+        ]);
+        KcaGovernanceConfiguration::factory()->create([
+            'admission_signer_name' => 'Provost Jane',
+            'admission_signer_title' => 'Provost, KCA',
+        ]);
+
+        $scope = new ScopeReference('global', 'platform');
+        $actor = $this->actorWithPermissions(['kca.applications.transition'], $scope);
+        $this->authenticate($actor);
+        $this->withHeaders($this->headers($scope))
+            ->postJson("/api/v1/admin/kca/applications/{$application->public_id}/admission-letter/issue")
+            ->assertCreated();
+
+        $this->authenticate($user);
+        $this->getJson('/api/v1/user/kca/me')
+            ->assertOk()
+            ->assertJsonPath('data.destination', 'admission_letter')
+            ->assertJsonPath('data.admission_letter.acceptance_status', 'pending')
+            ->assertJsonPath('data.permitted_actions', fn (mixed $value): bool => is_array($value) && in_array('accept_letter', $value, true));
+    }
+
+    public function test_kca_access_moves_admitted_applicant_to_orientation_after_acceptance(): void
+    {
+        $person = Person::factory()->create();
+        $user = User::factory()->create(['person_id' => $person->getKey()]);
+        $application = KcaApplication::factory()->create([
+            'person_id' => $person->getKey(),
+            'status' => KcaApplicationState::Accepted,
+        ]);
+        KcaGovernanceConfiguration::factory()->create([
+            'admission_signer_name' => 'Provost Jane',
+            'admission_signer_title' => 'Provost, KCA',
+        ]);
+
+        $scope = new ScopeReference('global', 'platform');
+        $actor = $this->actorWithPermissions(['kca.applications.transition'], $scope);
+        $this->authenticate($actor);
+        $this->withHeaders($this->headers($scope))
+            ->postJson("/api/v1/admin/kca/applications/{$application->public_id}/admission-letter/issue")
+            ->assertCreated();
+
+        $this->authenticate($user);
+        $this->postJson('/api/v1/user/kca/admission-letter/accept', [
+            'applicant_signature_name' => 'Accepted Applicant',
+        ])->assertOk();
+
+        $this->getJson('/api/v1/user/kca/me')
+            ->assertOk()
+            ->assertJsonPath('data.destination', 'orientation')
+            ->assertJsonPath('data.admission_letter.acceptance_status', 'accepted')
+            ->assertJsonPath('data.permitted_actions', fn (mixed $value): bool => is_array($value) && in_array('complete_orientation', $value, true));
     }
 
     public function test_applications_catalog_resolves_church_name_from_church_id(): void

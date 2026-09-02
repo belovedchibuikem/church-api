@@ -20,6 +20,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'signature_file_asset_id',
     'issued_by_user_id',
     'issued_at',
+    'applicant_accepted_at',
+    'applicant_signature_name',
+    'applicant_signature_file_asset_id',
+    'guardian_name',
+    'guardian_phone',
+    'guardian_signature_name',
+    'guardian_confirmed_at',
 ])]
 class KcaAdmissionLetter extends Model
 {
@@ -56,10 +63,17 @@ class KcaAdmissionLetter extends Model
         return $this->belongsTo(FileAsset::class, 'signature_file_asset_id');
     }
 
+    public function applicantSignatureFile(): BelongsTo
+    {
+        return $this->belongsTo(FileAsset::class, 'applicant_signature_file_asset_id');
+    }
+
     protected function casts(): array
     {
         return [
             'issued_at' => 'immutable_datetime',
+            'applicant_accepted_at' => 'immutable_datetime',
+            'guardian_confirmed_at' => 'immutable_datetime',
         ];
     }
 }

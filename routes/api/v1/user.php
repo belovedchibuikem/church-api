@@ -4,8 +4,8 @@ use App\Http\Controllers\Api\V1\User\ConsentController;
 use App\Http\Controllers\Api\V1\User\CurrentUserController;
 use App\Http\Controllers\Api\V1\User\DashboardController;
 use App\Http\Controllers\Api\V1\User\DeviceController;
-use App\Http\Controllers\Api\V1\User\KcaApplicationController;
 use App\Http\Controllers\Api\V1\User\KcaAdmissionLetterController;
+use App\Http\Controllers\Api\V1\User\KcaApplicationController;
 use App\Http\Controllers\Api\V1\User\KcaCurriculumController;
 use App\Http\Controllers\Api\V1\User\MessageController;
 use App\Http\Controllers\Api\V1\User\NotificationController;
@@ -17,11 +17,11 @@ use App\Http\Controllers\Api\V1\User\ProfileController;
 use App\Http\Controllers\Api\V1\User\SecuritySessionController;
 use App\Http\Controllers\Api\V1\User\SyncController;
 use App\Http\Controllers\Api\V1\User\UserAuthorizationController;
+use App\Http\Controllers\Api\V1\User\UserBibleController;
 use App\Http\Controllers\Api\V1\User\UserChurchCommunityController;
 use App\Http\Controllers\Api\V1\User\UserChurchOperationsController;
 use App\Http\Controllers\Api\V1\User\UserDomainOperationsController;
 use App\Http\Controllers\Api\V1\User\UserKcaCommunityController;
-use App\Http\Controllers\Api\V1\User\UserBibleController;
 use App\Http\Controllers\Api\V1\User\UserLivestreamController;
 use App\Http\Controllers\Api\V1\User\UserMissionController;
 use App\Http\Middleware\EnsureRecentMfa;
@@ -75,6 +75,7 @@ Route::prefix('mission')->name('mission.')->controller(UserMissionController::cl
 Route::prefix('kca')->name('kca.')->group(function (): void {
     Route::get('/me', [KcaApplicationController::class, 'me'])->name('me');
     Route::get('/admission-letter', [KcaAdmissionLetterController::class, 'show'])->name('admission_letter.show');
+    Route::post('/admission-letter/accept', [KcaAdmissionLetterController::class, 'accept'])->name('admission_letter.accept');
     Route::get('/admission-letter/download', [KcaAdmissionLetterController::class, 'download'])->name('admission_letter.download');
     Route::get('/admission-letter/assets/{file}', [KcaAdmissionLetterController::class, 'streamAsset'])
         ->whereUlid('file')

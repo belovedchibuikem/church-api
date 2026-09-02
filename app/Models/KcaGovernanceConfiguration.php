@@ -19,6 +19,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'admission_signer_title',
     'admission_letterhead_file_asset_id',
     'admission_signature_file_asset_id',
+    'admission_reference_prefix',
+    'admission_letter_body_template',
+    'admission_programme_commencement',
+    'admission_programme_completion',
+    'admission_programme_venue',
+    'admission_programme_schedule',
+    'admission_programme_mentor',
 ])]
 class KcaGovernanceConfiguration extends Model
 {

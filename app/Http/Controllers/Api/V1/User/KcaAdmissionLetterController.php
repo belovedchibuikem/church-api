@@ -5,12 +5,14 @@ namespace App\Http\Controllers\Api\V1\User;
 use App\Files\FileAssetStreamResponse;
 use App\Http\Controllers\Api\V1\User\Concerns\ResolvesAuthenticatedPerson;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\V1\User\AcceptKcaAdmissionLetterRequest;
 use App\Http\Resources\Api\V1\KcaAdmissionLetterResource;
 use App\Kca\KcaApplicationState;
 use App\Models\FileAsset;
 use App\Models\KcaAdmissionLetter;
 use App\Models\KcaApplication;
 use App\Support\Api\ApiResponse;
+use App\Support\Kca\AcceptKcaAdmissionLetterAction;
 use App\Support\Kca\KcaAdmissionLetterPdfRenderer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -27,6 +29,27 @@ class KcaAdmissionLetterController extends Controller
         $letter = $this->requireLetter($request);
 
         return ApiResponse::success($request, (new KcaAdmissionLetterResource($letter))->resolve($request));
+    }
+
+    public function accept(
+        AcceptKcaAdmissionLetterRequest $request,
+        AcceptKcaAdmissionLetterAction $action,
+    ): JsonResponse {
+        $letter = $this->requireLetter($request);
+        $validated = $request->validated();
+        $updated = $action->handle(
+            $letter,
+            $request->user(),
+            $validated['applicant_signature_name'],
+            isset($validated['applicant_signature_file_asset_id'])
+                ? FileAsset::query()->where('public_id', $validated['applicant_signature_file_asset_id'])->firstOrFail()
+                : null,
+            $validated['guardian_name'] ?? null,
+            $validated['guardian_signature_name'] ?? null,
+            $validated['guardian_phone'] ?? null,
+        );
+
+        return ApiResponse::success($request, (new KcaAdmissionLetterResource($updated))->resolve($request));
     }
 
     public function download(Request $request, KcaAdmissionLetterPdfRenderer $pdf): Response
@@ -49,6 +72,7 @@ class KcaAdmissionLetterController extends Controller
         $allowedIds = array_filter([
             $letter->letterheadFile?->public_id,
             $letter->signatureFile?->public_id,
+            $letter->applicantSignatureFile?->public_id,
         ]);
 
         if (! in_array($file, $allowedIds, true)) {
@@ -65,7 +89,10 @@ class KcaAdmissionLetterController extends Controller
         $person = $this->person($request);
         $application = KcaApplication::query()
             ->where('person_id', $person->getKey())
-            ->where('status', KcaApplicationState::Accepted->value)
+            ->whereIn('status', [
+                KcaApplicationState::Accepted->value,
+                KcaApplicationState::ProvisionallyAccepted->value,
+            ])
             ->latest('id')
             ->first();
 
@@ -78,6 +105,7 @@ class KcaAdmissionLetterController extends Controller
                 'application.person.profile',
                 'letterheadFile:id,public_id',
                 'signatureFile:id,public_id',
+                'applicantSignatureFile:id,public_id',
             ])
             ->where('kca_application_id', $application->getKey())
             ->first();
