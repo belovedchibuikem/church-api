@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['kca_enrollment_id', 'kca_module_id', 'title', 'assignment_kind', 'soul_tree_spec', 'due_at'])]
+#[Fillable(['kca_enrollment_id', 'kca_module_id', 'kca_lesson_id', 'title', 'assignment_kind', 'soul_tree_spec', 'due_at'])]
 class KcaAssignment extends Model
 {
     /** @use HasFactory<KcaAssignmentFactory> */
@@ -37,6 +37,11 @@ class KcaAssignment extends Model
     public function module(): BelongsTo
     {
         return $this->belongsTo(KcaModule::class, 'kca_module_id');
+    }
+
+    public function lesson(): BelongsTo
+    {
+        return $this->belongsTo(KcaLesson::class, 'kca_lesson_id');
     }
 
     public function lastTransitionedBy(): BelongsTo

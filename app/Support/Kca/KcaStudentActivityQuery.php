@@ -94,7 +94,10 @@ class KcaStudentActivityQuery
         $lessonTotal = count($lessonIds);
         $chapterTotal = count($chapterIds);
         $assignments = KcaAssignment::query()
-            ->with('module:id,public_id,code,title,sequence')
+            ->with([
+                'module:id,public_id,code,title,sequence',
+                'lesson:id,public_id,code,title,sequence,kca_module_id',
+            ])
             ->where('kca_enrollment_id', $enrollment->getKey())
             ->where('state', '!=', KcaAssignmentState::Draft->value)
             ->orderByRaw('due_at is null')
@@ -184,6 +187,12 @@ class KcaStudentActivityQuery
                 'code' => $assignment->module->code,
                 'title' => $assignment->module->title,
                 'sequence' => $assignment->module->sequence,
+            ] : null,
+            'lesson' => $assignment->lesson ? [
+                'id' => $assignment->lesson->public_id,
+                'code' => $assignment->lesson->code,
+                'title' => $assignment->lesson->title,
+                'sequence' => $assignment->lesson->sequence,
             ] : null,
         ];
         if ($assignment->isSoulWinning()) {

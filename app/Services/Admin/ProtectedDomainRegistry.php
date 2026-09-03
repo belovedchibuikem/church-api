@@ -249,6 +249,7 @@ class ProtectedDomainRegistry
                     'enrollment:id,public_id,registration_number',
                     ...PersonDisplayName::eager('enrollment.person'),
                     'module:id,public_id,title,code',
+                    'lesson:id,public_id,title,code,kca_module_id',
                 ],
                 'order_column' => 'assigned_at',
                 'order_direction' => 'desc',

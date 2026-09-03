@@ -58,8 +58,8 @@ class IssueKcaAdmissionLetterAction
             if ($existing !== null) {
                 return $existing->load([
                     'application.person.profile',
-                    'letterheadFile:id,public_id',
-                    'signatureFile:id,public_id',
+                    'letterheadFile',
+                    'signatureFile',
                 ]);
             }
 
@@ -105,8 +105,8 @@ class IssueKcaAdmissionLetterAction
 
             return $letter->load([
                 'application.person.profile',
-                'letterheadFile:id,public_id',
-                'signatureFile:id,public_id',
+                'letterheadFile',
+                'signatureFile',
             ]);
         }, attempts: 3);
     }

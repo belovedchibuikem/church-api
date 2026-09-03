@@ -97,14 +97,22 @@ class ProtectedCatalogRecordResource extends JsonResource
             $this->resource instanceof KcaAssignment => [
                 'id' => $this->public_id,
                 'enrollment_id' => $this->enrollment?->public_id,
+                'kca_enrollment_id' => $this->enrollment?->public_id,
                 'student_name' => PersonDisplayName::of($this->enrollment?->person),
                 'person_name' => PersonDisplayName::of($this->enrollment?->person),
                 'module_id' => $this->module?->public_id,
+                'kca_module_id' => $this->module?->public_id,
                 'module_title' => $this->module?->title,
+                'lesson_id' => $this->lesson?->public_id,
+                'kca_lesson_id' => $this->lesson?->public_id,
+                'lesson_title' => $this->lesson?->title,
                 'title' => $this->title,
                 'assignment_kind' => $this->assignment_kind ?? 'standard',
                 'kind' => $this->assignment_kind ?? 'standard',
                 'soul_tree_spec' => $this->soul_tree_spec,
+                'soul_tree_levels' => is_array($this->soul_tree_spec['levels'] ?? null)
+                    ? implode(',', array_map('strval', $this->soul_tree_spec['levels']))
+                    : null,
                 'state' => $this->state->value,
                 'status' => $this->state->value,
                 'due_at' => $this->due_at?->utc()->toIso8601String(),

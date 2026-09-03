@@ -6,7 +6,7 @@ use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
-class CreateKcaStudentAssignmentRequest extends FormRequest
+class UpdateKcaStudentAssignmentRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -19,14 +19,12 @@ class CreateKcaStudentAssignmentRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'kca_enrollment_id' => ['required', 'ulid', 'exists:kca_enrollments,public_id'],
-            'kca_module_id' => ['required', 'ulid', 'exists:kca_modules,public_id'],
-            'kca_lesson_id' => ['required', 'ulid', 'exists:kca_lessons,public_id'],
-            'title' => ['required', 'string', 'max:191'],
-            'assignment_kind' => ['nullable', Rule::in(['standard', 'soul_winning'])],
+            'kca_module_id' => ['sometimes', 'required', 'ulid', 'exists:kca_modules,public_id'],
+            'kca_lesson_id' => ['sometimes', 'required', 'ulid', 'exists:kca_lessons,public_id'],
+            'title' => ['sometimes', 'required', 'string', 'max:191'],
+            'due_at' => ['nullable', 'date'],
             'soul_tree_levels' => ['nullable', 'array', 'min:1'],
             'soul_tree_levels.*' => ['integer', 'min:1', 'max:50'],
-            'due_at' => ['nullable', 'date'],
         ];
     }
 }

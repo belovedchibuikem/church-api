@@ -27,6 +27,7 @@ use App\Models\Person;
 use App\Support\Api\ApiResponse;
 use App\Support\Identity\PersonDisplayName;
 use App\Support\Kca\BuildKcaOrientationProgramAction;
+use App\Support\Kca\CompleteKcaChapterAction;
 use App\Support\Kca\CompleteKcaLessonAction;
 use App\Support\Kca\CompleteKcaOrientationAction;
 use App\Support\Kca\KcaCertificatePdfRenderer;
@@ -206,7 +207,10 @@ class KcaCurriculumController extends Controller
         }
 
         $departments = KcaAssignment::query()
-            ->with('module:id,public_id,code,title,sequence')
+            ->with([
+                'module:id,public_id,code,title,sequence',
+                'lesson:id,public_id,code,title,sequence,kca_module_id',
+            ])
             ->where('kca_enrollment_id', $enrollment->getKey())
             ->where('state', '!=', KcaAssignmentState::Draft->value)
             ->orderBy('assigned_at')
@@ -225,6 +229,11 @@ class KcaCurriculumController extends Controller
                         'id' => $assignment->module->public_id,
                         'title' => $assignment->module->title,
                         'code' => $assignment->module->code,
+                    ] : null,
+                    'lesson' => $assignment->lesson ? [
+                        'id' => $assignment->lesson->public_id,
+                        'title' => $assignment->lesson->title,
+                        'code' => $assignment->lesson->code,
                     ] : null,
                 ];
             })
@@ -432,7 +441,10 @@ class KcaCurriculumController extends Controller
         $enrollment = $this->requireEnrollment($person);
 
         $rows = KcaAssignment::query()
-            ->with('module:id,public_id,code,title,sequence')
+            ->with([
+                'module:id,public_id,code,title,sequence',
+                'lesson:id,public_id,code,title,sequence,kca_module_id',
+            ])
             ->where('kca_enrollment_id', $enrollment->getKey())
             ->where('state', '!=', KcaAssignmentState::Draft->value)
             ->orderByRaw('due_at is null')
@@ -448,7 +460,10 @@ class KcaCurriculumController extends Controller
         $person = $this->person($request);
         $enrollment = $this->requireEnrollment($person);
         $row = KcaAssignment::query()
-            ->with('module:id,public_id,code,title,sequence')
+            ->with([
+                'module:id,public_id,code,title,sequence',
+                'lesson:id,public_id,code,title,sequence,kca_module_id',
+            ])
             ->where('public_id', $assignment)
             ->where('kca_enrollment_id', $enrollment->getKey())
             ->where('state', '!=', KcaAssignmentState::Draft->value)

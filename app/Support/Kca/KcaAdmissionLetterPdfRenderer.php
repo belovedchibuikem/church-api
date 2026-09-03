@@ -2,9 +2,11 @@
 
 namespace App\Support\Kca;
 
+use App\Files\FileAssetStatus;
 use App\Files\Queries\OpenFileAssetStreamQuery;
 use App\Models\FileAsset;
 use App\Models\KcaAdmissionLetter;
+use App\Storage\Contracts\ObjectStorageDiskResolver;
 use App\Support\Identity\PersonDisplayName;
 use App\Support\Pdf\SimplePdfDocument;
 
@@ -56,21 +58,27 @@ class KcaAdmissionLetterPdfRenderer
 
     public function __construct(
         private readonly OpenFileAssetStreamQuery $fileAssetStreams,
+        private readonly ObjectStorageDiskResolver $storageResolver,
     ) {}
 
     public function render(KcaAdmissionLetter $letter): string
     {
         $letter->loadMissing([
             'application.person.profile',
-            'letterheadFile',
-            'signatureFile',
         ]);
+
+        // Always reload full file rows — controllers often eager-load only id/public_id,
+        // which strips storage fields needed to open logo/signature bytes.
+        $letterhead = $this->hydrateImageAsset($letter->letterhead_file_asset_id);
+        $signature = $this->hydrateImageAsset($letter->signature_file_asset_id);
+        $letter->setRelation('letterheadFile', $letterhead);
+        $letter->setRelation('signatureFile', $signature);
 
         $pdf = new SimplePdfDocument;
         $this->signatureImageCounter = 0;
         $operations = $this->brandedFooter();
 
-        $logoJpeg = $this->resolveLogoJpeg($letter->letterheadFile);
+        $logoJpeg = $this->resolveLogoJpeg($letterhead);
         $operations = array_merge($operations, $this->brandedHeader($pdf, $logoJpeg));
 
         $body = trim((string) ($letter->letter_body ?? ''));
@@ -140,7 +148,7 @@ class KcaAdmissionLetterPdfRenderer
                         foreach ($this->renderLines($line, 'F3', 12, 15, $y) as $lineOp) {
                             $operations[] = $lineOp;
                         }
-                        $y = $this->appendSignature($pdf, $operations, $letter->signatureFile, $y, $signerTitle);
+                        $y = $this->appendSignature($pdf, $operations, $signature, $y, $signerTitle);
                         $signatureInserted = true;
                         $signerTitleRendered = $signerTitle !== '';
 
@@ -170,7 +178,7 @@ class KcaAdmissionLetterPdfRenderer
                 foreach ($this->renderLines($paragraph, 'F3', 12, 15, $y) as $lineOp) {
                     $operations[] = $lineOp;
                 }
-                $y = $this->appendSignature($pdf, $operations, $letter->signatureFile, $y, $signerTitle);
+                $y = $this->appendSignature($pdf, $operations, $signature, $y, $signerTitle);
                 $signatureInserted = true;
                 $signerTitleRendered = $signerTitle !== '';
 
@@ -193,15 +201,17 @@ class KcaAdmissionLetterPdfRenderer
             }
         }
 
-        if (! $signatureInserted && $signerName !== '') {
+        if (! $signatureInserted) {
             $y -= 8;
             foreach ($this->renderLines('Yours faithfully,', 'F1', self::BODY_FONT_SIZE, self::LINE_HEIGHT, $y) as $lineOp) {
                 $operations[] = $lineOp;
             }
-            foreach ($this->renderLines($signerName, 'F3', 12, 15, $y) as $lineOp) {
-                $operations[] = $lineOp;
+            if ($signerName !== '') {
+                foreach ($this->renderLines($signerName, 'F3', 12, 15, $y) as $lineOp) {
+                    $operations[] = $lineOp;
+                }
             }
-            $y = $this->appendSignature($pdf, $operations, $letter->signatureFile, $y, $signerTitle);
+            $y = $this->appendSignature($pdf, $operations, $signature, $y, $signerTitleRendered ? null : $signerTitle);
         }
 
         $pdf->addPage($operations);
@@ -216,17 +226,25 @@ class KcaAdmissionLetterPdfRenderer
 
         if ($logoJpeg !== null) {
             $info = getimagesizefromstring($logoJpeg);
-            if (is_array($info)) {
+            if (is_array($info) && (int) $info[0] > 0 && (int) $info[1] > 0) {
                 $pdf->addJpegImage('Logo', $logoJpeg, (int) $info[0], (int) $info[1]);
                 $aspect = (int) $info[0] / max(1, (int) $info[1]);
-                $drawWidth = self::LOGO_HEIGHT * $aspect;
+                $drawHeight = self::LOGO_HEIGHT;
+                $drawWidth = $drawHeight * $aspect;
+                // Keep logo from colliding with header titles.
+                $maxWidth = 92.0;
+                if ($drawWidth > $maxWidth) {
+                    $drawWidth = $maxWidth;
+                    $drawHeight = $drawWidth / max(0.01, $aspect);
+                }
+                $logoY = self::LOGO_BOTTOM_Y + ((self::LOGO_HEIGHT - $drawHeight) / 2);
                 $operations[] = 'q';
                 $operations[] = sprintf(
                     '%.2f 0 0 %.2f %.2f %.2f cm',
                     $drawWidth,
-                    self::LOGO_HEIGHT,
+                    $drawHeight,
                     self::LOGO_X,
-                    self::LOGO_BOTTOM_Y,
+                    $logoY,
                 );
                 $operations[] = '/Logo Do';
                 $operations[] = 'Q';
@@ -374,22 +392,29 @@ class KcaAdmissionLetterPdfRenderer
             $signatureJpeg = $this->jpegBytes($signatureFile);
             if ($signatureJpeg !== null) {
                 $info = getimagesizefromstring($signatureJpeg);
-                if (is_array($info)) {
+                if (is_array($info) && (int) $info[0] > 0 && (int) $info[1] > 0) {
                     $imageName = $this->nextSignatureImageName();
                     $pdf->addJpegImage($imageName, $signatureJpeg, (int) $info[0], (int) $info[1]);
-                    $drawWidth = 150;
-                    $drawHeight = 52;
+                    $drawWidth = 160.0;
+                    $aspect = (int) $info[0] / max(1, (int) $info[1]);
+                    $drawHeight = min(56.0, $drawWidth / max(0.01, $aspect));
                     $signatureY = $y - $drawHeight;
                     $operations[] = 'q';
-                    $operations[] = "{$drawWidth} 0 0 {$drawHeight} ".self::MARGIN_X." {$signatureY} cm";
+                    $operations[] = sprintf(
+                        '%.2f 0 0 %.2f %.2f %.2f cm',
+                        $drawWidth,
+                        $drawHeight,
+                        self::MARGIN_X,
+                        $signatureY,
+                    );
                     $operations[] = "/{$imageName} Do";
                     $operations[] = 'Q';
-                    $lineY = $signatureY - 8;
+                    $lineY = $signatureY - 6;
                 }
             }
         }
 
-        $lineEnd = self::MARGIN_X + 150;
+        $lineEnd = self::MARGIN_X + 160;
         $operations[] = 'q 0 0 0 RG 0.75 w';
         $operations[] = self::MARGIN_X.' '.$lineY.' m '.$lineEnd.' '.$lineY.' l S Q';
         $y = $lineY - 14;
@@ -418,8 +443,38 @@ class KcaAdmissionLetterPdfRenderer
         }
 
         $bytes = file_get_contents($path);
+        if (! is_string($bytes) || $bytes === '') {
+            return null;
+        }
 
-        return is_string($bytes) && $bytes !== '' ? $bytes : null;
+        return $this->normalizeToJpeg($bytes) ?? $bytes;
+    }
+
+    private function hydrateImageAsset(int|string|null $fileAssetId): ?FileAsset
+    {
+        if ($fileAssetId === null || $fileAssetId === '') {
+            return null;
+        }
+
+        $asset = FileAsset::query()
+            ->whereKey($fileAssetId)
+            ->whereNull('deleted_at')
+            ->first();
+
+        if ($asset === null) {
+            return null;
+        }
+
+        // Governance uploads can remain Pending until first preview stream.
+        // PDF download must still embed them, so promote Pending/Quarantined assets.
+        if (in_array($asset->status, [FileAssetStatus::Pending, FileAssetStatus::Quarantined], true)) {
+            $asset->forceFill([
+                'status' => FileAssetStatus::Available,
+                'available_at' => $asset->available_at ?? now()->utc(),
+            ])->save();
+        }
+
+        return $asset->status === FileAssetStatus::Available ? $asset->refresh() : null;
     }
 
     private function isStructuredTemplate(string $body): bool
@@ -564,26 +619,55 @@ class KcaAdmissionLetterPdfRenderer
 
     private function jpegBytes(FileAsset $asset): ?string
     {
+        $bytes = $this->readAssetBytes($asset);
+        if ($bytes === null) {
+            return null;
+        }
+
+        return $this->normalizeToJpeg($bytes);
+    }
+
+    private function readAssetBytes(FileAsset $asset): ?string
+    {
         try {
             $stream = $this->fileAssetStreams->handle($asset);
+            $bytes = stream_get_contents($stream);
+            if (is_resource($stream)) {
+                fclose($stream);
+            }
+            if (is_string($bytes) && $bytes !== '') {
+                return $bytes;
+            }
+        } catch (\Throwable) {
+            // Fall through to direct disk read for partially hydrated / pending assets.
+        }
+
+        if (! filled($asset->object_key)) {
+            return null;
+        }
+
+        try {
+            $disk = $this->storageResolver->diskFor(
+                $asset->storage_provider,
+                $asset->disk_name,
+                $asset->storage_configuration_revision,
+            );
+            $bytes = $disk->get($asset->object_key);
+
+            return is_string($bytes) && $bytes !== '' ? $bytes : null;
         } catch (\Throwable) {
             return null;
         }
+    }
 
-        $bytes = stream_get_contents($stream);
-        if (is_resource($stream)) {
-            fclose($stream);
-        }
-        if (! is_string($bytes) || $bytes === '') {
-            return null;
-        }
-
-        $mime = strtolower((string) $asset->detected_mime_type);
-        if (str_contains($mime, 'jpeg') || str_contains($mime, 'jpg')) {
-            return $bytes;
-        }
-
+    private function normalizeToJpeg(string $bytes): ?string
+    {
         if (! function_exists('imagecreatefromstring') || ! function_exists('imagejpeg')) {
+            $info = @getimagesizefromstring($bytes);
+            if (is_array($info) && isset($info[2]) && (int) $info[2] === IMAGETYPE_JPEG) {
+                return $bytes;
+            }
+
             return null;
         }
 
@@ -592,13 +676,14 @@ class KcaAdmissionLetterPdfRenderer
             return null;
         }
 
-        if (function_exists('imagesavealpha')) {
-            imagealphablending($image, true);
-            imagesavealpha($image, true);
-        }
-
         $width = imagesx($image);
         $height = imagesy($image);
+        if ($width < 1 || $height < 1) {
+            imagedestroy($image);
+
+            return null;
+        }
+
         $canvas = imagecreatetruecolor($width, $height);
         if ($canvas === false) {
             imagedestroy($image);

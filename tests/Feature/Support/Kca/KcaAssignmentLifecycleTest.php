@@ -76,4 +76,24 @@ class KcaAssignmentLifecycleTest extends TestCase
             $this->assertNull($assignment->assigned_at);
         }
     }
+
+    public function test_assignment_title_and_due_date_can_be_updated(): void
+    {
+        $assignment = KcaAssignment::factory()->create([
+            'title' => 'Original title',
+            'state' => KcaAssignmentState::Assigned,
+        ]);
+        $actor = User::factory()->create();
+
+        $updated = $this->app->make(\App\Support\Kca\UpdateKcaAssignmentAction::class)->handle(
+            $assignment,
+            $actor,
+            'Updated reflection essay',
+            \Carbon\CarbonImmutable::parse('2026-09-30'),
+        );
+
+        $this->assertSame('Updated reflection essay', $updated->title);
+        $this->assertSame('2026-09-30', $updated->due_at?->toDateString());
+        $this->assertSame(1, AuditEvent::query()->where('action', 'kca.assignment.updated')->count());
+    }
 }

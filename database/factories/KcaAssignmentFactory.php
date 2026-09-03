@@ -5,6 +5,7 @@ namespace Database\Factories;
 use App\Kca\KcaAssignmentState;
 use App\Models\KcaAssignment;
 use App\Models\KcaEnrollment;
+use App\Models\KcaLesson;
 use App\Models\KcaModule;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -23,6 +24,11 @@ class KcaAssignmentFactory extends Factory
         return [
             'kca_enrollment_id' => KcaEnrollment::factory(),
             'kca_module_id' => KcaModule::factory(),
+            'kca_lesson_id' => function (array $attributes) {
+                return KcaLesson::factory()->create([
+                    'kca_module_id' => $attributes['kca_module_id'],
+                ])->getKey();
+            },
             'title' => fake()->sentence(4),
             'state' => KcaAssignmentState::Draft,
             'due_at' => now()->addWeek(),

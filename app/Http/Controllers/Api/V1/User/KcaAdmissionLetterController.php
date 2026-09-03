@@ -103,9 +103,9 @@ class KcaAdmissionLetterController extends Controller
         $letter = KcaAdmissionLetter::query()
             ->with([
                 'application.person.profile',
-                'letterheadFile:id,public_id',
-                'signatureFile:id,public_id',
-                'applicantSignatureFile:id,public_id',
+                'letterheadFile',
+                'signatureFile',
+                'applicantSignatureFile',
             ])
             ->where('kca_application_id', $application->getKey())
             ->first();

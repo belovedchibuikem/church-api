@@ -47,9 +47,10 @@ class AcceptKcaAdmissionLetterAction
 
             if ($locked->applicant_accepted_at !== null) {
                 return $locked->load([
-                    'letterheadFile:id,public_id',
-                    'signatureFile:id,public_id',
-                    'applicantSignatureFile:id,public_id',
+                    'application.person.profile',
+                    'letterheadFile',
+                    'signatureFile',
+                    'applicantSignatureFile',
                 ]);
             }
 
@@ -83,9 +84,9 @@ class AcceptKcaAdmissionLetterAction
 
             return $locked->load([
                 'application.person.profile',
-                'letterheadFile:id,public_id',
-                'signatureFile:id,public_id',
-                'applicantSignatureFile:id,public_id',
+                'letterheadFile',
+                'signatureFile',
+                'applicantSignatureFile',
             ]);
         }, attempts: 3);
     }

@@ -156,9 +156,12 @@ class UserKcaChaptersActivityAndSoulTreeTest extends TestCase
 
         $shown = $this->getJson("/api/v1/user/kca/assignments/{$assignment->public_id}")
             ->assertOk()
-            ->assertJsonPath('data.soul_tree.open', true);
+            ->assertJsonPath('data.soul_tree.open', true)
+            ->assertJsonPath('data.module.id', $module->public_id)
+            ->assertJsonStructure(['data' => ['lesson' => ['id', 'title']]]);
         $parentId = $shown->json('data.soul_tree.tree.0.id');
         $this->assertIsString($parentId);
+        $this->assertNotNull($assignment->fresh()->kca_lesson_id);
 
         $this->postJson("/api/v1/user/kca/assignments/{$assignment->public_id}/souls", [
             'parent_id' => $parentId,
