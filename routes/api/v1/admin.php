@@ -569,7 +569,12 @@ Route::prefix('kca')->name('kca.')->controller(KcaOperationsController::class)->
     Route::delete('/mentor-assignments/{assignment}', 'destroyMentorAssignment')->whereUlid('assignment')->middleware(RequirePermissionAndScope::class.':kca.enrollments.manage')->name('mentor_assignments.destroy');
     Route::delete('/prerequisites/{prerequisite}', 'destroyPrerequisite')->whereUlid('prerequisite')->middleware(RequirePermissionAndScope::class.':kca.modules.manage')->name('prerequisites.destroy');
     Route::post('/enrollments/{enrollment}/attendance', 'recordAttendance')->whereUlid('enrollment')->middleware(RequirePermissionAndScope::class.':kca.attendance.record')->name('enrollments.attendance.store');
+    Route::get('/attendance/roster', 'attendanceRoster')->middleware(RequirePermissionAndScope::class.':kca.attendance.record')->name('attendance.roster');
+    Route::post('/attendance/mass', 'recordMassAttendance')->middleware(RequirePermissionAndScope::class.':kca.attendance.record')->name('attendance.mass');
     Route::get('/enrollments/registration-number-preview', 'previewRegistrationNumber')->middleware(RequirePermissionAndScope::class.':kca.enrollments.manage')->name('enrollments.registration_number.preview');
+    Route::get('/students/import-template', 'downloadStudentImportTemplate')->middleware(RequirePermissionAndScope::class.':kca.enrollments.manage')->name('students.import_template');
+    Route::get('/students/export', 'exportStudents')->middleware(RequirePermissionAndScope::class.':kca.enrollments.manage')->name('students.export');
+    Route::post('/students/import', 'importStudents')->middleware(RequirePermissionAndScope::class.':kca.enrollments.manage')->name('students.import');
     Route::post('/assessment-results', 'recordAssessmentResults')->middleware(RequirePermissionAndScope::class.':kca.enrollments.manage')->name('assessment_results.store');
     Route::post('/applications', 'storeApplication')->middleware(RequirePermissionAndScope::class.':kca.applications.transition')->name('applications.store');
     Route::post('/applications/{application}/transitions', 'transitionApplication')->whereUlid('application')->middleware(RequirePermissionAndScope::class.':kca.applications.transition')->name('applications.transitions.store');

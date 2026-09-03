@@ -16,9 +16,11 @@ use App\Http\Requests\Api\V1\Admin\CreateKcaModulePrerequisiteRequest;
 use App\Http\Requests\Api\V1\Admin\CreateKcaModuleRequest;
 use App\Http\Requests\Api\V1\Admin\CreateKcaYearRequest;
 use App\Http\Requests\Api\V1\Admin\EnrollKcaStudentRequest;
+use App\Http\Requests\Api\V1\Admin\ImportKcaStudentsRequest;
 use App\Http\Requests\Api\V1\Admin\IssueKcaCertificateRequest;
 use App\Http\Requests\Api\V1\Admin\RecordKcaAssessmentResultsRequest;
 use App\Http\Requests\Api\V1\Admin\RecordKcaAttendanceRequest;
+use App\Http\Requests\Api\V1\Admin\RecordKcaMassAttendanceRequest;
 use App\Http\Requests\Api\V1\Admin\ReviewKcaEvidenceRequest;
 use App\Http\Requests\Api\V1\Admin\RevokeKcaCertificateRequest;
 use App\Http\Requests\Api\V1\Admin\SubmitKcaEvidenceRequest;
@@ -64,12 +66,15 @@ use App\Support\Kca\CreateKcaMentorAssignmentAction;
 use App\Support\Kca\CreateKcaModuleAction;
 use App\Support\Kca\CreateKcaYearAction;
 use App\Support\Kca\EnrollKcaStudentAction;
+use App\Support\Kca\ExportKcaStudentsAction;
 use App\Support\Kca\GenerateKcaRegistrationNumberAction;
+use App\Support\Kca\ImportKcaStudentsAction;
 use App\Support\Kca\IssueKcaCertificateAction;
 use App\Support\Kca\MapKcaModuleDaysAction;
 use App\Support\Kca\PublishKcaModuleAction;
 use App\Support\Kca\RecordKcaAssessmentResultsAction;
 use App\Support\Kca\RecordKcaAttendanceAction;
+use App\Support\Kca\RecordKcaMassAttendanceAction;
 use App\Support\Kca\ReviewKcaEvidenceAction;
 use App\Support\Kca\RevokeKcaCertificateAction;
 use App\Support\Kca\SubmitKcaEvidenceAction;
@@ -81,6 +86,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class KcaOperationsController extends Controller
 {
@@ -157,6 +163,32 @@ class KcaOperationsController extends Controller
         $enrollment->load(['application:id,public_id', 'person:id,public_id', 'year:id,public_id', 'cohort:id,public_id']);
 
         return ApiResponse::success($request, (new ProtectedCatalogRecordResource($enrollment))->resolve($request), status: 201);
+    }
+
+    public function downloadStudentImportTemplate(Request $request, ExportKcaStudentsAction $action, ProtectedAdminContext $context): StreamedResponse
+    {
+        $context->ensureGlobal($request);
+
+        return $action->template();
+    }
+
+    public function exportStudents(Request $request, ExportKcaStudentsAction $action, ProtectedAdminContext $context): StreamedResponse
+    {
+        $context->ensureGlobal($request);
+
+        return $action->enrolledStudents();
+    }
+
+    public function importStudents(ImportKcaStudentsRequest $request, ImportKcaStudentsAction $action, ProtectedAdminContext $context): JsonResponse
+    {
+        $context->ensureGlobal($request);
+        $result = $this->execute(fn (): array => $action->handle(
+            $request->file('file'),
+            $context->actor($request),
+            (string) $request->validated('mode', 'enroll'),
+        ));
+
+        return ApiResponse::success($request, $result, status: 201);
     }
 
     public function previewRegistrationNumber(
@@ -573,6 +605,57 @@ class KcaOperationsController extends Controller
         $attendance->load(['enrollment:id,public_id,registration_number', 'lesson:id,public_id,title,code', ...PersonDisplayName::eager('enrollment.person')]);
 
         return ApiResponse::success($request, (new ProtectedCatalogRecordResource($attendance))->resolve($request), status: 201);
+    }
+
+    public function attendanceRoster(Request $request, RecordKcaMassAttendanceAction $action, ProtectedAdminContext $context): JsonResponse
+    {
+        $context->ensureGlobal($request);
+        $data = $request->validate([
+            'lesson_id' => ['required', 'ulid', 'exists:kca_lessons,public_id'],
+            'session_on' => ['required', 'date'],
+            'cohort_id' => ['nullable', 'ulid', 'exists:kca_cohorts,public_id'],
+        ]);
+        $lesson = KcaLesson::query()->where('public_id', $data['lesson_id'])->firstOrFail();
+        $sessionOn = CarbonImmutable::parse((string) $data['session_on']);
+        $roster = $action->roster($lesson, $sessionOn, $data['cohort_id'] ?? null);
+
+        return ApiResponse::success($request, [
+            'lesson' => [
+                'id' => $lesson->public_id,
+                'title' => $lesson->title,
+                'code' => $lesson->code,
+            ],
+            'session_on' => $sessionOn->toDateString(),
+            'students' => $roster->all(),
+            'total' => $roster->count(),
+            'marked' => $roster->whereNotNull('status')->count(),
+        ]);
+    }
+
+    public function recordMassAttendance(RecordKcaMassAttendanceRequest $request, RecordKcaMassAttendanceAction $action, ProtectedAdminContext $context): JsonResponse
+    {
+        $context->ensureGlobal($request);
+        $validated = $request->validated();
+        $lesson = KcaLesson::query()->where('public_id', $validated['lesson_id'])->firstOrFail();
+        $sessionOn = CarbonImmutable::parse((string) $validated['session_on']);
+        $result = $this->execute(fn (): array => $action->handle(
+            $lesson,
+            $sessionOn,
+            array_map(static fn (array $row): array => [
+                'enrollment_id' => (string) $row['enrollment_id'],
+                'status' => (string) $row['status'],
+            ], $validated['records']),
+            $context->actor($request),
+        ));
+
+        return ApiResponse::success($request, [
+            'lesson_id' => $lesson->public_id,
+            'session_on' => $sessionOn->toDateString(),
+            'recorded' => $result['recorded'],
+            'updated' => $result['updated'],
+            'total' => count($result['rows']),
+            'rows' => $result['rows'],
+        ], status: 201);
     }
 
     public function recordAssessmentResults(RecordKcaAssessmentResultsRequest $request, RecordKcaAssessmentResultsAction $action, ProtectedAdminContext $context): JsonResponse

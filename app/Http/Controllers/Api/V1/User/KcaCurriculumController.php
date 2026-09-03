@@ -213,6 +213,7 @@ class KcaCurriculumController extends Controller
             ])
             ->where('kca_enrollment_id', $enrollment->getKey())
             ->where('state', '!=', KcaAssignmentState::Draft->value)
+            ->where('assignment_kind', 'practical')
             ->orderBy('assigned_at')
             ->get()
             ->map(function (KcaAssignment $assignment): array {
@@ -224,6 +225,7 @@ class KcaCurriculumController extends Controller
                     'id' => $assignment->public_id,
                     'title' => $assignment->title,
                     'state' => $state,
+                    'assignment_kind' => $assignment->assignment_kind ?? 'practical',
                     'due_at' => $assignment->due_at?->toIso8601String(),
                     'module' => $assignment->module ? [
                         'id' => $assignment->module->public_id,

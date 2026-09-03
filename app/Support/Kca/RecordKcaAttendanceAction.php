@@ -22,8 +22,9 @@ class RecordKcaAttendanceAction
         KcaAttendanceStatus $status,
         CarbonImmutable $sessionOn,
         User $actor,
+        bool $updateExisting = true,
     ): KcaAttendance {
-        return DB::transaction(function () use ($enrollment, $lesson, $status, $sessionOn, $actor): KcaAttendance {
+        return DB::transaction(function () use ($enrollment, $lesson, $status, $sessionOn, $actor, $updateExisting): KcaAttendance {
             $lockedEnrollment = KcaEnrollment::query()->lockForUpdate()->findOrFail($enrollment->getKey());
             $lockedLesson = KcaLesson::query()->lockForUpdate()->findOrFail($lesson->getKey());
             $existing = KcaAttendance::query()
@@ -34,7 +35,29 @@ class RecordKcaAttendanceAction
                 ->first();
 
             if ($existing !== null) {
-                return $existing;
+                if (! $updateExisting || $existing->status === $status) {
+                    return $existing;
+                }
+                $existing->forceFill([
+                    'status' => $status,
+                    'recorded_by_user_id' => $actor->getKey(),
+                    'recorded_at' => now()->utc(),
+                ])->save();
+
+                $this->recordAuditEvent->handle(new AuditEventData(
+                    action: 'kca.attendance.updated',
+                    actor: $actor,
+                    targetType: 'kca_attendance',
+                    targetId: $existing->public_id,
+                    metadata: [
+                        'enrollment_id' => $lockedEnrollment->public_id,
+                        'lesson_id' => $lockedLesson->public_id,
+                        'status' => $status->value,
+                        'session_on' => $sessionOn->toDateString(),
+                    ],
+                ));
+
+                return $existing->refresh();
             }
 
             $attendance = KcaAttendance::query()->create([

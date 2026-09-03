@@ -40,7 +40,12 @@ class CreateKcaAssignmentAction
         if ((int) $lesson->kca_module_id !== (int) $module->getKey()) {
             throw new InvalidArgumentException('The selected lesson must belong to the selected module.');
         }
-        $kind = $kind === 'soul_winning' ? 'soul_winning' : 'standard';
+        $kind = match ($kind) {
+            'soul_winning' => 'soul_winning',
+            'practical' => 'practical',
+            'written' => 'written',
+            default => 'standard',
+        };
         $levels = array_values(array_filter(array_map('intval', $soulTreeLevels), fn (int $n): bool => $n > 0));
         if ($kind === 'soul_winning' && $levels === []) {
             throw new InvalidArgumentException('Soul-winning assignments require a levels tree such as 3,2,4.');

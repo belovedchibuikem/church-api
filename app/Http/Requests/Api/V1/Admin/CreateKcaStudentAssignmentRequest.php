@@ -23,7 +23,7 @@ class CreateKcaStudentAssignmentRequest extends FormRequest
             'kca_module_id' => ['required', 'ulid', 'exists:kca_modules,public_id'],
             'kca_lesson_id' => ['required', 'ulid', 'exists:kca_lessons,public_id'],
             'title' => ['required', 'string', 'max:191'],
-            'assignment_kind' => ['nullable', Rule::in(['standard', 'soul_winning'])],
+            'assignment_kind' => ['nullable', Rule::in(['standard', 'soul_winning', 'practical', 'written'])],
             'soul_tree_levels' => ['nullable', 'array', 'min:1'],
             'soul_tree_levels.*' => ['integer', 'min:1', 'max:50'],
             'due_at' => ['nullable', 'date'],

@@ -85,7 +85,7 @@ Route::prefix('kca')->name('kca.')->group(function (): void {
     Route::get('/dashboard', [KcaCurriculumController::class, 'dashboard'])->name('dashboard');
     Route::get('/orientation', [KcaCurriculumController::class, 'orientation'])->name('orientation.show');
     Route::post('/orientation/stages/{stage}/complete', [KcaCurriculumController::class, 'completeOrientationStage'])
-        ->where('stage', 'overview|rules|path|mentors')
+        ->where('stage', '[A-Za-z0-9_-]+')
         ->name('orientation.stages.complete');
     Route::post('/orientation/complete', [KcaCurriculumController::class, 'completeOrientation'])->name('orientation.complete');
     Route::get('/practical-service', [KcaCurriculumController::class, 'practicalService'])->name('practical_service.show');
