@@ -100,6 +100,8 @@ class ProtectedCatalogRecordResource extends JsonResource
                 'kca_enrollment_id' => $this->enrollment?->public_id,
                 'student_name' => PersonDisplayName::of($this->enrollment?->person),
                 'person_name' => PersonDisplayName::of($this->enrollment?->person),
+                'cohort_id' => $this->enrollment?->cohort?->public_id,
+                'cohort_name' => $this->enrollment?->cohort?->name,
                 'module_id' => $this->module?->public_id,
                 'kca_module_id' => $this->module?->public_id,
                 'module_title' => $this->module?->title,
@@ -290,6 +292,10 @@ class ProtectedCatalogRecordResource extends JsonResource
                 'allowed_transitions' => $this->status->allowedTargetValues(),
                 'isbn' => $this->isbn,
                 'publisher_name' => $this->publisher_name,
+                'content_file_asset_id' => $this->relationLoaded('contentFileAsset')
+                    ? $this->contentFileAsset?->public_id
+                    : null,
+                'content_source_url' => $this->content_source_url,
                 'author_name' => PersonDisplayName::of(
                     $this->relationLoaded('contributors')
                         ? $this->contributors->firstWhere('role', PressContributorRole::Author)?->person

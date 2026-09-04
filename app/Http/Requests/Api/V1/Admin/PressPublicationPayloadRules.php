@@ -37,6 +37,7 @@ final class PressPublicationPayloadRules
             'description' => ['nullable', 'string', 'max:5000'],
             'cover_file_asset_id' => ['nullable', 'ulid', 'exists:file_assets,public_id'],
             'content_file_asset_id' => ['nullable', 'ulid', 'exists:file_assets,public_id'],
+            'content_source_url' => ['nullable', 'string', 'url', 'max:2048'],
             'price_minor' => ['nullable', 'integer', 'min:0'],
             'currency_code' => ['nullable', 'string', 'size:3'],
             'type_metadata' => ['sometimes', 'array'],

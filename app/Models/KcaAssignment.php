@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\KcaAssignmentStateCast;
 use App\Kca\KcaAssignmentState;
 use Database\Factories\KcaAssignmentFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -11,7 +12,18 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['kca_enrollment_id', 'kca_module_id', 'kca_lesson_id', 'title', 'assignment_kind', 'soul_tree_spec', 'due_at'])]
+#[Fillable([
+    'kca_enrollment_id',
+    'kca_module_id',
+    'kca_lesson_id',
+    'title',
+    'assignment_kind',
+    'soul_tree_spec',
+    'state',
+    'due_at',
+    'assigned_at',
+    'last_transitioned_by_user_id',
+])]
 class KcaAssignment extends Model
 {
     /** @use HasFactory<KcaAssignmentFactory> */
@@ -67,7 +79,7 @@ class KcaAssignment extends Model
     protected function casts(): array
     {
         return [
-            'state' => KcaAssignmentState::class,
+            'state' => KcaAssignmentStateCast::class,
             'soul_tree_spec' => 'array',
             'due_at' => 'immutable_datetime',
             'assigned_at' => 'immutable_datetime',

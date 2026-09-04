@@ -19,6 +19,8 @@ final readonly class PressPublicationData
 
     public ?string $summary;
 
+    public ?string $contentSourceUrl;
+
     /** @var array<string, mixed> */
     public array $typeMetadata;
 
@@ -36,6 +38,7 @@ final readonly class PressPublicationData
         public ?string $description = null,
         public ?FileAsset $coverFileAsset = null,
         public ?FileAsset $contentFileAsset = null,
+        ?string $contentSourceUrl = null,
         public ?int $priceMinor = null,
         ?string $currencyCode = null,
         public PressPublicationType $publicationType = PressPublicationType::Book,
@@ -54,6 +57,7 @@ final readonly class PressPublicationData
         $this->summary = $summary === null || trim($summary) === '' ? null : trim($summary);
         $this->typeMetadata = $this->publicationType->normalizeMetadata($typeMetadata);
         $this->publicationType->assertCreateRequirements($this->typeMetadata);
+        $this->contentSourceUrl = self::normalizeUrl($contentSourceUrl);
 
         if (($priceMinor === null) !== ($this->currencyCode === null)) {
             throw new InvalidArgumentException('Price minor units and currency must be provided together.');
@@ -100,6 +104,7 @@ final readonly class PressPublicationData
             'slug' => $this->slug,
             'cover_file_asset_id' => $this->coverFileAsset?->getKey(),
             'content_file_asset_id' => $this->contentFileAsset?->getKey(),
+            'content_source_url' => $this->contentSourceUrl,
             'price_minor' => $this->priceMinor,
             'currency_code' => $this->currencyCode,
             'visibility' => $this->visibility->value,
@@ -130,5 +135,28 @@ final readonly class PressPublicationData
         $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $value);
 
         return $date !== false && $date->format('Y-m-d') === $value;
+    }
+
+    private static function normalizeUrl(?string $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $value = trim($value);
+        if ($value === '') {
+            return null;
+        }
+
+        if (filter_var($value, FILTER_VALIDATE_URL) === false) {
+            throw new InvalidArgumentException('Content source URL must be a valid http(s) URL.');
+        }
+
+        $scheme = strtolower((string) parse_url($value, PHP_URL_SCHEME));
+        if (! in_array($scheme, ['http', 'https'], true)) {
+            throw new InvalidArgumentException('Content source URL must use http or https.');
+        }
+
+        return $value;
     }
 }

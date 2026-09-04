@@ -36,6 +36,8 @@ class PressPublicationResource extends JsonResource
             'summary' => $this->summary,
             'slug' => $this->slug,
             'type_metadata' => is_array($this->type_metadata) ? $this->type_metadata : [],
+            'content_source_url' => $this->content_source_url,
+            'has_download' => $this->content_file_asset_id !== null || (is_string($this->content_source_url) && $this->content_source_url !== ''),
             'availability' => $this->availability->value,
             'published_at' => $this->published_at?->utc()->toIso8601String(),
             'translations' => PressTranslationResource::collection($this->whenLoaded('translations')),

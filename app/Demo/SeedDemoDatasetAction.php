@@ -137,10 +137,6 @@ class SeedDemoDatasetAction
             $pastor = $this->namedUser('Grace', 'Ezekiel', 'pastor@familyhouse.demo', 'Pastor Grace Ezekiel');
             $student = $this->namedUser('Samuel', 'David', 'member@familyhouse.demo', 'Samuel David');
             $this->grantAllAdminRoles($admin);
-            $this->grantRoles($pastor, [
-                AuthorizationBundleCatalog::CHURCH_OPERATIONS_ADMINISTRATOR_ROLE,
-                AuthorizationBundleCatalog::ORGANIZATION_ADMINISTRATOR_ROLE,
-            ]);
             $this->grantRoles($student, [AuthorizationBundleCatalog::MEMBER_SECURITY_ROLE]);
 
             $leaders = [
@@ -162,9 +158,11 @@ class SeedDemoDatasetAction
             }
 
             $churches = $this->churches($countries, $palette);
+            $this->grantChurchAdministrator($pastor, $churches[0]);
             $homeChurches = $this->homeChurches($churches, $pastor, $leaders);
             $this->livestream($churches[2] ?? $churches[0], $pastor->person);
             $this->memberships($churches, $homeChurches, array_merge([$admin->person, $pastor->person, $student->person], $leaders, $members));
+            $this->ensureMembership($pastor->person, $churches[0]);
             $this->churchCommunity($churches, $pastor->person, array_merge([$student->person], array_slice($members, 0, 6)));
             $this->firstTimersAndFollowUps($churches[0], $homeChurches[0], $members, $pastor->person);
             $this->ministryExtras($churches[0], $homeChurches[0], $members, $pastor->person, $leaders);
@@ -1164,6 +1162,37 @@ class SeedDemoDatasetAction
 
         $assignment = $this->assignRole->handle($user, $role);
         $this->assignScope->handle($assignment, $scope);
+    }
+
+    private function grantChurchAdministrator(User $user, Church $church): void
+    {
+        $role = Role::query()
+            ->where('code', AuthorizationBundleCatalog::CHURCH_OPERATIONS_ADMINISTRATOR_ROLE)
+            ->firstOrFail();
+        $assignment = $this->assignRole->handle($user, $role);
+        $this->remember($assignment);
+        $scopeAssignment = $this->assignScope->handle($assignment, new ScopeReference('church', $church->public_id));
+        $this->remember($scopeAssignment);
+    }
+
+    private function ensureMembership(Person $person, Church $church): void
+    {
+        $existing = ChurchMembership::query()
+            ->where('person_id', $person->getKey())
+            ->where('church_id', $church->getKey())
+            ->where('active_marker', 1)
+            ->exists();
+        if ($existing) {
+            return;
+        }
+
+        $membership = ChurchMembership::factory()->create([
+            'person_id' => $person->getKey(),
+            'church_id' => $church->getKey(),
+            'home_church_id' => null,
+            'joined_at' => now()->subMonths(6),
+        ]);
+        $this->remember($membership);
     }
 
     /** @param  list<string>  $codes */

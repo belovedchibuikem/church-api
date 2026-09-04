@@ -23,6 +23,7 @@ use App\Models\MissionInvitation;
 use App\Models\MissionSoulJourney;
 use App\Models\MissionTeamAssignment;
 use App\Models\PastoralNeed;
+use App\Models\PaymentTransaction;
 use App\Models\Person;
 use App\Models\PrayerRequest;
 use App\Models\SafeguardingIncident;
@@ -510,14 +511,49 @@ class ProtectedDomainCatalogQuery
 
         $query->where(function (Builder $scoped) use ($churchIds): void {
             $scoped->whereIn('church_id', $churchIds)
-                ->orWhereHas('homeChurch', fn (Builder $homeChurch) => $homeChurch->whereIn('church_id', $churchIds))
-                ->orWhereHas('person', function (Builder $personQuery) use ($churchIds): void {
-                    $personQuery->where(function (Builder $inner) use ($churchIds): void {
-                        $inner->whereHas('memberships', fn (Builder $membershipQuery) => $membershipQuery->whereIn('church_id', $churchIds))
-                            ->orWhereHas('firstTimers', fn (Builder $firstTimerQuery) => $firstTimerQuery->whereIn('church_id', $churchIds));
-                    });
+                ->orWhere(function (Builder $homeScoped) use ($churchIds): void {
+                    $homeScoped->whereNull('church_id')
+                        ->whereHas('homeChurch', fn (Builder $homeChurch) => $homeChurch->whereIn('church_id', $churchIds));
                 });
         });
+    }
+
+    /** @return LengthAwarePaginator<PaymentTransaction> */
+    public function churchGivingTransactions(ScopeReference $scope, array $filters, int $perPage): LengthAwarePaginator
+    {
+        $query = PaymentTransaction::query()->with([
+            'intent:id,public_id,purpose_code,status,payer_person_id,currency,amount_minor,succeeded_at',
+            ...PersonDisplayName::eager('intent.payer'),
+            'receipt:id,public_id,receipt_number,issued_at,payment_transaction_id',
+            'reconciliation:id,public_id,status,reason_code,reconciled_at,payment_transaction_id',
+        ]);
+        $churchIds = $this->visibleChurchIds($scope);
+        if ($churchIds !== null) {
+            $query->whereHas('intent.payer.memberships', fn (Builder $membershipQuery) => $membershipQuery->whereIn('church_id', $churchIds));
+        }
+        if (isset($filters['church_id'])) {
+            $churchId = Church::query()->where('public_id', $filters['church_id'])->value('id');
+            $query->whereHas('intent.payer.memberships', fn (Builder $membershipQuery) => $membershipQuery->where('church_id', $churchId ?? 0));
+        }
+        if (isset($filters['purpose'])) {
+            $query->whereHas('intent', fn (Builder $intentQuery) => $intentQuery->where('purpose_code', $filters['purpose']));
+        }
+        if (isset($filters['search'])) {
+            $term = '%'.trim((string) $filters['search']).'%';
+            $query->whereHas('intent.payer.profile', function (Builder $profileQuery) use ($term): void {
+                $profileQuery->where('given_name', 'like', $term)
+                    ->orWhere('family_name', 'like', $term)
+                    ->orWhere('preferred_name', 'like', $term);
+            });
+        }
+
+        return $query->latest('occurred_at')->paginate($perPage);
+    }
+
+    /** @return array<int, int>|null */
+    public function visibleChurchIds(ScopeReference $scope): ?array
+    {
+        return $this->churchIds($scope);
     }
 
     private function applyCrusadeScope(Builder $query, ScopeReference $scope): void

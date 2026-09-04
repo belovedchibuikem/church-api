@@ -301,7 +301,7 @@ class KcaCurriculumController extends Controller
         ));
     }
 
-    public function lesson(Request $request, string $lesson, CompleteKcaLessonAction $complete, CompleteKcaChapterAction $completeChapter, KcaLessonUnlockToken $tokens): JsonResponse
+    public function lesson(Request $request, string $lesson, CompleteKcaLessonAction $complete, \App\Support\Kca\CompleteKcaChapterAction $completeChapter, KcaLessonUnlockToken $tokens): JsonResponse
     {
         $person = $this->person($request);
         $enrollment = $this->requireEnrollment($person);
@@ -353,7 +353,7 @@ class KcaCurriculumController extends Controller
         ]);
     }
 
-    public function chapter(Request $request, string $chapter, CompleteKcaChapterAction $completeChapter, CompleteKcaLessonAction $complete, KcaLessonUnlockToken $tokens): JsonResponse
+    public function chapter(Request $request, string $chapter, \App\Support\Kca\CompleteKcaChapterAction $completeChapter, CompleteKcaLessonAction $complete, KcaLessonUnlockToken $tokens): JsonResponse
     {
         $person = $this->person($request);
         $enrollment = $this->requireEnrollment($person);
@@ -377,7 +377,7 @@ class KcaCurriculumController extends Controller
         ]);
     }
 
-    public function completeChapter(Request $request, string $chapter, CompleteKcaChapterAction $action): JsonResponse
+    public function completeChapter(Request $request, string $chapter, \App\Support\Kca\CompleteKcaChapterAction $action): JsonResponse
     {
         $data = $request->validate([
             'acknowledged' => ['sometimes', 'boolean'],

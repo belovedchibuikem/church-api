@@ -246,8 +246,9 @@ class ProtectedDomainRegistry
                 'operation_id' => 'listAdminCatalogKcaAssignments',
                 'model' => KcaAssignment::class,
                 'with' => [
-                    'enrollment:id,public_id,registration_number',
+                    'enrollment:id,public_id,registration_number,person_id,kca_cohort_id',
                     ...PersonDisplayName::eager('enrollment.person'),
+                    'enrollment.cohort:id,public_id,name,code',
                     'module:id,public_id,title,code',
                     'lesson:id,public_id,title,code,kca_module_id',
                 ],

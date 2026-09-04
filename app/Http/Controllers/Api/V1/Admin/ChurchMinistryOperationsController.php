@@ -27,6 +27,7 @@ use App\Support\Identity\PersonDisplayName;
 use App\Support\Church\AppointChurchLeaderAction;
 use App\Support\Church\ChurchLeadershipCatalog;
 use App\Support\Church\EndChurchLeaderAssignmentAction;
+use App\Support\Church\StartChurchMembershipAction;
 use App\Support\People\ArchivePersonAction;
 use App\Support\People\CreatePersonAction;
 use App\Support\People\MatchPeopleQuery;
@@ -47,7 +48,7 @@ class ChurchMinistryOperationsController extends Controller
         return $this->page($request, $catalog->people($context->scope($request), $request->validated('filter', []), (int) $request->validated('per_page', 25)));
     }
 
-    public function matchPeople(Request $request, MatchPeopleQuery $query): JsonResponse
+    public function matchPeople(Request $request, MatchPeopleQuery $query, ProtectedAdminContext $context, ProtectedDomainCatalogQuery $catalog): JsonResponse
     {
         $data = $request->validate([
             'email' => ['nullable', 'email', 'max:191'],
@@ -62,28 +63,50 @@ class ChurchMinistryOperationsController extends Controller
                 $data['phone'] ?? null,
                 $data['given_name'] ?? null,
                 $data['family_name'] ?? null,
+                $catalog->visibleChurchIds($context->scope($request)),
             ),
         ]);
     }
 
-    public function storePerson(Request $request, CreatePersonAction $action, MatchPeopleQuery $query, ProtectedAdminContext $context): JsonResponse
-    {
+    public function storePerson(
+        Request $request,
+        CreatePersonAction $action,
+        MatchPeopleQuery $query,
+        ProtectedAdminContext $context,
+        ProtectedDomainCatalogQuery $catalog,
+        StartChurchMembershipAction $startMembership,
+    ): JsonResponse {
         $data = $request->validate([
             'given_name' => ['required', 'string', 'max:100'],
             'family_name' => ['required', 'string', 'max:100'],
             'preferred_name' => ['nullable', 'string', 'max:100'],
             'phone' => ['nullable', 'string', 'max:40'],
             'email' => ['nullable', 'email', 'max:191'],
+            'church_id' => ['nullable', 'ulid', 'exists:churches,public_id'],
             'confirm_new' => ['sometimes', 'boolean'],
         ]);
-        $matches = $query->handle($data['email'] ?? null, $data['phone'] ?? null, $data['given_name'], $data['family_name']);
+        $church = $this->membershipChurchForCreate($request, $context, $data['church_id'] ?? null);
+        $matches = $query->handle(
+            $data['email'] ?? null,
+            $data['phone'] ?? null,
+            $data['given_name'],
+            $data['family_name'],
+            $catalog->visibleChurchIds($context->scope($request)),
+        );
         if ($matches !== [] && ! $request->boolean('confirm_new')) {
             return ApiResponse::success($request, [
                 'requires_confirmation' => true,
                 'matches' => $matches,
             ], status: 409);
         }
-        $person = $this->execute(fn (): Person => $action->handle($data, $context->actor($request)));
+        $person = $this->execute(function () use ($action, $context, $request, $data, $church, $startMembership): Person {
+            $created = $action->handle($data, $context->actor($request));
+            if ($church !== null) {
+                $startMembership->handle($created, $church, actor: $context->actor($request), confirmTransfer: true);
+            }
+
+            return $created;
+        });
         $person->load($this->personShowRelations());
 
         return ApiResponse::success($request, $this->person360($request, $person), status: 201);
@@ -102,12 +125,13 @@ class ChurchMinistryOperationsController extends Controller
         $data = $request->validate([
             'source_person_id' => ['required', 'ulid', 'exists:people,public_id'],
         ]);
-        $canonical = Person::query()->with(['user', 'memberships.church', 'firstTimers.church'])->where('public_id', $person)->firstOrFail();
-        $duplicate = Person::query()->with('user')->where('public_id', $data['source_person_id'])->firstOrFail();
+        $canonical = Person::query()->with(['user', 'memberships.church', 'firstTimers.church', 'converts.church', 'roleAssignments.church'])->where('public_id', $person)->firstOrFail();
+        $duplicate = Person::query()->with(['user', 'memberships.church', 'firstTimers.church', 'converts.church', 'roleAssignments.church'])->where('public_id', $data['source_person_id'])->firstOrFail();
         if ($canonical->is($duplicate)) {
             abort(422, 'Cannot merge a person into themselves.');
         }
         $this->ensurePersonVisible($request, $context, $canonical);
+        $this->ensurePersonVisible($request, $context, $duplicate);
         $merged = $this->execute(fn (): Person => $action->handle($canonical, $duplicate, $context->actor($request)));
         $merged->load($this->personShowRelations());
 
@@ -117,7 +141,7 @@ class ChurchMinistryOperationsController extends Controller
     public function archivePerson(Request $request, string $person, ArchivePersonAction $action, ProtectedAdminContext $context): JsonResponse
     {
         $data = $request->validate(['reason' => ['required', 'string', 'max:191']]);
-        $target = Person::query()->with(['memberships.church', 'firstTimers.church'])->where('public_id', $person)->firstOrFail();
+        $target = Person::query()->with(['memberships.church', 'firstTimers.church', 'converts.church', 'roleAssignments.church'])->where('public_id', $person)->firstOrFail();
         $this->ensurePersonVisible($request, $context, $target);
         $archived = $this->execute(fn (): Person => $action->handle($target, $context->actor($request), $data['reason']));
         $archived->load($this->personShowRelations());
@@ -133,6 +157,8 @@ class ChurchMinistryOperationsController extends Controller
             ->firstOrFail();
         if ($target->church !== null) {
             $context->ensureContains($request, $target->church->scopeReference());
+        } elseif (! $context->isGlobal($context->scope($request))) {
+            throw new NotFoundHttpException;
         }
         $payload = (new ProtectedDomainRecordResource($target))->resolve($request);
         $payload['client_person_id'] = $target->client?->public_id;
@@ -207,11 +233,35 @@ class ChurchMinistryOperationsController extends Controller
         if ($context->isGlobal($scope)) {
             return;
         }
-        $church = $person->memberships->first()?->church ?? $person->firstTimers->first()?->church;
-        if ($church === null) {
+        $churchIds = app(ProtectedDomainCatalogQuery::class)->visibleChurchIds($scope) ?? [];
+        $relatedIds = collect([
+            ...$person->memberships->pluck('church_id'),
+            ...$person->firstTimers->pluck('church_id'),
+            ...$person->converts->pluck('church_id'),
+            ...$person->roleAssignments->pluck('church_id'),
+        ])->filter()->map(fn (mixed $id): int => (int) $id)->unique()->all();
+        if ($relatedIds === [] || array_intersect($relatedIds, $churchIds) === []) {
             throw new NotFoundHttpException;
         }
+    }
+
+    private function membershipChurchForCreate(Request $request, ProtectedAdminContext $context, ?string $churchPublicId): ?Church
+    {
+        $scope = $context->scope($request);
+        if ($churchPublicId === null && $scope->type === 'church') {
+            $churchPublicId = $scope->key;
+        }
+        if ($churchPublicId === null) {
+            if (! $context->isGlobal($scope)) {
+                abort(422, 'church_id is required when creating a person in a church scope.');
+            }
+
+            return null;
+        }
+        $church = Church::query()->where('public_id', $churchPublicId)->firstOrFail();
         $context->ensureContains($request, $church->scopeReference());
+
+        return $church;
     }
 
     public function converts(ListProtectedDomainRecordsRequest $request, ProtectedDomainCatalogQuery $catalog, ProtectedAdminContext $context): JsonResponse
@@ -963,7 +1013,11 @@ class ChurchMinistryOperationsController extends Controller
             'given_name' => ['nullable', 'string', 'max:100'],
             'family_name' => ['nullable', 'string', 'max:100'],
         ]);
-        $target = Person::query()->with('profile')->where('public_id', $person)->firstOrFail();
+        $target = Person::query()
+            ->with(['profile', 'memberships.church', 'firstTimers.church', 'converts.church', 'roleAssignments.church'])
+            ->where('public_id', $person)
+            ->firstOrFail();
+        $this->ensurePersonVisible($request, $context, $target);
         $this->execute(function () use ($target, $data): void {
             $profile = $target->profile;
             if ($profile === null) {

@@ -60,7 +60,7 @@ class AdminDashboardQuery
             AdminDashboardModule::Global => $this->global($scope, $period),
             AdminDashboardModule::Geography => $this->geography($scope, $period),
             AdminDashboardModule::HomeChurches => $this->homeChurches($scope, $period),
-            AdminDashboardModule::Church => $this->church($scope, $period),
+            AdminDashboardModule::Church => $this->church($scope, $period, $currency),
             AdminDashboardModule::People => $this->people($scope, $period),
             AdminDashboardModule::Kca => $this->kca($scope, $period),
             AdminDashboardModule::Mission => $this->mission($scope, $period),
@@ -186,7 +186,7 @@ class AdminDashboardQuery
         ];
     }
 
-    private function church(ScopeReference $scope, DashboardPeriod $period): array
+    private function church(ScopeReference $scope, DashboardPeriod $period, string $currency = 'NGN'): array
     {
         $churchQuery = $this->churchQuery($scope);
         $membershipQuery = $this->membershipQuery($scope);
@@ -212,6 +212,10 @@ class AdminDashboardQuery
         $withHomeChurch = (clone $membershipQuery)->whereNotNull('home_church_id')->count();
         $withoutHomeChurch = (clone $membershipQuery)->whereNull('home_church_id')->count();
         $totalMembers = max(1, (clone $membershipQuery)->count());
+        $givingQuery = PaymentTransaction::query();
+        $this->applyPayerChurchScope($givingQuery, $scope);
+        $this->constrainToPeriod($givingQuery, 'occurred_at', $period);
+        $givingMinor = (int) (clone $givingQuery)->sum('amount_minor');
 
         return [
             'metrics' => [
@@ -226,6 +230,7 @@ class AdminDashboardQuery
                 $this->metric('Small Groups', (clone $groupQuery)->count(), (clone $groupQuery), 'created_at', period: $period),
                 $this->metric('Evangelism', (clone $evangelismQuery)->count(), (clone $evangelismQuery), 'occurred_at', period: $period),
                 $this->metric('Attendance (Avg)', $attendanceCount),
+                $this->metric('Giving', $this->formatCurrency($givingMinor, $currency)),
             ],
             'breakdown' => $this->percentBreakdown([
                 ['With Home Church', $withHomeChurch],

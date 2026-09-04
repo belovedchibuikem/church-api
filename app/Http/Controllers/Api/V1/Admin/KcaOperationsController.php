@@ -25,6 +25,7 @@ use App\Http\Requests\Api\V1\Admin\ReviewKcaEvidenceRequest;
 use App\Http\Requests\Api\V1\Admin\RevokeKcaCertificateRequest;
 use App\Http\Requests\Api\V1\Admin\SubmitKcaEvidenceRequest;
 use App\Http\Requests\Api\V1\Admin\TransitionKcaApplicationRequest;
+use App\Http\Requests\Api\V1\Admin\TransitionKcaAssignmentRequest;
 use App\Http\Requests\Api\V1\Admin\UpdateKcaCohortRequest;
 use App\Http\Requests\Api\V1\Admin\UpdateKcaLessonRequest;
 use App\Http\Requests\Api\V1\Admin\UpdateKcaModuleRequest;
@@ -57,6 +58,7 @@ use App\Support\Identity\PersonDisplayName;
 use App\Support\Kca\CompleteKcaOrientationAction;
 use App\Support\Kca\CreateAdminKcaApplicationAction;
 use App\Support\Kca\CreateKcaAssignmentAction;
+use App\Support\Kca\DeleteKcaAssignmentAction;
 use App\Support\Kca\UpdateKcaAssignmentAction;
 use App\Support\Kca\CreateKcaChapterAction;
 use App\Support\Kca\CreateKcaCohortAction;
@@ -79,6 +81,7 @@ use App\Support\Kca\ReviewKcaEvidenceAction;
 use App\Support\Kca\RevokeKcaCertificateAction;
 use App\Support\Kca\SubmitKcaEvidenceAction;
 use App\Support\Kca\TransitionKcaApplicationToStatusAction;
+use App\Support\Kca\TransitionKcaAssignmentAction;
 use App\Support\Kca\UpdateKcaLessonAction;
 use App\Support\Kca\UpdateKcaModuleAction;
 use App\Support\Kca\VerifyKcaLeadershipRecommendationAction;
@@ -239,7 +242,7 @@ class KcaOperationsController extends Controller
         $target = KcaAssignment::query()->where('public_id', $assignment)->firstOrFail();
         $updated = $this->execute(fn (): KcaAssignment => $action->handle(
             $target,
-            KcaAssignmentState::from((string) $request->validated('status')),
+            KcaAssignmentState::fromStored((string) $request->validated('status')),
             $context->actor($request),
         ));
 
@@ -504,30 +507,67 @@ class KcaOperationsController extends Controller
     public function storeAssignment(CreateKcaStudentAssignmentRequest $request, CreateKcaAssignmentAction $action, ProtectedAdminContext $context): JsonResponse
     {
         $context->ensureGlobal($request);
-        $enrollment = KcaEnrollment::query()->where('public_id', $request->validated('kca_enrollment_id'))->firstOrFail();
-        $module = KcaModule::query()->where('public_id', $request->validated('kca_module_id'))->firstOrFail();
-        $lesson = KcaLesson::query()->where('public_id', $request->validated('kca_lesson_id'))->firstOrFail();
-        $dueAt = $request->validated('due_at')
-            ? CarbonImmutable::parse((string) $request->validated('due_at'))
+        $validated = $request->validated();
+        $enrollment = isset($validated['kca_enrollment_id'])
+            ? KcaEnrollment::query()->where('public_id', $validated['kca_enrollment_id'])->firstOrFail()
             : null;
-        $assignment = $this->execute(fn (): KcaAssignment => $action->handle(
+        $cohort = isset($validated['cohort_id'])
+            ? KcaCohort::query()->where('public_id', $validated['cohort_id'])->firstOrFail()
+            : null;
+        $module = KcaModule::query()->where('public_id', $validated['kca_module_id'])->firstOrFail();
+        $lesson = KcaLesson::query()->where('public_id', $validated['kca_lesson_id'])->firstOrFail();
+        $dueAt = isset($validated['due_at'])
+            ? CarbonImmutable::parse((string) $validated['due_at'])
+            : null;
+        $asDraft = filter_var($validated['as_draft'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        $result = $this->execute(fn (): array => $action->handleForAudience(
+            (string) ($validated['audience'] ?? 'student'),
             $enrollment,
+            $cohort,
             $module,
             $lesson,
-            (string) $request->validated('title'),
+            (string) $validated['title'],
             $context->actor($request),
-            (string) ($request->validated('assignment_kind') ?? 'standard'),
-            array_map('intval', $request->validated('soul_tree_levels') ?? []),
+            (string) ($validated['assignment_kind'] ?? 'standard'),
+            array_map('intval', $validated['soul_tree_levels'] ?? []),
             $dueAt,
+            $asDraft ? KcaAssignmentState::Draft : KcaAssignmentState::Assigned,
         ));
-        $assignment->load([
-            'enrollment:id,public_id',
-            ...PersonDisplayName::eager('enrollment.person'),
-            'module:id,public_id,code,title',
-            'lesson:id,public_id,code,title,kca_module_id',
-        ]);
 
-        return ApiResponse::success($request, (new ProtectedCatalogRecordResource($assignment))->resolve($request), status: 201);
+        $first = $result['assignments'][0] ?? null;
+        if ($first instanceof KcaAssignment) {
+            $first->load($this->assignmentCatalogRelations());
+        }
+
+        if ($result['created'] === 1 && $first instanceof KcaAssignment) {
+            return ApiResponse::success(
+                $request,
+                (new ProtectedCatalogRecordResource($first))->resolve($request),
+                status: 201,
+            );
+        }
+
+        return ApiResponse::success($request, [
+            'id' => $first?->public_id,
+            'created' => $result['created'],
+            'audience' => $result['audience'],
+            'assignment_ids' => array_map(
+                static fn (KcaAssignment $assignment): string => $assignment->public_id,
+                $result['assignments'],
+            ),
+            'first' => $first instanceof KcaAssignment
+                ? (new ProtectedCatalogRecordResource($first))->resolve($request)
+                : null,
+        ], status: 201);
+    }
+
+    public function showAssignment(Request $request, string $assignment, ProtectedAdminContext $context): JsonResponse
+    {
+        $context->ensureGlobal($request);
+        $target = KcaAssignment::query()->where('public_id', $assignment)->firstOrFail();
+        $target->load($this->assignmentCatalogRelations());
+
+        return ApiResponse::success($request, (new ProtectedCatalogRecordResource($target))->resolve($request));
     }
 
     public function updateAssignment(UpdateKcaStudentAssignmentRequest $request, string $assignment, UpdateKcaAssignmentAction $action, ProtectedAdminContext $context): JsonResponse
@@ -556,15 +596,24 @@ class KcaOperationsController extends Controller
                 : null,
             $module,
             $lesson,
+            isset($validated['assignment_kind']) ? (string) $validated['assignment_kind'] : null,
         ));
-        $updated->load([
-            'enrollment:id,public_id',
-            ...PersonDisplayName::eager('enrollment.person'),
-            'module:id,public_id,code,title',
-            'lesson:id,public_id,code,title,kca_module_id',
-        ]);
+        $updated->load($this->assignmentCatalogRelations());
 
         return ApiResponse::success($request, (new ProtectedCatalogRecordResource($updated))->resolve($request));
+    }
+
+    public function destroyAssignment(Request $request, string $assignment, DeleteKcaAssignmentAction $action, ProtectedAdminContext $context): JsonResponse
+    {
+        $context->ensureGlobal($request);
+        $target = KcaAssignment::query()->where('public_id', $assignment)->firstOrFail();
+        $this->execute(function () use ($action, $target, $context, $request): true {
+            $action->handle($target, $context->actor($request));
+
+            return true;
+        });
+
+        return ApiResponse::success($request, ['id' => $assignment, 'deleted' => true]);
     }
 
     public function storePrerequisite(CreateKcaModulePrerequisiteRequest $request, string $module, ProtectedAdminContext $context): JsonResponse
@@ -800,5 +849,19 @@ class KcaOperationsController extends Controller
         });
 
         return ApiResponse::success($request, ['id' => $prerequisite, 'deleted' => true]);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function assignmentCatalogRelations(): array
+    {
+        return [
+            'enrollment:id,public_id,person_id,kca_cohort_id,registration_number',
+            ...PersonDisplayName::eager('enrollment.person'),
+            'enrollment.cohort:id,public_id,name,code',
+            'module:id,public_id,code,title',
+            'lesson:id,public_id,code,title,kca_module_id',
+        ];
     }
 }

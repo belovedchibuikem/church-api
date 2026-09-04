@@ -158,7 +158,9 @@ class KcaStudentActivityQuery
             ],
             'assignments' => [
                 'open' => $assignments->filter(function (KcaAssignment $row): bool {
-                    $state = $row->state instanceof KcaAssignmentState ? $row->state : KcaAssignmentState::from((string) $row->state);
+                    $state = $row->state instanceof KcaAssignmentState
+                        ? $row->state
+                        : KcaAssignmentState::fromStored((string) $row->state);
 
                     return ! in_array($state, [KcaAssignmentState::Approved, KcaAssignmentState::FinalAssessment], true);
                 })->count(),

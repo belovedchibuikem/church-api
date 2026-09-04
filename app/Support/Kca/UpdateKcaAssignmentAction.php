@@ -30,6 +30,7 @@ class UpdateKcaAssignmentAction
         ?array $soulTreeLevels = null,
         ?KcaModule $module = null,
         ?KcaLesson $lesson = null,
+        ?string $kind = null,
     ): KcaAssignment {
         if ($assignment->state === KcaAssignmentState::FinalAssessment) {
             throw new InvalidArgumentException('Final-assessment assignments cannot be edited.');
@@ -64,8 +65,21 @@ class UpdateKcaAssignmentAction
         } elseif ($dueAt !== null) {
             $updates['due_at'] = $dueAt;
         }
+        if ($kind !== null) {
+            $normalizedKind = match ($kind) {
+                'soul_winning' => 'soul_winning',
+                'practical' => 'practical',
+                'written' => 'written',
+                default => 'standard',
+            };
+            $updates['assignment_kind'] = $normalizedKind;
+            if ($normalizedKind !== 'soul_winning') {
+                $updates['soul_tree_spec'] = null;
+            }
+        }
         if ($soulTreeLevels !== null) {
-            if (! $assignment->isSoulWinning()) {
+            $willBeSoulWinning = ($updates['assignment_kind'] ?? $assignment->assignment_kind ?? 'standard') === 'soul_winning';
+            if (! $willBeSoulWinning) {
                 throw new InvalidArgumentException('Soul tree levels only apply to soul-winning assignments.');
             }
             $levels = array_values(array_filter(array_map('intval', $soulTreeLevels), fn (int $n): bool => $n > 0));

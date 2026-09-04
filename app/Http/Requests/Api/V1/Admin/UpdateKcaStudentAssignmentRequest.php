@@ -25,6 +25,7 @@ class UpdateKcaStudentAssignmentRequest extends FormRequest
             'due_at' => ['nullable', 'date'],
             'soul_tree_levels' => ['nullable', 'array', 'min:1'],
             'soul_tree_levels.*' => ['integer', 'min:1', 'max:50'],
+            'assignment_kind' => ['sometimes', 'required', Rule::in(['standard', 'soul_winning', 'practical', 'written'])],
         ];
     }
 }

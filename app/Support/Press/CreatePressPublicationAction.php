@@ -48,6 +48,7 @@ class CreatePressPublicationAction
                     'description' => $data->description,
                     'cover_file_asset_id' => $data->coverFileAsset?->getKey(),
                     'content_file_asset_id' => $data->contentFileAsset?->getKey(),
+                    'content_source_url' => $data->contentSourceUrl,
                     'price_minor' => $data->priceMinor,
                     'currency_code' => $data->currencyCode,
                     'format' => $data->format,

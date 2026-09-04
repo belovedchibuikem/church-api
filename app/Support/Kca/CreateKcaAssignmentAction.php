@@ -4,6 +4,7 @@ namespace App\Support\Kca;
 
 use App\Kca\KcaAssignmentState;
 use App\Models\KcaAssignment;
+use App\Models\KcaCohort;
 use App\Models\KcaEnrollment;
 use App\Models\KcaLesson;
 use App\Models\KcaModule;
@@ -11,6 +12,7 @@ use App\Models\User;
 use App\Support\Audit\AuditEventData;
 use App\Support\Audit\RecordAuditEventAction;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -18,6 +20,64 @@ use InvalidArgumentException;
 class CreateKcaAssignmentAction
 {
     public function __construct(private RecordAuditEventAction $recordAuditEvent) {}
+
+    /**
+     * @param  list<int>  $soulTreeLevels
+     * @return array{created: int, audience: string, assignments: list<KcaAssignment>}
+     */
+    public function handleForAudience(
+        string $audience,
+        ?KcaEnrollment $enrollment,
+        ?KcaCohort $cohort,
+        KcaModule $module,
+        KcaLesson $lesson,
+        string $title,
+        User $actor,
+        string $kind = 'standard',
+        array $soulTreeLevels = [],
+        ?CarbonImmutable $dueAt = null,
+        KcaAssignmentState $state = KcaAssignmentState::Assigned,
+    ): array {
+        $normalizedAudience = $this->normalizeAudience($audience);
+        $enrollments = $this->resolveEnrollments($normalizedAudience, $enrollment, $cohort);
+        if ($enrollments->isEmpty()) {
+            throw new InvalidArgumentException('No enrolled students match the selected audience.');
+        }
+
+        $assignments = [];
+        DB::transaction(function () use (
+            $enrollments,
+            $module,
+            $lesson,
+            $title,
+            $actor,
+            $kind,
+            $soulTreeLevels,
+            $dueAt,
+            $state,
+            &$assignments,
+        ): void {
+            foreach ($enrollments as $target) {
+                $assignments[] = $this->handle(
+                    $target,
+                    $module,
+                    $lesson,
+                    $title,
+                    $actor,
+                    $kind,
+                    $soulTreeLevels,
+                    $dueAt,
+                    $state,
+                );
+            }
+        }, attempts: 3);
+
+        return [
+            'created' => count($assignments),
+            'audience' => $normalizedAudience,
+            'assignments' => $assignments,
+        ];
+    }
 
     /**
      * @param  list<int>  $soulTreeLevels
@@ -81,5 +141,45 @@ class CreateKcaAssignmentAction
 
             return $assignment;
         }, attempts: 3);
+    }
+
+    private function normalizeAudience(string $audience): string
+    {
+        $normalized = strtolower(trim($audience));
+        if ($normalized === '' || str_contains($normalized, 'one') || $normalized === 'student') {
+            return 'student';
+        }
+        if (str_contains($normalized, 'cohort')) {
+            return 'cohort';
+        }
+        if (str_contains($normalized, 'all')) {
+            return 'all';
+        }
+
+        throw new InvalidArgumentException('Audience must be one student, a cohort, or all enrolled students.');
+    }
+
+    /**
+     * @return Collection<int, KcaEnrollment>
+     */
+    private function resolveEnrollments(string $audience, ?KcaEnrollment $enrollment, ?KcaCohort $cohort): Collection
+    {
+        if ($audience === 'student') {
+            if ($enrollment === null) {
+                throw new InvalidArgumentException('Select the student to assign.');
+            }
+
+            return collect([$enrollment]);
+        }
+
+        $query = KcaEnrollment::query()->orderBy('id');
+        if ($audience === 'cohort') {
+            if ($cohort === null) {
+                throw new InvalidArgumentException('Select the cohort to assign.');
+            }
+            $query->whereBelongsTo($cohort, 'cohort');
+        }
+
+        return $query->get();
     }
 }

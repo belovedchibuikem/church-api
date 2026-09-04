@@ -59,8 +59,7 @@ final class MobilePermissionAliasCatalog
         'kca.mentoring.intervene' => 'kca.enrollments.view',
 
         // Church/home-church finance workspaces (staff catalog)
-        'church.finance.view' => 'finance.payment_intents.view',
-        'home_church.finance.view' => 'finance.payment_intents.view',
+        'home_church.finance.view' => 'church.finance.view',
 
         // Member self-service giving/history uses signed-in /user/payments
         // routes, not the admin finance catalog permissions.

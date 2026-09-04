@@ -39,6 +39,7 @@ class UpdatePressPublicationAction
                 'slug' => $data->slug,
                 'cover_file_asset_id' => $data->coverFileAsset?->getKey() ?? $locked->cover_file_asset_id,
                 'content_file_asset_id' => $data->contentFileAsset?->getKey() ?? $locked->content_file_asset_id,
+                'content_source_url' => $data->contentSourceUrl ?? $locked->content_source_url,
                 'price_minor' => $data->priceMinor,
                 'currency_code' => $data->currencyCode,
                 'format' => $data->format,

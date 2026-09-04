@@ -103,6 +103,8 @@ final class AuthorizationBundleCatalog
                 'church.first_timers.manage',
                 'church.follow_up.view',
                 'church.follow_up.complete',
+                'church.finance.view',
+                'church.finance.manage',
             ],
         ],
         self::MISSION_OPERATIONS_ADMINISTRATOR_ROLE => [

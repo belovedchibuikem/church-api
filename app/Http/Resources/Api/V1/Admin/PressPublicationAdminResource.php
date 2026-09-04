@@ -35,6 +35,8 @@ class PressPublicationAdminResource extends JsonResource
             'page_count' => $publication->page_count,
             'format' => $publication->format->value,
             'publication_type' => $publication->publicationType()->value,
+            'content_file_asset_id' => $publication->contentFileAsset?->public_id,
+            'content_source_url' => $publication->content_source_url,
             'availability' => $publication->availability->value,
             'visibility' => $publication->visibilityEnum()->value,
             'featured' => (bool) $publication->featured,

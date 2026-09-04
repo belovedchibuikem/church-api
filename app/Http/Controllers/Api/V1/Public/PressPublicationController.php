@@ -57,14 +57,20 @@ class PressPublicationController extends Controller
         );
     }
 
-    public function download(ShowPressPublicationRequest $request, string $publicId): StreamedResponse
+    public function download(ShowPressPublicationRequest $request, string $publicId): StreamedResponse|\Illuminate\Http\RedirectResponse
     {
         $publication = $this->publications->findByPublicIdOrFail($publicId);
         $contentFileAssetId = PressPublication::query()
             ->whereKey($publication->getKey())
             ->value('content_file_asset_id');
+        $contentSourceUrl = PressPublication::query()
+            ->whereKey($publication->getKey())
+            ->value('content_source_url');
 
         if ($contentFileAssetId === null) {
+            if (is_string($contentSourceUrl) && $contentSourceUrl !== '') {
+                return redirect()->away($contentSourceUrl);
+            }
             abort(404);
         }
 

@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\V1\Admin\AdminProfileController;
 use App\Http\Controllers\Api\V1\Admin\AdminWorkItemController;
 use App\Http\Controllers\Api\V1\Admin\AdvisoryAiOperationsController;
 use App\Http\Controllers\Api\V1\Admin\AuditReviewController;
+use App\Http\Controllers\Api\V1\Admin\ChurchFinanceOperationsController;
 use App\Http\Controllers\Api\V1\Admin\ChurchMinistryOperationsController;
 use App\Http\Controllers\Api\V1\Admin\ChurchOperationsController;
 use App\Http\Controllers\Api\V1\Admin\CommunicationOperationsController;
@@ -504,6 +505,8 @@ Route::prefix('church')->name('church.ministry.')->controller(ChurchMinistryOper
     Route::delete('/groups/{group}', 'destroyChurchGroup')->whereUlid('group')->middleware(RequirePermissionAndScope::class.':church.churches.manage')->name('groups.destroy');
     Route::get('/announcements', 'announcements')->middleware(RequirePermissionAndScope::class.':church.churches.view')->name('announcements.index');
     Route::post('/announcements', 'storeAnnouncement')->middleware(RequirePermissionAndScope::class.':church.churches.manage')->name('announcements.store');
+    Route::get('/giving-transactions', [ChurchFinanceOperationsController::class, 'transactions'])->middleware(RequirePermissionAndScope::class.':church.finance.view')->name('giving_transactions.index');
+    Route::post('/giving-records', [ChurchFinanceOperationsController::class, 'storeGiving'])->middleware(RequirePermissionAndScope::class.':church.finance.manage')->name('giving_records.store');
 });
 
 Route::prefix('safeguarding')->name('safeguarding.')->controller(SafeguardingOperationsController::class)->group(function (): void {
@@ -559,7 +562,9 @@ Route::prefix('kca')->name('kca.')->controller(KcaOperationsController::class)->
     Route::patch('/lessons/{lesson}', 'updateLesson')->whereUlid('lesson')->middleware(RequirePermissionAndScope::class.':kca.lessons.manage')->name('lessons.update');
     Route::post('/lessons/{lesson}/chapters', 'storeChapter')->whereUlid('lesson')->middleware(RequirePermissionAndScope::class.':kca.lessons.manage')->name('lessons.chapters.store');
     Route::post('/assignments', 'storeAssignment')->middleware(RequirePermissionAndScope::class.':kca.assignments.transition')->name('assignments.store');
+    Route::get('/assignments/{assignment}', 'showAssignment')->whereUlid('assignment')->middleware(RequirePermissionAndScope::class.':kca.enrollments.view')->name('assignments.show');
     Route::patch('/assignments/{assignment}', 'updateAssignment')->whereUlid('assignment')->middleware(RequirePermissionAndScope::class.':kca.assignments.transition')->name('assignments.update');
+    Route::delete('/assignments/{assignment}', 'destroyAssignment')->whereUlid('assignment')->middleware(RequirePermissionAndScope::class.':kca.assignments.transition')->name('assignments.destroy');
     Route::post('/modules/{module}/prerequisites', 'storePrerequisite')->whereUlid('module')->middleware(RequirePermissionAndScope::class.':kca.modules.manage')->name('modules.prerequisites.store');
     Route::post('/lecturer-assignments', 'storeLecturerAssignment')->middleware(RequirePermissionAndScope::class.':kca.modules.manage')->name('lecturer_assignments.store');
     Route::patch('/lecturer-assignments/{assignment}', 'updateLecturerAssignment')->whereUlid('assignment')->middleware(RequirePermissionAndScope::class.':kca.modules.manage')->name('lecturer_assignments.update');

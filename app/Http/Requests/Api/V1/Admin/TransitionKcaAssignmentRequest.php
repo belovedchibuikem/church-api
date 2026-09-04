@@ -23,4 +23,12 @@ class TransitionKcaAssignmentRequest extends FormRequest
             'status' => ['required', Rule::enum(KcaAssignmentState::class)],
         ];
     }
+
+    protected function prepareForValidation(): void
+    {
+        $status = $this->input('status');
+        if (is_string($status) && $status !== '') {
+            $this->merge(['status' => KcaAssignmentState::fromStored($status)->value]);
+        }
+    }
 }

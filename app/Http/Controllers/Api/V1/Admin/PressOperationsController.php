@@ -77,6 +77,8 @@ class PressOperationsController extends Controller
         $target->load([
             ...PersonDisplayName::eager('contributors.person'),
             'assets.fileAsset',
+            'contentFileAsset',
+            'coverFileAsset',
             ...PersonDisplayName::eager('reviews.reviewer'),
             'translations',
         ]);
@@ -301,6 +303,7 @@ class PressOperationsController extends Controller
             description: $request->validated('description'),
             coverFileAsset: $cover,
             contentFileAsset: $content,
+            contentSourceUrl: $request->validated('content_source_url'),
             priceMinor: $request->validated('price_minor') === null ? null : (int) $request->validated('price_minor'),
             currencyCode: $request->validated('currency_code'),
             publicationType: PressPublicationType::from((string) $request->validated('publication_type', PressPublicationType::Book->value)),

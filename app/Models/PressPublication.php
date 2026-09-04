@@ -20,8 +20,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
     'title', 'subtitle', 'publisher_name', 'edition', 'publication_date', 'copyright_year',
-    'language_code', 'page_count', 'category', 'description', 'cover_file_asset_id',
-    'content_file_asset_id', 'price_minor', 'currency_code', 'format', 'summary', 'slug',
+    'language_code', 'page_count', 'category', 'description',     'cover_file_asset_id',
+    'content_file_asset_id', 'content_source_url', 'price_minor', 'currency_code', 'format', 'summary', 'slug',
 ])]
 #[Hidden(['idempotency_key_hash', 'request_fingerprint'])]
 class PressPublication extends Model
