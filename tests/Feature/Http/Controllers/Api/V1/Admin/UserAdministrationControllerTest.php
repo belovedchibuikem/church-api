@@ -43,6 +43,11 @@ class UserAdministrationControllerTest extends TestCase
             ->assertOk()
             ->assertJsonFragment(['email' => 'staff.admin@example.test'])
             ->assertJsonMissing(['email' => 'app.member@example.test']);
+
+        $this->withHeaders($this->globalScopeHeaders())
+            ->getJson('/api/v1/admin/users?filter[exclude_app_members]=true&page=1&per_page=25&sort=-created_at')
+            ->assertOk()
+            ->assertJsonFragment(['email' => 'staff.admin@example.test']);
     }
 
     public function test_lists_users_with_opaque_ids_for_global_authority(): void

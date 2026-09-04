@@ -18,6 +18,39 @@ class ListUsersRequest extends FormRequest
         return true;
     }
 
+    protected function prepareForValidation(): void
+    {
+        $filter = $this->input('filter');
+        if (! is_array($filter)) {
+            return;
+        }
+
+        foreach (['email_verified', 'exclude_app_members'] as $key) {
+            if (! array_key_exists($key, $filter)) {
+                continue;
+            }
+            $value = $filter[$key];
+            if (is_bool($value)) {
+                continue;
+            }
+            if (is_int($value) || is_float($value)) {
+                $filter[$key] = ((int) $value) === 1;
+                continue;
+            }
+            if (! is_string($value)) {
+                continue;
+            }
+            $normalized = strtolower(trim($value));
+            if (in_array($normalized, ['true', '1', 'yes', 'on'], true)) {
+                $filter[$key] = true;
+            } elseif (in_array($normalized, ['false', '0', 'no', 'off'], true)) {
+                $filter[$key] = false;
+            }
+        }
+
+        $this->merge(['filter' => $filter]);
+    }
+
     /**
      * Get the validation rules that apply to the request.
      *

@@ -138,6 +138,64 @@ class SubmitKcaEvidenceActionTest extends TestCase
         );
     }
 
+    public function test_internal_classification_is_accepted_for_kca_evidence(): void
+    {
+        [$assignment, $enrollment, $person, $actor] = $this->evidenceContext();
+        $file = FileAsset::factory()
+            ->available()
+            ->for($person, 'owner')
+            ->create([
+                'purpose' => 'kca.evidence',
+                'classification' => FileAssetClassification::Internal,
+            ]);
+
+        $this->app->make(SubmitKcaEvidenceAction::class)->handle(
+            $assignment,
+            $enrollment,
+            $file,
+            $person,
+            'mobile-retry-internal',
+            $actor,
+        );
+
+        $this->assertSame(1, KcaEvidenceSubmission::query()->count());
+        $this->assertSame(KcaAssignmentState::Submitted, $assignment->refresh()->state);
+    }
+
+    public function test_soul_winning_evidence_is_kept_without_closing_an_open_tree(): void
+    {
+        [$assignment, $enrollment, $person, $actor, $file] = $this->evidenceContext();
+        $assignment->forceFill([
+            'assignment_kind' => 'soul_winning',
+            'soul_tree_spec' => ['levels' => [1, 1]],
+        ])->save();
+
+        $this->app->make(SubmitKcaEvidenceAction::class)->handle(
+            $assignment,
+            $enrollment,
+            $file,
+            $person,
+            'mobile-retry-soul-open',
+            $actor,
+        );
+
+        $this->assertSame(1, KcaEvidenceSubmission::query()->count());
+        $this->assertSame(KcaAssignmentState::Assigned, $assignment->refresh()->state);
+    }
+
+    public function test_additional_evidence_can_be_added_after_submit(): void
+    {
+        [$assignment, $enrollment, $person, $actor, $file] = $this->evidenceContext();
+        $action = $this->app->make(SubmitKcaEvidenceAction::class);
+        $action->handle($assignment, $enrollment, $file, $person, 'mobile-retry-7a', $actor);
+        $second = $this->evidenceFile($person);
+
+        $action->handle($assignment->refresh(), $enrollment, $second, $person, 'mobile-retry-7b', $actor);
+
+        $this->assertSame(2, KcaEvidenceSubmission::query()->count());
+        $this->assertSame(KcaAssignmentState::Submitted, $assignment->refresh()->state);
+    }
+
     public function test_audit_failure_rolls_back_evidence_and_assignment_state(): void
     {
         [$assignment, $enrollment, $person, $actor, $file] = $this->evidenceContext();

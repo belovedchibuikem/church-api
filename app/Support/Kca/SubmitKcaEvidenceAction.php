@@ -83,6 +83,7 @@ class SubmitKcaEvidenceAction
             if (
                 $lockedFileAsset->purpose !== 'kca.evidence'
                 || ! in_array($lockedFileAsset->classification, [
+                    FileAssetClassification::Internal,
                     FileAssetClassification::Confidential,
                     FileAssetClassification::Restricted,
                 ], true)
@@ -93,8 +94,26 @@ class SubmitKcaEvidenceAction
             }
 
             $from = $lockedAssignment->state;
-            $this->transitions->assertCanTransition($from, KcaAssignmentState::Submitted);
-            app(KcaSoulTreeService::class)->assertCompleteForClosure($lockedAssignment);
+            if (! in_array($from, [
+                KcaAssignmentState::Assigned,
+                KcaAssignmentState::Resubmit,
+                KcaAssignmentState::Submitted,
+            ], true)) {
+                throw new InvalidArgumentException('This assignment is no longer accepting photos or videos.');
+            }
+
+            $treeReady = ! $lockedAssignment->isSoulWinning()
+                || app(KcaSoulTreeService::class)->isComplete($lockedAssignment);
+            $shouldClose = in_array($from, [
+                KcaAssignmentState::Assigned,
+                KcaAssignmentState::Resubmit,
+            ], true) && $treeReady;
+
+            if ($shouldClose) {
+                $this->transitions->assertCanTransition($from, KcaAssignmentState::Submitted);
+                app(KcaSoulTreeService::class)->assertCompleteForClosure($lockedAssignment);
+            }
+
             $now = now()->utc();
             $submission = (new KcaEvidenceSubmission)->forceFill([
                 'kca_assignment_id' => $lockedAssignment->getKey(),
@@ -106,10 +125,14 @@ class SubmitKcaEvidenceAction
             ]);
             $submission->save();
 
-            $lockedAssignment->state = KcaAssignmentState::Submitted;
-            $lockedAssignment->submitted_at = $now;
-            $lockedAssignment->last_transitioned_by_user_id = $actor->getKey();
-            $lockedAssignment->save();
+            $to = $from;
+            if ($shouldClose) {
+                $lockedAssignment->state = KcaAssignmentState::Submitted;
+                $lockedAssignment->submitted_at = $now;
+                $lockedAssignment->last_transitioned_by_user_id = $actor->getKey();
+                $lockedAssignment->save();
+                $to = KcaAssignmentState::Submitted;
+            }
 
             $this->recordAuditEvent->handle(new AuditEventData(
                 action: 'kca.evidence.submitted',
@@ -122,7 +145,7 @@ class SubmitKcaEvidenceAction
                     'assignment_id' => $lockedAssignment->public_id,
                     'file_asset_id' => $lockedFileAsset->public_id,
                     'from' => $from->value,
-                    'to' => KcaAssignmentState::Submitted->value,
+                    'to' => $to->value,
                 ],
             ));
 

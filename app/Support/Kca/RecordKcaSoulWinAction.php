@@ -2,6 +2,7 @@
 
 namespace App\Support\Kca;
 
+use App\Kca\KcaAssignmentState;
 use App\Models\KcaAssignment;
 use App\Models\KcaSoulWin;
 use App\Models\User;
@@ -44,6 +45,20 @@ class RecordKcaSoulWinAction
                 'won_at' => now()->utc(),
             ]);
 
+            $complete = $this->tree->isComplete($locked->fresh());
+            if (
+                $complete
+                && in_array($locked->state, [KcaAssignmentState::Assigned, KcaAssignmentState::Resubmit], true)
+                && $locked->evidenceSubmissions()->exists()
+            ) {
+                app(KcaAssignmentTransitionService::class)
+                    ->assertCanTransition($locked->state, KcaAssignmentState::Submitted);
+                $locked->state = KcaAssignmentState::Submitted;
+                $locked->submitted_at = now()->utc();
+                $locked->last_transitioned_by_user_id = $actor->getKey();
+                $locked->save();
+            }
+
             $this->recordAuditEvent->handle(new AuditEventData(
                 action: 'kca.soul_win.recorded',
                 actor: $actor,
@@ -52,7 +67,7 @@ class RecordKcaSoulWinAction
                 metadata: [
                     'assignment_id' => $locked->public_id,
                     'depth' => $depth,
-                    'complete' => $this->tree->isComplete($locked->fresh()),
+                    'complete' => $complete,
                 ],
             ));
 

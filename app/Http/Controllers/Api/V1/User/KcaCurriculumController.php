@@ -465,6 +465,7 @@ class KcaCurriculumController extends Controller
             ->with([
                 'module:id,public_id,code,title,sequence',
                 'lesson:id,public_id,code,title,sequence,kca_module_id',
+                'evidenceSubmissions.fileAsset:id,public_id,detected_mime_type,metadata',
             ])
             ->where('public_id', $assignment)
             ->where('kca_enrollment_id', $enrollment->getKey())

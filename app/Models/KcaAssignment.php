@@ -76,6 +76,11 @@ class KcaAssignment extends Model
         return ($this->assignment_kind ?? 'standard') === 'soul_winning';
     }
 
+    public function requiresMedia(): bool
+    {
+        return in_array($this->assignment_kind ?? 'standard', ['practical', 'written', 'soul_winning'], true);
+    }
+
     protected function casts(): array
     {
         return [

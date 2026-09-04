@@ -181,6 +181,7 @@ class KcaStudentActivityQuery
             'title' => $assignment->title,
             'state' => $state,
             'assignment_kind' => $assignment->assignment_kind ?? 'standard',
+            'requires_media' => $assignment->requiresMedia(),
             'due_at' => $assignment->due_at?->toIso8601String(),
             'assigned_at' => $assignment->assigned_at?->toIso8601String(),
             'submitted_at' => $assignment->submitted_at?->toIso8601String(),
@@ -199,6 +200,21 @@ class KcaStudentActivityQuery
         ];
         if ($assignment->isSoulWinning()) {
             $payload['soul_tree'] = $this->soulTree->progress($assignment);
+        }
+
+        if ($assignment->relationLoaded('evidenceSubmissions')) {
+            $payload['evidence'] = $assignment->evidenceSubmissions->map(function ($submission): array {
+                $file = $submission->fileAsset;
+                $metadata = is_array($file?->metadata) ? $file->metadata : [];
+
+                return [
+                    'id' => $submission->public_id,
+                    'file_asset_id' => $file?->public_id,
+                    'filename' => $metadata['original_filename'] ?? null,
+                    'mime' => $file?->detected_mime_type,
+                    'submitted_at' => $submission->submitted_at?->utc()->toIso8601String(),
+                ];
+            })->values()->all();
         }
 
         return $payload;
