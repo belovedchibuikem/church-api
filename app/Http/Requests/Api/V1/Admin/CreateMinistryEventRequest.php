@@ -28,6 +28,7 @@ class CreateMinistryEventRequest extends FormRequest
             'fee_amount_minor' => ['nullable', 'integer', 'min:0'],
             'fee_currency' => ['nullable', 'string', 'size:3'],
             'capacity' => ['nullable', 'integer', 'min:1'],
+            'is_important' => ['sometimes', 'boolean'],
             'published_at' => ['nullable', 'date'],
         ];
     }

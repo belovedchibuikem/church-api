@@ -55,6 +55,7 @@ class EventOperationsController extends Controller
                 : (int) $request->validated('fee_amount_minor'),
             'feeCurrency' => $request->validated('fee_currency'),
             'capacity' => $request->validated('capacity') === null ? null : (int) $request->validated('capacity'),
+            'isImportant' => (bool) ($request->validated('is_important') ?? false),
             'publishedAt' => $request->validated('published_at') === null
                 ? null
                 : CarbonImmutable::parse((string) $request->validated('published_at')),
@@ -124,6 +125,9 @@ class EventOperationsController extends Controller
             $attributes['capacity'] = $request->validated('capacity') === null
                 ? null
                 : (int) $request->validated('capacity');
+        }
+        if ($request->has('is_important')) {
+            $attributes['is_important'] = (bool) $request->validated('is_important');
         }
         if ($request->has('published_at')) {
             $attributes['published_at'] = $request->validated('published_at') === null

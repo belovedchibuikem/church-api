@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['location_id', 'category_code', 'name', 'starts_at', 'ends_at', 'registration_opens_at', 'registration_closes_at', 'fee_amount_minor', 'fee_currency', 'capacity', 'published_at'])]
+#[Fillable(['location_id', 'category_code', 'name', 'starts_at', 'ends_at', 'registration_opens_at', 'registration_closes_at', 'fee_amount_minor', 'fee_currency', 'capacity', 'is_important', 'published_at'])]
 class MinistryEvent extends Model
 {
     /** @use HasFactory<MinistryEventFactory> */
@@ -53,7 +53,7 @@ class MinistryEvent extends Model
         return [
             'starts_at' => 'immutable_datetime', 'ends_at' => 'immutable_datetime',
             'registration_opens_at' => 'immutable_datetime', 'registration_closes_at' => 'immutable_datetime',
-            'fee_amount_minor' => 'integer', 'capacity' => 'integer', 'published_at' => 'immutable_datetime',
+            'fee_amount_minor' => 'integer', 'capacity' => 'integer', 'is_important' => 'boolean', 'published_at' => 'immutable_datetime',
         ];
     }
 }

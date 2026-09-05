@@ -11,6 +11,7 @@ use App\Mission\MissionSoulJourneyStatus;
 use App\Models\AccessDecision;
 use App\Models\AdministrativeUnit;
 use App\Models\AuditEvent;
+use App\Models\BibleReadingPosition;
 use App\Models\Church;
 use App\Models\ChurchDepartment;
 use App\Models\ChurchGroup;
@@ -88,8 +89,21 @@ class AdminDashboardQuery
         $churchQuery = $this->churchQuery($scope);
         $homeChurchQuery = $this->homeChurchQuery($scope);
         $membershipQuery = $this->membershipQuery($scope);
+        $bibleReadersQuery = $this->bibleReadersQuery($scope);
         $countriesWithChurches = $this->churchUnitsQuery($scope)
             ->join('countries', 'countries.id', '=', 'administrative_units.country_id');
+        $dailyBibleReaders = (clone $bibleReadersQuery)
+            ->where('updated_at', '>=', now()->startOfDay())
+            ->distinct()
+            ->count('person_id');
+        $weeklyBibleReaders = (clone $bibleReadersQuery)
+            ->where('updated_at', '>=', now()->startOfWeek())
+            ->distinct()
+            ->count('person_id');
+        $yearlyBibleReaders = (clone $bibleReadersQuery)
+            ->where('updated_at', '>=', now()->startOfYear())
+            ->distinct()
+            ->count('person_id');
 
         return [
             'metrics' => [
@@ -97,6 +111,9 @@ class AdminDashboardQuery
                 $this->metric('Home Churches', (clone $homeChurchQuery)->count(), (clone $homeChurchQuery), 'created_at', period: $period),
                 $this->metric('Members', (clone $membershipQuery)->count(), (clone $membershipQuery), 'joined_at', period: $period),
                 $this->presenceMetric('Countries', $countriesWithChurches, 'countries.id', $period),
+                $this->metric('Bible Readers (Day)', $dailyBibleReaders),
+                $this->metric('Bible Readers (Week)', $weeklyBibleReaders),
+                $this->metric('Bible Readers (Year)', $yearlyBibleReaders),
             ],
             'breakdown' => $this->topCountriesByChurches($scope, 5),
             'series' => $this->monthlySeries((clone $churchQuery), 'created_at', $period),
@@ -543,6 +560,7 @@ class AdminDashboardQuery
         $churchQuery = $this->churchQuery($scope);
         $homeChurchQuery = $this->homeChurchQuery($scope);
         $membershipQuery = $this->membershipQuery($scope);
+        $bibleReadersQuery = $this->bibleReadersQuery($scope);
 
         $countryCount = $this->distinctChurchGeographyCount(
             $this->churchUnitsQuery($scope)->join('countries', 'countries.id', '=', 'administrative_units.country_id'),
@@ -551,6 +569,18 @@ class AdminDashboardQuery
         $peopleCount = (clone $membershipQuery)->count();
         $churchCount = (clone $churchQuery)->count();
         $homeChurchCount = (clone $homeChurchQuery)->count();
+        $dailyBibleReaders = (clone $bibleReadersQuery)
+            ->where('updated_at', '>=', now()->startOfDay())
+            ->distinct()
+            ->count('person_id');
+        $weeklyBibleReaders = (clone $bibleReadersQuery)
+            ->where('updated_at', '>=', now()->startOfWeek())
+            ->distinct()
+            ->count('person_id');
+        $yearlyBibleReaders = (clone $bibleReadersQuery)
+            ->where('updated_at', '>=', now()->startOfYear())
+            ->distinct()
+            ->count('person_id');
         $breakdown = $this->topCountriesByChurches($scope, 5);
 
         return [
@@ -559,6 +589,9 @@ class AdminDashboardQuery
                 $this->metric('Active Churches', $churchCount, (clone $churchQuery), 'created_at', period: $period),
                 $this->metric('Home Churches', $homeChurchCount, (clone $homeChurchQuery), 'created_at', period: $period),
                 $this->metric('Countries', $countryCount),
+                $this->metric('Bible Readers (Day)', $dailyBibleReaders),
+                $this->metric('Bible Readers (Week)', $weeklyBibleReaders),
+                $this->metric('Bible Readers (Year)', $yearlyBibleReaders),
             ],
             'breakdown' => $breakdown,
             'donut' => [
@@ -781,6 +814,36 @@ class AdminDashboardQuery
         }
 
         return $query->count();
+    }
+
+    /** @return Builder<BibleReadingPosition> */
+    private function bibleReadersQuery(ScopeReference $scope): Builder
+    {
+        $query = BibleReadingPosition::query();
+        $churchIds = $this->churchIds($scope);
+
+        if ($churchIds === null) {
+            return $query;
+        }
+
+        $homeChurchPublicId = $scope->type === 'home_church' ? $scope->key : null;
+        $homeChurchId = null;
+        if ($homeChurchPublicId !== null) {
+            $homeChurchId = HomeChurch::query()
+                ->where('public_id', $homeChurchPublicId)
+                ->value('id');
+        }
+
+        $query->whereHas('person.memberships', function (Builder $membershipQuery) use ($churchIds, $homeChurchId): void {
+            $membershipQuery
+                ->whereIn('church_id', $churchIds)
+                ->where('status', ChurchMembershipStatus::Active->value);
+            if ($homeChurchId !== null) {
+                $membershipQuery->where('home_church_id', $homeChurchId);
+            }
+        });
+
+        return $query;
     }
 
     /**

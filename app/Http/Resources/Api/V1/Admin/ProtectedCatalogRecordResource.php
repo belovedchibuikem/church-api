@@ -368,6 +368,7 @@ class ProtectedCatalogRecordResource extends JsonResource
                 'fee_amount_minor' => $this->fee_amount_minor,
                 'fee_currency' => $this->fee_currency,
                 'capacity' => $this->capacity,
+                'is_important' => (bool) $this->is_important,
                 'status' => \App\Events\MinistryEventLifecycleStatus::forEvent($this->resource)->value,
                 'updated_at' => $this->updated_at?->utc()->toIso8601String(),
             ],

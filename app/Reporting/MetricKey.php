@@ -39,4 +39,7 @@ enum MetricKey: string
     case PressSales = 'press.sales';
     case PressLanguages = 'press.languages';
     case PressReaders = 'press.readers';
+    case BibleReadersDay = 'bible.readers_day';
+    case BibleReadersWeek = 'bible.readers_week';
+    case BibleReadersYear = 'bible.readers_year';
 }

@@ -6,6 +6,7 @@ use App\Communication\CommunicationChannel;
 use App\Communication\CommunicationDeliveryStatus;
 use App\Models\AdministrativeLevel;
 use App\Models\AdministrativeUnit;
+use App\Models\BibleReadingPosition;
 use App\Models\Church;
 use App\Models\ChurchMembership;
 use App\Models\CommunicationBroadcast;
@@ -330,6 +331,15 @@ class AdminDashboardApiTest extends TestCase
         Country::factory()->count(4)->create();
         Church::factory()->count(2)->create();
         ChurchMembership::factory()->count(3)->create(['status' => 'active']);
+        $reader = User::factory()->withPerson()->create();
+        BibleReadingPosition::query()->forceCreate([
+            'public_id' => (string) \Illuminate\Support\Str::ulid(),
+            'person_id' => $reader->person->getKey(),
+            'book_id' => 'john',
+            'chapter' => 1,
+            'created_at' => now()->subHours(2),
+            'updated_at' => now()->subHours(2),
+        ]);
 
         $expectedCountries = (int) Church::query()
             ->join('administrative_units', 'administrative_units.id', '=', 'churches.administrative_unit_id')
@@ -351,6 +361,9 @@ class AdminDashboardApiTest extends TestCase
             ->assertJsonPath('data.metrics.2.label', 'Home Churches')
             ->assertJsonPath('data.metrics.3.label', 'Countries')
             ->assertJsonPath('data.metrics.3.value', number_format($expectedCountries))
+            ->assertJsonPath('data.metrics.4.label', 'Bible Readers (Day)')
+            ->assertJsonPath('data.metrics.5.label', 'Bible Readers (Week)')
+            ->assertJsonPath('data.metrics.6.label', 'Bible Readers (Year)')
             ->assertJsonPath('data.donut.label', 'People');
     }
 

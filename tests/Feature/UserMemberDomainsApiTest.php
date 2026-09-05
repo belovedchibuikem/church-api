@@ -74,6 +74,10 @@ class UserMemberDomainsApiTest extends TestCase
             ->assertJsonPath('data.unread_notification_count', 0)
             ->assertJsonPath('data.open_prayer_count', 0)
             ->assertJsonPath('data.upcoming_note', null)
+            ->assertJsonPath('data.important_event', null)
+            ->assertJsonPath('data.bible_reader_counts.day', 0)
+            ->assertJsonPath('data.bible_reader_counts.week', 0)
+            ->assertJsonPath('data.bible_reader_counts.year', 0)
             ->assertJsonStructure([
                 'data' => [
                     'profile',
@@ -81,6 +85,8 @@ class UserMemberDomainsApiTest extends TestCase
                     'recent_payment_intents',
                     'open_prayer_count',
                     'upcoming_note',
+                    'important_event',
+                    'bible_reader_counts',
                 ],
             ]);
     }

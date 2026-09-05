@@ -9,6 +9,7 @@ use App\Support\Audit\AuditEventData;
 use App\Support\Audit\RecordAuditEventAction;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 
@@ -28,6 +29,7 @@ class CreateMinistryEventAction
      *     feeAmountMinor?: int|null,
      *     feeCurrency?: string|null,
      *     capacity?: int|null,
+     *     isImportant?: bool|null,
      *     publishedAt?: CarbonImmutable|null
      * }  $attributes
      */
@@ -58,7 +60,7 @@ class CreateMinistryEventAction
                 ? null
                 : Location::query()->lockForUpdate()->findOrFail($location->getKey());
 
-            $event = MinistryEvent::query()->create([
+            $data = [
                 'location_id' => $lockedLocation?->getKey(),
                 'category_code' => $categoryCode,
                 'name' => $name,
@@ -70,7 +72,12 @@ class CreateMinistryEventAction
                 'fee_currency' => $attributes['feeCurrency'] ?? null,
                 'capacity' => $attributes['capacity'] ?? null,
                 'published_at' => $attributes['publishedAt'] ?? null,
-            ]);
+            ];
+            if (Schema::hasColumn('ministry_events', 'is_important')) {
+                $data['is_important'] = (bool) ($attributes['isImportant'] ?? false);
+            }
+
+            $event = MinistryEvent::query()->create($data);
 
             $this->recordAuditEvent->handle(new AuditEventData(
                 action: 'events.event.created',

@@ -66,6 +66,9 @@ final class MetricDefinitionRegistry
             MetricKey::PressSales => new MetricDefinition($key, 'Sales', 'Sales from reconciled payment transactions only.', 'reconciled_sum'),
             MetricKey::PressLanguages => $this->count($key, 'Languages', 'Distinct published translation languages.'),
             MetricKey::PressReaders => $this->aggregate($key, 'Readers', 'Privacy-safe distinct readership estimate.'),
+            MetricKey::BibleReadersDay => $this->periodCount($key, 'Bible readers (day)', 'Distinct readers active today based on Bible reading activity updates.', true),
+            MetricKey::BibleReadersWeek => $this->periodCount($key, 'Bible readers (week)', 'Distinct readers active this week based on Bible reading activity updates.', true),
+            MetricKey::BibleReadersYear => $this->periodCount($key, 'Bible readers (year)', 'Distinct readers active this year based on Bible reading activity updates.', true),
         };
     }
 

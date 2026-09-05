@@ -9,6 +9,7 @@ use App\Support\Audit\AuditEventData;
 use App\Support\Audit\RecordAuditEventAction;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 
@@ -57,7 +58,11 @@ class UpdateMinistryEventAction
                 }
             }
 
-            foreach (['fee_amount_minor', 'capacity'] as $field) {
+            $numericAndBooleanFields = ['fee_amount_minor', 'capacity'];
+            if (Schema::hasColumn('ministry_events', 'is_important')) {
+                $numericAndBooleanFields[] = 'is_important';
+            }
+            foreach ($numericAndBooleanFields as $field) {
                 if (array_key_exists($field, $attributes)) {
                     $locked->{$field} = $attributes[$field];
                 }
