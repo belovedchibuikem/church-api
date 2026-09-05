@@ -38,9 +38,21 @@ enum PressPublicationType: string
     public function assertCreateRequirements(array $metadata): void
     {
         match ($this) {
-            self::Sermon => $this->requireAny($metadata, ['speaker', 'preacher', 'speaker_name']),
-            self::Devotional => $this->requireAny($metadata, ['body', 'reflection', 'content']),
-            self::BibleStudy => $this->requireAny($metadata, ['passage', 'scripture', 'session_passage']),
+            self::Sermon => $this->requireAny(
+                $metadata,
+                ['speaker', 'preacher', 'speaker_name'],
+                'Sermons require a speaker or preacher name.',
+            ),
+            self::Devotional => $this->requireAny(
+                $metadata,
+                ['body', 'reflection', 'content'],
+                'Devotionals require a reflection or body.',
+            ),
+            self::BibleStudy => $this->requireAny(
+                $metadata,
+                ['passage', 'scripture', 'session_passage'],
+                'Study manuals require a scripture passage.',
+            ),
             self::DocumentPdf, self::Book => null,
         };
     }
@@ -49,7 +61,7 @@ enum PressPublicationType: string
      * @param  array<string, mixed>  $metadata
      * @param  list<string>  $keys
      */
-    private function requireAny(array $metadata, array $keys): void
+    private function requireAny(array $metadata, array $keys, string $message): void
     {
         foreach ($keys as $key) {
             $value = $metadata[$key] ?? null;
@@ -58,8 +70,6 @@ enum PressPublicationType: string
             }
         }
 
-        throw new \InvalidArgumentException(
-            "Publication type {$this->value} requires one of: ".implode(', ', $keys).'.',
-        );
+        throw new \InvalidArgumentException($message);
     }
 }

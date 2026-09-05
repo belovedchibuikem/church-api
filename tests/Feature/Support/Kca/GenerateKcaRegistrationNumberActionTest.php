@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Support\Kca;
 
+use App\Models\KcaAdmissionLetter;
 use App\Models\KcaCohort;
 use App\Models\KcaEnrollment;
 use App\Models\KcaYear;
@@ -21,6 +22,21 @@ class GenerateKcaRegistrationNumberActionTest extends TestCase
         ]);
         $cohort = KcaCohort::factory()->for($year, 'year')->create();
         KcaEnrollment::factory()->for($year, 'year')->for($cohort, 'cohort')->create([
+            'registration_number' => 'KCA-2026-00001',
+        ]);
+
+        $next = app(GenerateKcaRegistrationNumberAction::class)->handle($year);
+
+        $this->assertSame('KCA-2026-00002', $next);
+    }
+
+    public function test_it_skips_registration_numbers_already_reserved_on_admission_letters(): void
+    {
+        $year = KcaYear::factory()->create([
+            'code' => 'kca-2026',
+            'name' => '2026 KCA Year',
+        ]);
+        KcaAdmissionLetter::factory()->create([
             'registration_number' => 'KCA-2026-00001',
         ]);
 

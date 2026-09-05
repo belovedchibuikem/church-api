@@ -20,6 +20,7 @@ use App\Exceptions\KcaEvidenceUnavailableException;
 use App\Exceptions\KcaIdempotencyConflictException;
 use App\Exceptions\KcaInvalidTransitionException;
 use App\Exceptions\KcaMentorAssignmentException;
+use App\Exceptions\MembershipTransferRequiredException;
 use App\Exceptions\MissionAssignmentException;
 use App\Exceptions\MissionIdempotencyConflictException;
 use App\Exceptions\MissionInvalidTransitionException;
@@ -44,6 +45,7 @@ trait ExecutesDomainMutations
             InvalidArgumentException|
             LogicException|
             DomainException|
+            MembershipTransferRequiredException|
             KcaInvalidTransitionException|
             KcaIdempotencyConflictException|
             KcaEvidenceOwnershipException|

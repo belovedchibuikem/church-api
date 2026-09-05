@@ -58,14 +58,31 @@ class PressOperationsController extends Controller
 {
     use ExecutesDomainMutations;
 
-    public function storePublication(CreatePressPublicationRequest $request, CreatePressPublicationAction $action, ProtectedAdminContext $context): JsonResponse
-    {
+    public function storePublication(
+        CreatePressPublicationRequest $request,
+        CreatePressPublicationAction $action,
+        TransitionPressPublicationAction $transition,
+        ProtectedAdminContext $context,
+    ): JsonResponse {
         $context->ensureGlobal($request);
-        $publication = $this->execute(fn (): PressPublication => $action->handle(
-            $this->publicationData($request),
-            $context->actor($request),
-            (string) $request->validated('idempotency_key'),
-        ));
+        $publication = $this->execute(function () use ($request, $action, $transition, $context): PressPublication {
+            $created = $action->handle(
+                $this->publicationData($request),
+                $context->actor($request),
+                (string) $request->validated('idempotency_key'),
+            );
+
+            if ($request->boolean('publish_now') && ! $request->boolean('as_draft')) {
+                return $transition->handle(
+                    $created,
+                    PressPublicationStatus::Published,
+                    $context->actor($request),
+                    'publication.approved',
+                );
+            }
+
+            return $created;
+        });
 
         return ApiResponse::success($request, (new ProtectedCatalogRecordResource($publication))->resolve($request), status: 201);
     }

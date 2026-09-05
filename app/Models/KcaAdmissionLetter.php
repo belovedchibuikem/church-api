@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Fillable([
     'kca_application_id',
     'reference_code',
+    'registration_number',
     'batch_label',
     'letter_body',
     'signer_name',

@@ -108,6 +108,12 @@ class KcaApplicationController extends Controller
         }
         $application->save();
 
+        $phone = trim((string) ($incoming['phone'] ?? $incoming['mobile'] ?? ''));
+        if ($phone !== '') {
+            $person->loadMissing('profile');
+            $person->profile?->forceFill(['phone' => $phone])->save();
+        }
+
         $this->syncLeadershipRecommendation($application, $incoming, $request->user());
 
         return ApiResponse::success($request, [

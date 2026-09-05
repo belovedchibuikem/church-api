@@ -19,19 +19,22 @@ class KcaAdmissionLetterResource extends JsonResource
         /** @var KcaAdmissionLetter $letter */
         $letter = $this->resource;
         $application = $letter->application;
+        $application?->loadMissing(['person.profile', 'enrollment']);
         $resolver = app(ResolveKcaApplicationChurchName::class);
         $applicationData = is_array($application?->application_data) ? $application->application_data : [];
+        $registrationNumber = trim((string) ($letter->registration_number ?: $application?->enrollment?->registration_number ?: ''));
 
         return [
             'id' => $letter->public_id,
             'application_id' => $application?->public_id,
             'reference_code' => $letter->reference_code,
+            'registration_number' => $registrationNumber !== '' ? $registrationNumber : null,
             'applicant_name' => PersonDisplayName::of($application?->person) ?: 'Applicant',
             'church_name' => $resolver->fromApplicationData($applicationData),
             'batch_label' => $letter->batch_label,
             'letter_body' => SyncKcaAdmissionLetterReference::inBody(
                 (string) ($letter->letter_body ?? ''),
-                (string) ($letter->reference_code ?? ''),
+                $registrationNumber !== '' ? $registrationNumber : (string) ($letter->reference_code ?? ''),
             ),
             'signer_name' => $letter->signer_name,
             'signer_title' => $letter->signer_title,

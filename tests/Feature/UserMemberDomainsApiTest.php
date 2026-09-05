@@ -42,6 +42,36 @@ class UserMemberDomainsApiTest extends TestCase
             ->assertJsonPath('data.0.subject', 'Healing for Mum');
     }
 
+    public function test_member_can_crud_own_testimonies(): void
+    {
+        $user = User::factory()->withPerson()->create();
+        $this->authenticate($user);
+
+        $created = $this->postJson('/api/v1/user/testimonies', [
+            'title' => 'He restored my family',
+            'body' => 'We prayed and the Lord made a way this week.',
+        ])->assertCreated()
+            ->assertJsonPath('data.title', 'He restored my family')
+            ->assertJsonPath('data.status', 'pending');
+
+        $id = $created->json('data.id');
+        $this->assertNotEmpty($id);
+
+        $this->getJson('/api/v1/user/testimonies')
+            ->assertOk()
+            ->assertJsonPath('data.0.title', 'He restored my family');
+
+        $this->putJson("/api/v1/user/testimonies/{$id}", [
+            'title' => 'He restored my family and health',
+            'body' => 'Updated testimony after the doctor visit.',
+        ])->assertOk()
+            ->assertJsonPath('data.title', 'He restored my family and health');
+
+        $this->deleteJson("/api/v1/user/testimonies/{$id}")
+            ->assertOk()
+            ->assertJsonPath('data.deleted', true);
+    }
+
     public function test_giving_intent_is_denied_by_default_governance(): void
     {
         config()->set('finance.governance_mode', 'deny');

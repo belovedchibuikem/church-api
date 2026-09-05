@@ -6,7 +6,7 @@ final class KcaAdmissionLetterDefaultTemplate
 {
     public const PLACEHOLDER_HELP = <<<'TEXT'
 Available placeholders:
-{reference_code}, {date}, {applicant_name}, {applicant_first_name}, {applicant_address}, {applicant_phone},
+{registration_number}, {reference_code}, {date}, {applicant_name}, {applicant_first_name}, {applicant_address}, {applicant_phone},
 {church_name}, {kca_year}, {programme_commencement}, {programme_completion}, {venue},
 {training_schedule}, {assigned_mentor}, {signer_name}, {signer_title},
 {applicant_signature}, {applicant_acceptance_date}, {guardian_name}, {guardian_signature},
@@ -21,7 +21,8 @@ KINGDOM CHANGE AGENTS (KCA)
 YOUTH DISCIPLESHIP TRAINING PROGRAMME
 ADMISSION & ACCEPTANCE LETTER
 
-Ref. No.: {reference_code}
+Registration Number: {registration_number}
+Ref. No.: {registration_number}
 Date: {date}
 
 To:

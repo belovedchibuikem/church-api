@@ -42,7 +42,9 @@ class AdminRemainingDomainCatalogApiTest extends TestCase
             'privacy.data_subject_requests.view',
             'platform.files.view',
         ]);
-        $application = KcaApplication::factory()->create();
+        $application = KcaApplication::factory()->create([
+            'application_data' => ['phone' => '+2348012345678', 'why' => 'To serve'],
+        ]);
         $certificate = KcaCertificate::factory()->create();
         $publication = PressPublication::factory()->create(['title' => 'Kingdom Leadership']);
         $event = MinistryEvent::factory()->create(['name' => 'Youth Summit']);
@@ -59,7 +61,11 @@ class AdminRemainingDomainCatalogApiTest extends TestCase
 
         $this->withHeaders($headers)->getJson('/api/v1/admin/catalog/kca/applications')
             ->assertOk()
-            ->assertJsonFragment(['id' => $application->public_id, 'status' => $application->status->value]);
+            ->assertJsonFragment([
+                'id' => $application->public_id,
+                'status' => $application->status->value,
+                'phone' => '+2348012345678',
+            ]);
 
         $this->withHeaders($headers)->getJson('/api/v1/admin/catalog/kca/certificates')
             ->assertOk()

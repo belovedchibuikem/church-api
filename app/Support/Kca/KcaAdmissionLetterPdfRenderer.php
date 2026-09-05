@@ -122,7 +122,7 @@ class KcaAdmissionLetterPdfRenderer
             );
         }
 
-        $referenceCode = trim((string) ($letter->reference_code ?? ''));
+        $referenceCode = trim((string) ($letter->registration_number ?: $letter->reference_code ?? ''));
         $body = SyncKcaAdmissionLetterReference::inBody($body, $referenceCode);
         $body = $this->normalizeLetterBody($body);
 

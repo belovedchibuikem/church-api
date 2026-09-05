@@ -14,6 +14,7 @@ use App\Press\PressPublicationAvailability;
 use App\Press\PressPublicationData;
 use App\Press\PressPublicationFormat;
 use App\Press\PressPublicationStatus;
+use App\Press\PressPublicationType;
 use App\Support\Press\AddPressPublicationContributorAction;
 use App\Support\Press\AssignPressPublicationIsbnAction;
 use App\Support\Press\CreatePressPublicationAction;
@@ -52,6 +53,8 @@ class PressPublicationWorkflowTest extends TestCase
         );
         $publication = $transition->handle($publication, PressPublicationStatus::PublicationApproval, $actor, 'publication.reviewed');
         $publication = $transition->handle($publication, PressPublicationStatus::Published, $actor, 'publication.approved');
+        $this->assertSame(PressPublicationAvailability::Available, $publication->availability);
+        $this->assertTrue($publication->isPubliclyListed());
         $publication = $transition->handle($publication, PressPublicationStatus::Distribution, $actor, 'distribution.started');
         $transitionCount = PressPublicationTransition::query()->count();
         $auditCount = AuditEvent::query()->count();
@@ -71,7 +74,7 @@ class PressPublicationWorkflowTest extends TestCase
         );
     }
 
-    public function test_rejects_skipped_transitions_without_writes(): void
+    public function test_rejects_book_publish_without_isbn(): void
     {
         $actor = User::factory()->create();
         $publication = $this->createPublication($actor);
@@ -84,14 +87,42 @@ class PressPublicationWorkflowTest extends TestCase
                 $actor,
                 'publication.approved',
             );
-            $this->fail('Expected the skipped transition to be rejected.');
-        } catch (DomainException) {
-            $this->assertTrue(true);
+            $this->fail('Expected books without an ISBN to be rejected.');
+        } catch (DomainException $exception) {
+            $this->assertStringContainsString('ISBN', $exception->getMessage());
         }
 
         $this->assertSame(PressPublicationStatus::Manuscript, $publication->fresh()->status);
         $this->assertSame(0, PressPublicationTransition::query()->count());
         $this->assertSame($auditCount, AuditEvent::query()->count());
+    }
+
+    public function test_non_book_manuscript_can_publish_directly(): void
+    {
+        $actor = User::factory()->create();
+        $publication = $this->app->make(CreatePressPublicationAction::class)->handle(
+            new PressPublicationData(
+                title: 'Sunday notes',
+                publisherName: 'Family House Press',
+                languageCode: 'en',
+                format: PressPublicationFormat::Pdf,
+                publicationType: PressPublicationType::DocumentPdf,
+            ),
+            $actor,
+            'publication-request-'.fake()->uuid(),
+        );
+
+        $published = $this->app->make(TransitionPressPublicationAction::class)->handle(
+            $publication,
+            PressPublicationStatus::Published,
+            $actor,
+            'publication.approved',
+        );
+
+        $this->assertSame(PressPublicationStatus::Published, $published->status);
+        $this->assertSame(PressPublicationAvailability::Available, $published->availability);
+        $this->assertNotNull($published->published_at);
+        $this->assertTrue($published->isPubliclyListed());
     }
 
     public function test_invalid_isbn_checksum_is_denied(): void

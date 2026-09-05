@@ -14,6 +14,7 @@ use App\Support\Authorization\AuthorizationBundleCatalog;
 use App\Support\Authorization\ScopeReference;
 use App\Support\Identity\LinkUserToPersonAction;
 use App\Support\Identity\PersonDisplayName;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
@@ -44,11 +45,23 @@ class ProvisionPersonAdminAccessAction
 
             if ($user === null) {
                 $resolvedEmail = $this->resolveEmail($email);
-                $user = User::query()->create([
-                    'name' => PersonDisplayName::of($lockedPerson),
-                    'email' => mb_strtolower(trim($resolvedEmail)),
-                    'password' => Str::password(20),
-                ]);
+                $normalizedEmail = mb_strtolower(trim($resolvedEmail));
+                if (User::query()->where('email', $normalizedEmail)->exists()) {
+                    throw new InvalidArgumentException('A user with this email already exists.');
+                }
+                try {
+                    $user = User::query()->create([
+                        'name' => PersonDisplayName::of($lockedPerson),
+                        'email' => $normalizedEmail,
+                        'password' => Str::password(20),
+                    ]);
+                } catch (QueryException $exception) {
+                    if (($exception->errorInfo[1] ?? null) === 1062) {
+                        throw new InvalidArgumentException('A user with this email already exists.');
+                    }
+
+                    throw $exception;
+                }
                 $user = $this->linkUser->handle($user, $lockedPerson, $actor);
                 Password::sendResetLink(['email' => $user->email]);
             }

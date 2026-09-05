@@ -79,6 +79,39 @@ class PressPublicationTypesApiTest extends TestCase
             ->assertJsonPath('data.0.publication_type', 'sermon');
     }
 
+    public function test_sermon_can_publish_now_from_create(): void
+    {
+        $scope = new ScopeReference('global', 'platform');
+        $actor = $this->actorWithPermissions([
+            'press.publications.manage',
+            'press.publications.transition',
+            'press.publications.view',
+        ], $scope);
+        $this->authenticate($actor);
+
+        $created = $this->withHeaders([...$this->headers($scope), 'Idempotency-Key' => 'press-sermon-publish-now-0001'])
+            ->postJson('/api/v1/admin/press/publications', [
+                'title' => 'Hope Sunday Message Live',
+                'publisher_name' => 'Family House Press',
+                'language_code' => 'en',
+                'format' => 'audio',
+                'publication_type' => 'sermon',
+                'publish_now' => true,
+                'type_metadata' => [
+                    'speaker' => 'Pastor Demo',
+                    'preached_date' => '2026-08-30',
+                ],
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.publication_type', 'sermon')
+            ->assertJsonPath('data.status', 'published')
+            ->assertJsonPath('data.availability', 'available');
+
+        $this->getJson('/api/v1/press/publications?filter[publication_type]=sermon')
+            ->assertOk()
+            ->assertJsonPath('data.0.id', $created->json('data.id'));
+    }
+
     public function test_sermon_create_without_speaker_is_rejected(): void
     {
         $scope = new ScopeReference('global', 'platform');
@@ -93,7 +126,50 @@ class PressPublicationTypesApiTest extends TestCase
                 'format' => 'audio',
                 'publication_type' => 'sermon',
             ])
-            ->assertStatus(422);
+            ->assertStatus(422)
+            ->assertJsonPath('error.message', 'Sermons require a speaker or preacher name.');
+    }
+
+    public function test_bible_study_create_without_passage_is_rejected(): void
+    {
+        $scope = new ScopeReference('global', 'platform');
+        $actor = $this->actorWithPermissions(['press.publications.manage'], $scope);
+        $this->authenticate($actor);
+
+        $this->withHeaders([...$this->headers($scope), 'Idempotency-Key' => 'press-bible-study-invalid-0001'])
+            ->postJson('/api/v1/admin/press/publications', [
+                'title' => 'Untitled Study',
+                'publisher_name' => 'Family House Press',
+                'language_code' => 'en',
+                'format' => 'pdf',
+                'publication_type' => 'bible_study',
+            ])
+            ->assertStatus(422)
+            ->assertJsonPath('error.message', 'Study manuals require a scripture passage.');
+    }
+
+    public function test_bible_study_create_accepts_scripture_alias(): void
+    {
+        $scope = new ScopeReference('global', 'platform');
+        $actor = $this->actorWithPermissions(['press.publications.manage', 'press.publications.view'], $scope);
+        $this->authenticate($actor);
+
+        $created = $this->withHeaders([...$this->headers($scope), 'Idempotency-Key' => 'press-bible-study-scripture-0001'])
+            ->postJson('/api/v1/admin/press/publications', [
+                'title' => 'John Study',
+                'publisher_name' => 'Family House Press',
+                'language_code' => 'en',
+                'format' => 'pdf',
+                'publication_type' => 'bible_study',
+                'type_metadata' => ['scripture' => 'John 3:16'],
+            ])
+            ->assertCreated();
+
+        $this->withHeaders($this->headers($scope))
+            ->getJson('/api/v1/admin/press/publications/'.$created->json('data.id'))
+            ->assertOk()
+            ->assertJsonPath('data.publication_type', 'bible_study')
+            ->assertJsonPath('data.type_metadata.scripture', 'John 3:16');
     }
 
     public function test_draft_is_hidden_from_public_catalogue(): void
@@ -256,7 +332,8 @@ class PressPublicationTypesApiTest extends TestCase
         $role = Role::factory()->create();
 
         foreach ($permissionCodes as $permissionCode) {
-            $permission = Permission::factory()->create(['code' => $permissionCode]);
+            $permission = Permission::query()->where('code', $permissionCode)->first()
+                ?? Permission::factory()->create(['code' => $permissionCode]);
             $this->app->make(GrantPermissionToRoleAction::class)->handle($role, $permission);
         }
 

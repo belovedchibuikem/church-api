@@ -25,6 +25,7 @@ final class PressPublicationPayloadRules
             'publication_type' => ['sometimes', Rule::enum(PressPublicationType::class)],
             'visibility' => ['sometimes', Rule::enum(PressPublicationVisibility::class)],
             'as_draft' => ['sometimes', 'boolean'],
+            'publish_now' => ['sometimes', 'boolean'],
             'featured' => ['sometimes', 'boolean'],
             'slug' => ['nullable', 'string', 'max:191'],
             'summary' => ['nullable', 'string', 'max:2000'],

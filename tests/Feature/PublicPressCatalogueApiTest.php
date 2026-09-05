@@ -63,10 +63,12 @@ class PublicPressCatalogueApiTest extends TestCase
         $this->assertSame([
             'availability',
             'category',
+            'content_source_url',
             'copyright_year',
             'description',
             'edition',
             'format',
+            'has_download',
             'id',
             'image_url',
             'isbn',
@@ -134,6 +136,18 @@ class PublicPressCatalogueApiTest extends TestCase
             'subtitle',
             'title',
         ], $this->sortedKeys($publicationData['translations'][0]));
+    }
+
+    public function test_published_titles_appear_in_the_catalogue_before_distribution(): void
+    {
+        $publication = $this->publicPublication([
+            'title' => 'Newly Published Title',
+            'status' => PressPublicationStatus::Published,
+        ]);
+
+        $this->getJson('/api/v1/press/publications')
+            ->assertOk()
+            ->assertJsonPath('data.0.id', $publication->public_id);
     }
 
     public function test_unpublished_unavailable_and_malformed_public_ids_share_the_normalized_not_found_error(): void

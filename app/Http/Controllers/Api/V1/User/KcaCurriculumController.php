@@ -36,6 +36,7 @@ use App\Support\Kca\KcaSoulTreeService;
 use App\Support\Kca\KcaStudentActivityQuery;
 use App\Support\Kca\RecordKcaOrientationStageAction;
 use App\Support\Kca\RecordKcaSoulWinAction;
+use App\Support\Kca\ResolveKcaAccessQuery;
 use App\Support\Kca\SubmitKcaEvidenceAction;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
@@ -91,9 +92,8 @@ class KcaCurriculumController extends Controller
             'is_mentor' => $isMentor,
             'enrollment' => $this->enrollmentPayload($enrollment),
             'modules_total' => $snapshot['curriculum']['modules_total'],
-            'modules_with_progress' => $snapshot['curriculum']['modules_completed'] > 0
-                ? $snapshot['curriculum']['modules_completed']
-                : collect($snapshot['curriculum']['modules'])->filter(fn (array $row): bool => $row['lessons_completed'] > 0)->count(),
+            'modules_completed' => $snapshot['curriculum']['modules_completed'],
+            'modules_with_progress' => $snapshot['curriculum']['modules_completed'],
             'curriculum_percent' => $snapshot['curriculum']['percent'],
             'lessons_completed' => $snapshot['curriculum']['lessons_completed'],
             'lessons_total' => $snapshot['curriculum']['lessons_total'],
@@ -121,6 +121,7 @@ class KcaCurriculumController extends Controller
         $person = $this->person($request);
         $enrollment = $this->activeEnrollment($person);
         $application = KcaApplication::query()
+            ->with('admissionLetter:id,kca_application_id,applicant_accepted_at')
             ->where('person_id', $person->getKey())
             ->latest('id')
             ->first();
@@ -137,8 +138,16 @@ class KcaCurriculumController extends Controller
             ->values()
             ->all();
         $orientationCompletedAt = $application?->orientation_completed_at?->utc()->toIso8601String();
+        $letterAccepted = $application?->admissionLetter !== null
+            && $application->admissionLetter->applicant_accepted_at !== null;
         $canComplete = $orientationCompletedAt === null
-            && $applicationStatus === KcaApplicationState::Interview
+            && (
+                $applicationStatus === KcaApplicationState::Interview
+                || (
+                    in_array($applicationStatus, [KcaApplicationState::Accepted, KcaApplicationState::ProvisionallyAccepted], true)
+                    && $letterAccepted
+                )
+            )
             && $application !== null;
 
         $programPayload = $program->handle(
@@ -181,12 +190,15 @@ class KcaCurriculumController extends Controller
             throw new AccessDeniedHttpException('Authentication required.');
         }
         $application = $action->handleForApplicant($person, $user);
+        $access = app(ResolveKcaAccessQuery::class)->handle($person);
 
         return ApiResponse::success($request, [
             'application_id' => $application->public_id,
             'status' => $application->status->value,
             'orientation_completed_at' => $application->orientation_completed_at?->utc()->toIso8601String(),
-            'destination' => $application->status->destination(),
+            'destination' => is_string($access['destination'] ?? null)
+                ? $access['destination']
+                : $application->status->destination(),
         ]);
     }
 
@@ -301,7 +313,7 @@ class KcaCurriculumController extends Controller
         ));
     }
 
-    public function lesson(Request $request, string $lesson, CompleteKcaLessonAction $complete, \App\Support\Kca\CompleteKcaChapterAction $completeChapter, KcaLessonUnlockToken $tokens): JsonResponse
+    public function lesson(Request $request, string $lesson, CompleteKcaLessonAction $complete, CompleteKcaChapterAction $completeChapter, KcaLessonUnlockToken $tokens): JsonResponse
     {
         $person = $this->person($request);
         $enrollment = $this->requireEnrollment($person);
@@ -353,7 +365,7 @@ class KcaCurriculumController extends Controller
         ]);
     }
 
-    public function chapter(Request $request, string $chapter, \App\Support\Kca\CompleteKcaChapterAction $completeChapter, CompleteKcaLessonAction $complete, KcaLessonUnlockToken $tokens): JsonResponse
+    public function chapter(Request $request, string $chapter, CompleteKcaChapterAction $completeChapter, CompleteKcaLessonAction $complete, KcaLessonUnlockToken $tokens): JsonResponse
     {
         $person = $this->person($request);
         $enrollment = $this->requireEnrollment($person);
@@ -377,7 +389,7 @@ class KcaCurriculumController extends Controller
         ]);
     }
 
-    public function completeChapter(Request $request, string $chapter, \App\Support\Kca\CompleteKcaChapterAction $action): JsonResponse
+    public function completeChapter(Request $request, string $chapter, CompleteKcaChapterAction $action): JsonResponse
     {
         $data = $request->validate([
             'acknowledged' => ['sometimes', 'boolean'],

@@ -22,11 +22,14 @@ class UserKcaApplicationCurrentTest extends TestCase
             ->assertJsonPath('data', null);
 
         $this->postJson('/api/v1/user/kca/applications', [
-            'application_data' => ['motivation' => 'Called to serve'],
+            'application_data' => ['motivation' => 'Called to serve', 'phone' => '+2348012345678'],
             'finalize' => false,
         ])->assertCreated()
             ->assertJsonPath('data.status', KcaApplicationState::Draft->value)
-            ->assertJsonPath('data.application_data.motivation', 'Called to serve');
+            ->assertJsonPath('data.application_data.motivation', 'Called to serve')
+            ->assertJsonPath('data.application_data.phone', '+2348012345678');
+
+        $this->assertSame('+2348012345678', $user->person?->fresh(['profile'])?->profile?->phone);
 
         $this->getJson('/api/v1/user/kca/applications/current')
             ->assertOk()

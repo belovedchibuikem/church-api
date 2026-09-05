@@ -67,6 +67,7 @@ class TransitionPressPublicationAction
             if ($to === PressPublicationStatus::Published) {
                 $lockedPublication->published_at = $now;
                 $lockedPublication->scheduled_publish_at = null;
+                $lockedPublication->availability = PressPublicationAvailability::Available;
             }
 
             if ($to === PressPublicationStatus::Distribution) {

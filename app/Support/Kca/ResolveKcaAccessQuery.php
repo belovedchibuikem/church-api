@@ -78,9 +78,13 @@ class ResolveKcaAccessQuery
     private function destination(KcaApplicationState $status, KcaApplication $application): string
     {
         if ($status === KcaApplicationState::Accepted || $status === KcaApplicationState::ProvisionallyAccepted) {
-            return $this->admissionLetterAccepted($application)
-                ? 'orientation'
-                : 'admission_letter';
+            if (! $this->admissionLetterAccepted($application)) {
+                return 'admission_letter';
+            }
+
+            return $this->orientationCompleted($application)
+                ? 'student_dashboard'
+                : 'orientation';
         }
 
         return $status->destination();
@@ -91,6 +95,11 @@ class ResolveKcaAccessQuery
         $letter = $application->admissionLetter;
 
         return $letter !== null && $letter->applicant_accepted_at !== null;
+    }
+
+    private function orientationCompleted(KcaApplication $application): bool
+    {
+        return $application->orientation_completed_at !== null;
     }
 
     /** @return array<string, mixed>|null */
@@ -182,12 +191,8 @@ class ResolveKcaAccessQuery
             KcaApplicationState::InformationRequired => ['correct', 'withdraw'],
             KcaApplicationState::Received, KcaApplicationState::Reviewed => ['view_progress'],
             KcaApplicationState::Interview => ['view_progress', 'complete_orientation'],
-            KcaApplicationState::ProvisionallyAccepted => $this->admissionLetterAccepted($application)
-                ? ['view_letter', 'complete_orientation']
-                : ['view_letter', 'accept_letter'],
-            KcaApplicationState::Accepted => $this->admissionLetterAccepted($application)
-                ? ['view_letter', 'complete_orientation']
-                : ['view_letter', 'accept_letter'],
+            KcaApplicationState::ProvisionallyAccepted => $this->postAdmissionActions($application),
+            KcaApplicationState::Accepted => $this->postAdmissionActions($application),
             default => ['view_decision'],
         };
     }
@@ -221,6 +226,24 @@ class ResolveKcaAccessQuery
             return 'Read and accept your admission letter to continue to orientation.';
         }
 
-        return 'Attend orientation to begin your KCA journey.';
+        if (! $this->orientationCompleted($application)) {
+            return 'Attend orientation to begin your KCA journey.';
+        }
+
+        return 'Orientation is complete. Open your KCA dashboard to continue.';
+    }
+
+    /** @return list<string> */
+    private function postAdmissionActions(KcaApplication $application): array
+    {
+        if (! $this->admissionLetterAccepted($application)) {
+            return ['view_letter', 'accept_letter'];
+        }
+
+        if (! $this->orientationCompleted($application)) {
+            return ['view_letter', 'complete_orientation'];
+        }
+
+        return ['open_dashboard', 'continue_learning'];
     }
 }

@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\V1\User\PreferenceController;
 use App\Http\Controllers\Api\V1\User\ProfileController;
 use App\Http\Controllers\Api\V1\User\SecuritySessionController;
 use App\Http\Controllers\Api\V1\User\SyncController;
+use App\Http\Controllers\Api\V1\User\TestimonyController;
 use App\Http\Controllers\Api\V1\User\UserAuthorizationController;
 use App\Http\Controllers\Api\V1\User\UserBibleController;
 use App\Http\Controllers\Api\V1\User\UserChurchCommunityController;
@@ -53,6 +54,12 @@ Route::get('/payments/receipts/{receipt}', [PaymentController::class, 'receipt']
 
 Route::get('/prayers', [PrayerRequestController::class, 'index'])->name('prayers.index');
 Route::post('/prayers', [PrayerRequestController::class, 'store'])->name('prayers.store');
+
+Route::get('/testimonies', [TestimonyController::class, 'index'])->name('testimonies.index');
+Route::post('/testimonies', [TestimonyController::class, 'store'])->name('testimonies.store');
+Route::get('/testimonies/{testimony}', [TestimonyController::class, 'show'])->whereUlid('testimony')->name('testimonies.show');
+Route::put('/testimonies/{testimony}', [TestimonyController::class, 'update'])->whereUlid('testimony')->name('testimonies.update');
+Route::delete('/testimonies/{testimony}', [TestimonyController::class, 'destroy'])->whereUlid('testimony')->name('testimonies.destroy');
 
 Route::prefix('bible')->name('bible.')->controller(UserBibleController::class)->group(function (): void {
     Route::get('/progress', 'progress')->name('progress.show');

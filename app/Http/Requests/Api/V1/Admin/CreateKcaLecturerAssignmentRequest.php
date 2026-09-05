@@ -19,6 +19,7 @@ class CreateKcaLecturerAssignmentRequest extends FormRequest
     {
         return [
             'kca_module_id' => ['required', 'ulid', 'exists:kca_modules,public_id'],
+            'kca_lesson_id' => ['required', 'ulid', 'exists:kca_lessons,public_id'],
             'kca_cohort_id' => ['required', 'ulid', 'exists:kca_cohorts,public_id'],
             'lecturer_person_id' => ['required', 'ulid', 'exists:people,public_id'],
             'starts_at' => ['required', 'date'],

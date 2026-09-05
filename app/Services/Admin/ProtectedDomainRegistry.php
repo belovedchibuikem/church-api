@@ -15,16 +15,16 @@ use App\Models\EventRegistration;
 use App\Models\FileAsset;
 use App\Models\GuardianRelationship;
 use App\Models\KcaApplication;
-use App\Models\KcaAssignment;
 use App\Models\KcaAssessmentResult;
+use App\Models\KcaAssignment;
 use App\Models\KcaAttendance;
 use App\Models\KcaCertificate;
+use App\Models\KcaChapter;
 use App\Models\KcaCohort;
 use App\Models\KcaEnrollment;
 use App\Models\KcaEvidenceSubmission;
 use App\Models\KcaLecturerAssignment;
 use App\Models\KcaLesson;
-use App\Models\KcaChapter;
 use App\Models\KcaMentorAssignment;
 use App\Models\KcaModule;
 use App\Models\KcaModulePrerequisite;
@@ -80,7 +80,7 @@ class ProtectedDomainRegistry
                 'path' => 'kca/applications',
                 'operation_id' => 'listAdminCatalogKcaApplications',
                 'model' => KcaApplication::class,
-                'with' => [...PersonDisplayName::eager(), 'leadershipRecommendation', 'enrollment.cohort:id,public_id,name', 'admissionLetter:id,public_id,kca_application_id,issued_at'],
+                'with' => [...PersonDisplayName::eager(), 'leadershipRecommendation', 'enrollment.cohort:id,public_id,name', 'admissionLetter:id,public_id,kca_application_id,issued_at,registration_number'],
                 'order_column' => 'received_at',
                 'status_column' => 'status',
             ],
@@ -93,7 +93,7 @@ class ProtectedDomainRegistry
                     ...PersonDisplayName::eager(),
                     'year:id,public_id,name,code',
                     'cohort:id,public_id,name,code',
-                    'application:id,public_id',
+                    'application',
                     ...PersonDisplayName::eager('mentorAssignments.mentor'),
                 ],
                 'order_column' => 'starts_on',
@@ -221,6 +221,7 @@ class ProtectedDomainRegistry
                 'model' => KcaLecturerAssignment::class,
                 'with' => [
                     'module:id,public_id,title,code',
+                    'lesson:id,public_id,title,code',
                     'cohort:id,public_id,name,code',
                     ...PersonDisplayName::eager('lecturer'),
                 ],

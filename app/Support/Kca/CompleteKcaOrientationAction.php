@@ -13,86 +13,108 @@ use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 class CompleteKcaOrientationAction
 {
-  public function __construct(
-    private RecordKcaOrientationStageAction $recordStage,
-    private TransitionKcaApplicationAction $transition,
-  ) {}
+    public function __construct(
+        private RecordKcaOrientationStageAction $recordStage,
+        private TransitionKcaApplicationAction $transition,
+    ) {}
 
-  public function handleForApplicant(Person $person, User $actor): KcaApplication
-  {
-    $application = KcaApplication::query()
-      ->where('person_id', $person->getKey())
-      ->latest('id')
-      ->first();
+    public function handleForApplicant(Person $person, User $actor): KcaApplication
+    {
+        $application = KcaApplication::query()
+            ->with('admissionLetter')
+            ->where('person_id', $person->getKey())
+            ->latest('id')
+            ->first();
 
-    if ($application === null) {
-      throw new AccessDeniedHttpException('No KCA application found.');
+        if ($application === null) {
+            throw new AccessDeniedHttpException('No KCA application found.');
+        }
+
+        $status = $application->status instanceof KcaApplicationState
+          ? $application->status
+          : KcaApplicationState::from((string) $application->status);
+
+        if (! $this->canApplicantCompleteOrientation($application, $status)) {
+            throw new ConflictHttpException('Orientation can be completed during interview, or after accepting your admission letter.');
+        }
+
+        foreach (KcaOrientationStages::all() as $stage) {
+            $application = $this->recordStage->handle($person, $stage);
+        }
+
+        return $this->finalize($application, $actor);
     }
 
-    $status = $application->status instanceof KcaApplicationState
-      ? $application->status
-      : KcaApplicationState::from((string) $application->status);
+    public function handleForAdmin(KcaApplication $application, User $actor): KcaApplication
+    {
+        $status = $application->status instanceof KcaApplicationState
+          ? $application->status
+          : KcaApplicationState::from((string) $application->status);
 
-    if ($status !== KcaApplicationState::Interview) {
-      throw new ConflictHttpException('Orientation can only be completed during interview / orientation.');
+        if ($status !== KcaApplicationState::Interview) {
+            throw new ConflictHttpException('Orientation can only be completed during interview / orientation.');
+        }
+
+        return DB::transaction(function () use ($application, $actor): KcaApplication {
+            $locked = KcaApplication::query()->lockForUpdate()->findOrFail($application->getKey());
+            $locked->orientation_progress = KcaOrientationStages::all();
+            $locked->save();
+
+            return $this->finalize($locked, $actor);
+        }, attempts: 3);
     }
 
-    foreach (KcaOrientationStages::all() as $stage) {
-      $application = $this->recordStage->handle($person, $stage);
+    private function finalize(KcaApplication $application, User $actor): KcaApplication
+    {
+        $status = $application->status instanceof KcaApplicationState
+          ? $application->status
+          : KcaApplicationState::from((string) $application->status);
+
+        $progress = collect($application->orientation_progress ?? [])
+            ->filter(fn (mixed $value): bool => is_string($value) && KcaOrientationStages::isValid($value))
+            ->unique()
+            ->values()
+            ->all();
+
+        $missing = array_diff(KcaOrientationStages::all(), $progress);
+        if ($missing !== []) {
+            throw new ConflictHttpException('Complete all orientation stages before submitting.');
+        }
+
+        if ($application->orientation_completed_at !== null) {
+            if ($status === KcaApplicationState::Interview) {
+                return $this->transition->handle($application, KcaApplicationState::Reviewed, $actor);
+            }
+
+            return $application;
+        }
+
+        $application->orientation_completed_at = now()->utc();
+        $application->save();
+
+        if ($status === KcaApplicationState::Interview) {
+            return $this->transition->handle(
+                $application,
+                KcaApplicationState::Reviewed,
+                $actor,
+            );
+        }
+
+        return $application;
     }
 
-    return $this->finalize($application, $actor);
-  }
+    private function canApplicantCompleteOrientation(KcaApplication $application, KcaApplicationState $status): bool
+    {
+        if ($status === KcaApplicationState::Interview) {
+            return true;
+        }
 
-  public function handleForAdmin(KcaApplication $application, User $actor): KcaApplication
-  {
-    $status = $application->status instanceof KcaApplicationState
-      ? $application->status
-      : KcaApplicationState::from((string) $application->status);
+        if (! in_array($status, [KcaApplicationState::Accepted, KcaApplicationState::ProvisionallyAccepted], true)) {
+            return false;
+        }
 
-    if ($status !== KcaApplicationState::Interview) {
-      throw new ConflictHttpException('Orientation can only be completed during interview / orientation.');
+        $letter = $application->admissionLetter;
+
+        return $letter !== null && $letter->applicant_accepted_at !== null;
     }
-
-    return DB::transaction(function () use ($application, $actor): KcaApplication {
-      $locked = KcaApplication::query()->lockForUpdate()->findOrFail($application->getKey());
-      $locked->orientation_progress = KcaOrientationStages::all();
-      $locked->save();
-
-      return $this->finalize($locked, $actor);
-    }, attempts: 3);
-  }
-
-  private function finalize(KcaApplication $application, User $actor): KcaApplication
-  {
-    $progress = collect($application->orientation_progress ?? [])
-      ->filter(fn (mixed $value): bool => is_string($value) && KcaOrientationStages::isValid($value))
-      ->unique()
-      ->values()
-      ->all();
-
-    $missing = array_diff(KcaOrientationStages::all(), $progress);
-    if ($missing !== []) {
-      throw new ConflictHttpException('Complete all orientation stages before submitting.');
-    }
-
-    if ($application->orientation_completed_at !== null) {
-      $status = $application->status instanceof KcaApplicationState
-        ? $application->status
-        : KcaApplicationState::from((string) $application->status);
-
-      return $status === KcaApplicationState::Reviewed
-        ? $application
-        : $this->transition->handle($application, KcaApplicationState::Reviewed, $actor);
-    }
-
-    $application->orientation_completed_at = now()->utc();
-    $application->save();
-
-    return $this->transition->handle(
-      $application,
-      KcaApplicationState::Reviewed,
-      $actor,
-    );
-  }
 }

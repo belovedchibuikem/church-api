@@ -180,12 +180,12 @@ class ContentPagesSeeder extends Seeder
             ],
             [
                 'slug' => 'kca',
-                'title' => 'Kingdom Change Agents',
+                'title' => 'Kingdom Citizens Academy',
                 'summary' => 'Kingdom-minded learning and practical ministry training.',
                 'body' => 'KCA forms leaders through modules, mentoring, evidence, and certification.',
                 'items' => [
                     ['kind' => 'card', 'title' => 'Why Join KCA?', 'body' => 'A formation path from foundations of faith to mission and discipleship.', 'href' => '/kca/why'],
-                    ['kind' => 'card', 'title' => 'Apply', 'body' => 'Complete the guided application and join the next cohort.', 'href' => '/kca/apply'],
+                    ['kind' => 'card', 'title' => 'Apply', 'body' => 'Complete the guided application and join the next cohort.', 'href' => '/kca/enrol'],
                     ['kind' => 'card', 'title' => 'Verify a Certificate', 'body' => 'Confirm a KCA certificate with its public verification code.', 'href' => '/kca/certificates/verify'],
                 ],
             ],
@@ -207,7 +207,7 @@ class ContentPagesSeeder extends Seeder
                 'summary' => 'Books, devotionals, and teaching resources for every season of faith.',
                 'body' => 'Kingdom Press publishes leadership, prayer, worship, and discipleship titles used across the Family House network.',
                 'items' => [
-                    ['kind' => 'card', 'title' => 'Browse titles', 'body' => 'Leadership, prayer, worship, and Christian living from Kingdom Press.', 'href' => '/press', 'meta' => ['icon' => '📘']],
+                    ['kind' => 'card', 'title' => 'Publications', 'body' => 'Leadership, prayer, worship, and Christian living from Kingdom Press.', 'href' => '/press/publications', 'meta' => ['icon' => '📘']],
                     ['kind' => 'card', 'title' => 'Sermons', 'body' => 'Watch and download messages from Family House pulpits.', 'href' => '/online-church/sermons', 'meta' => ['icon' => '▶']],
                     ['kind' => 'card', 'title' => 'Devotionals', 'body' => 'Daily readings and Study Manuals. Each title shows its type.', 'href' => '/press/devotionals', 'meta' => ['icon' => '📖']],
                 ],

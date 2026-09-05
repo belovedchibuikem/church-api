@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Api\V1\Admin;
 
+use App\Events\MinistryEventLifecycleStatus;
 use App\Models\AlertOccurrence;
 use App\Models\AlertRule;
 use App\Models\ChildProfile;
@@ -19,9 +20,9 @@ use App\Models\GuardianRelationship;
 use App\Models\KcaApplication;
 use App\Models\KcaAssessmentResult;
 use App\Models\KcaAssignment;
-use App\Models\KcaChapter;
 use App\Models\KcaAttendance;
 use App\Models\KcaCertificate;
+use App\Models\KcaChapter;
 use App\Models\KcaCohort;
 use App\Models\KcaEnrollment;
 use App\Models\KcaEvidenceReview;
@@ -30,8 +31,8 @@ use App\Models\KcaLecturerAssignment;
 use App\Models\KcaLesson;
 use App\Models\KcaMentorAssignment;
 use App\Models\KcaModule;
-use App\Models\KcaOrientationSession;
 use App\Models\KcaModulePrerequisite;
+use App\Models\KcaOrientationSession;
 use App\Models\KcaYear;
 use App\Models\MinistryEvent;
 use App\Models\PaymentDispute;
@@ -50,6 +51,7 @@ use App\Models\SafeguardingIncident;
 use App\Press\PressContributorRole;
 use App\Support\Communication\CommunicationCopy;
 use App\Support\Identity\PersonDisplayName;
+use App\Support\Kca\KcaRegistrationProfile;
 use App\Support\Kca\ResolveKcaApplicationChurchName;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -63,14 +65,21 @@ class ProtectedCatalogRecordResource extends JsonResource
     public function toArray(Request $request): array
     {
         return match (true) {
-            $this->resource instanceof KcaApplication => [
+            $this->resource instanceof KcaApplication => array_merge([
                 'id' => $this->public_id,
                 'person_id' => $this->person?->public_id,
                 'person_name' => PersonDisplayName::of($this->person),
+                'email' => PersonDisplayName::email($this->person),
+                'phone' => PersonDisplayName::phone($this->person)
+                    ?: trim((string) data_get($this->application_data, 'phone', ''))
+                    ?: trim((string) data_get($this->application_data, 'mobile', '')),
                 'status' => $this->status->value,
                 'application_data' => $this->application_data,
                 'church_name' => app(ResolveKcaApplicationChurchName::class)->fromApplicationData($this->application_data),
                 'batch_name' => app(ResolveKcaApplicationChurchName::class)->batchLabel($this->resource),
+                'enrollment_id' => $this->enrollment?->public_id,
+                'registration_number' => $this->enrollment?->registration_number ?: $this->admissionLetter?->registration_number,
+                'cohort_name' => $this->enrollment?->cohort?->name,
                 'admission_letter_id' => $this->admissionLetter?->public_id,
                 'admission_letter_issued_at' => $this->admissionLetter?->issued_at?->utc()->toIso8601String(),
                 'received_at' => $this->received_at?->utc()->toIso8601String(),
@@ -79,21 +88,31 @@ class ProtectedCatalogRecordResource extends JsonResource
                 'orientation_progress' => $this->orientation_progress ?? [],
                 'recommendation_id' => $this->leadershipRecommendation?->public_id,
                 'recommendation_status' => $this->leadershipRecommendation?->status,
-            ],
-            $this->resource instanceof KcaEnrollment => [
+                'registration_sections' => KcaRegistrationProfile::sections($this->resource, $this->person),
+            ], KcaRegistrationProfile::flattened($this->resource, $this->person)),
+            $this->resource instanceof KcaEnrollment => array_merge([
                 'id' => $this->public_id,
                 'application_id' => $this->application?->public_id,
                 'person_id' => $this->person?->public_id,
                 'person_name' => PersonDisplayName::of($this->person),
+                'email' => PersonDisplayName::email($this->person),
+                'phone' => PersonDisplayName::phone($this->person)
+                    ?: trim((string) data_get($this->application?->application_data, 'phone', ''))
+                    ?: trim((string) data_get($this->application?->application_data, 'mobile', '')),
+                'given_name' => $this->person?->profile?->given_name,
+                'family_name' => $this->person?->profile?->family_name,
                 'registration_number' => $this->registration_number,
                 'year_id' => $this->year?->public_id,
                 'year_name' => $this->year?->name,
                 'cohort_id' => $this->cohort?->public_id,
+                'kca_cohort_id' => $this->cohort?->public_id,
                 'cohort_name' => $this->cohort?->name,
                 'mentor_name' => PersonDisplayName::of($this->mentorAssignments->first()?->mentor),
                 'status' => 'Active',
                 'starts_on' => $this->starts_on?->toDateString(),
-            ],
+                'application_data' => $this->application?->application_data,
+                'registration_sections' => KcaRegistrationProfile::sections($this->application, $this->person),
+            ], KcaRegistrationProfile::flattened($this->application, $this->person)),
             $this->resource instanceof KcaAssignment => [
                 'id' => $this->public_id,
                 'enrollment_id' => $this->enrollment?->public_id,
@@ -248,9 +267,14 @@ class ProtectedCatalogRecordResource extends JsonResource
                 'lecturer_name' => PersonDisplayName::of($this->lecturer),
                 'person_name' => PersonDisplayName::of($this->lecturer),
                 'module_id' => $this->module?->public_id,
+                'kca_module_id' => $this->module?->public_id,
                 'module_title' => $this->module?->title,
                 'module_code' => $this->module?->code,
+                'lesson_id' => $this->lesson?->public_id,
+                'kca_lesson_id' => $this->lesson?->public_id,
+                'lesson_title' => $this->lesson?->title,
                 'cohort_id' => $this->cohort?->public_id,
+                'kca_cohort_id' => $this->cohort?->public_id,
                 'cohort_name' => $this->cohort?->name,
                 'starts_at' => $this->starts_at?->utc()->toIso8601String(),
                 'ends_at' => $this->ends_at?->utc()->toIso8601String(),
@@ -369,7 +393,7 @@ class ProtectedCatalogRecordResource extends JsonResource
                 'fee_currency' => $this->fee_currency,
                 'capacity' => $this->capacity,
                 'is_important' => (bool) $this->is_important,
-                'status' => \App\Events\MinistryEventLifecycleStatus::forEvent($this->resource)->value,
+                'status' => MinistryEventLifecycleStatus::forEvent($this->resource)->value,
                 'updated_at' => $this->updated_at?->utc()->toIso8601String(),
             ],
             $this->resource instanceof EventRegistration => [

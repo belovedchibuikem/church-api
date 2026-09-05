@@ -30,8 +30,9 @@ enum PressPublicationStatus: string
     public function allowedTargets(): array
     {
         return match ($this) {
-            self::Draft => [self::Manuscript, self::Archived],
+            self::Draft => [self::Manuscript, self::Published, self::Archived],
             self::Manuscript => [
+                self::Published,
                 self::EditorialReview,
                 self::InformationRequired,
                 self::ChangesRequested,
@@ -39,25 +40,28 @@ enum PressPublicationStatus: string
                 self::Archived,
             ],
             self::EditorialReview => [
+                self::Published,
                 self::TheologicalReview,
                 self::InformationRequired,
                 self::ChangesRequested,
                 self::Rejected,
             ],
             self::TheologicalReview => [
+                self::Published,
                 self::CopyEditing,
                 self::InformationRequired,
                 self::ChangesRequested,
                 self::Rejected,
             ],
             self::CopyEditing => [
+                self::Published,
                 self::Design,
                 self::InformationRequired,
                 self::ChangesRequested,
                 self::Rejected,
             ],
-            self::Design => [self::IsbnAssignment, self::PublicationApproval],
-            self::IsbnAssignment => [self::PublicationApproval],
+            self::Design => [self::Published, self::IsbnAssignment, self::PublicationApproval],
+            self::IsbnAssignment => [self::Published, self::PublicationApproval],
             self::PublicationApproval => [
                 self::Published,
                 self::Scheduled,

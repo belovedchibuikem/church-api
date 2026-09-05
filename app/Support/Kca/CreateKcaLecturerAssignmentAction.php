@@ -4,6 +4,7 @@ namespace App\Support\Kca;
 
 use App\Models\KcaCohort;
 use App\Models\KcaLecturerAssignment;
+use App\Models\KcaLesson;
 use App\Models\KcaModule;
 use App\Models\Person;
 use App\Models\User;
@@ -24,14 +25,19 @@ class CreateKcaLecturerAssignmentAction
         CarbonImmutable $startsAt,
         ?CarbonImmutable $endsAt,
         User $actor,
+        ?KcaLesson $lesson = null,
     ): KcaLecturerAssignment {
         if ($endsAt !== null && $endsAt->lte($startsAt)) {
             throw new InvalidArgumentException('Lecturer assignment end must be after the start.');
         }
+        if ($lesson !== null && (int) $lesson->kca_module_id !== (int) $module->getKey()) {
+            throw new InvalidArgumentException('The selected lesson does not belong to the selected module.');
+        }
 
-        return DB::transaction(function () use ($module, $cohort, $lecturer, $startsAt, $endsAt, $actor): KcaLecturerAssignment {
+        return DB::transaction(function () use ($module, $cohort, $lecturer, $startsAt, $endsAt, $actor, $lesson): KcaLecturerAssignment {
             $assignment = KcaLecturerAssignment::query()->create([
                 'kca_module_id' => $module->getKey(),
+                'kca_lesson_id' => $lesson?->getKey(),
                 'kca_cohort_id' => $cohort->getKey(),
                 'lecturer_person_id' => $lecturer->getKey(),
                 'assigned_by_user_id' => $actor->getKey(),
@@ -46,6 +52,7 @@ class CreateKcaLecturerAssignmentAction
                 targetId: $assignment->public_id,
                 metadata: [
                     'module_id' => $module->public_id,
+                    'lesson_id' => $lesson?->public_id,
                     'cohort_id' => $cohort->public_id,
                     'lecturer_person_id' => $lecturer->public_id,
                 ],

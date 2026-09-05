@@ -87,6 +87,13 @@ class CreateAdminKcaApplicationAction
                 ]);
             }
 
+            $resolvedPhone = trim((string) ($phone ?: ($applicationData['phone'] ?? '')));
+            if ($resolvedPhone !== '' && $applicant !== null) {
+                $applicationData['phone'] = $resolvedPhone;
+                $applicant->loadMissing('profile');
+                $applicant->profile?->forceFill(['phone' => $resolvedPhone])->save();
+            }
+
             $application->application_data = $this->applicantSafeData($applicationData);
             $application->status = $finalize ? KcaApplicationState::Received : KcaApplicationState::Draft;
             if ($finalize && $application->received_at === null) {

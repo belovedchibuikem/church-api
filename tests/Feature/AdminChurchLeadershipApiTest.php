@@ -14,6 +14,7 @@ use App\Models\Role;
 use App\Models\RoleAssignment;
 use App\Models\SecuritySession;
 use App\Models\User;
+use App\Notifications\QueuedResetPassword;
 use App\Support\Authorization\AssignRoleToUserAction;
 use App\Support\Authorization\AssignScopeToRoleAssignmentAction;
 use App\Support\Authorization\AuthorizationBundleCatalog;
@@ -21,7 +22,6 @@ use App\Support\Authorization\GrantPermissionToRoleAction;
 use App\Support\Authorization\ProvisionAuthorizationBundlesAction;
 use App\Support\Authorization\ScopeReference;
 use App\Support\Church\ChurchLeadershipCatalog;
-use App\Notifications\QueuedResetPassword;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
@@ -75,6 +75,66 @@ class AdminChurchLeadershipApiTest extends TestCase
         $this->assertTrue(AuditEvent::query()->where('action', 'church.leadership.admin_access_granted')->exists());
     }
 
+    public function test_appointing_an_existing_member_as_associate_pastor_succeeds(): void
+    {
+        [$church, $headers] = $this->churchContext();
+        $person = Person::factory()->withProfile()->create();
+        ChurchMembership::factory()->create([
+            'church_id' => $church->getKey(),
+            'person_id' => $person->getKey(),
+        ]);
+
+        $this->withHeaders($headers)->postJson('/api/v1/admin/church/role-assignments', [
+            'church_id' => $church->public_id,
+            'person_id' => $person->public_id,
+            'role_type' => 'leader',
+            'title' => 'Associate Pastor',
+        ])
+            ->assertCreated()
+            ->assertJsonPath('data.title', 'Associate Pastor');
+    }
+
+    public function test_appointing_a_member_of_another_church_as_associate_pastor_succeeds(): void
+    {
+        [$church, $headers] = $this->churchContext();
+        $otherChurch = Church::factory()->create();
+        $person = Person::factory()->withProfile()->create();
+        ChurchMembership::factory()->create([
+            'church_id' => $otherChurch->getKey(),
+            'person_id' => $person->getKey(),
+        ]);
+
+        $this->withHeaders($headers)->postJson('/api/v1/admin/church/role-assignments', [
+            'church_id' => $church->public_id,
+            'person_id' => $person->public_id,
+            'role_type' => 'leader',
+            'title' => 'Associate Pastor',
+        ])
+            ->assertCreated()
+            ->assertJsonPath('data.title', 'Associate Pastor');
+    }
+
+    public function test_resident_pastor_and_deaconess_titles_are_accepted(): void
+    {
+        [$church, $headers] = $this->churchContext();
+        $pastor = Person::factory()->withProfile()->create();
+        $deaconess = Person::factory()->withProfile()->create();
+
+        $this->withHeaders($headers)->postJson('/api/v1/admin/church/role-assignments', [
+            'church_id' => $church->public_id,
+            'person_id' => $pastor->public_id,
+            'role_type' => 'leader',
+            'title' => 'Resident Pastor',
+        ])->assertCreated()->assertJsonPath('data.title', 'Resident Pastor');
+
+        $this->withHeaders($headers)->postJson('/api/v1/admin/church/role-assignments', [
+            'church_id' => $church->public_id,
+            'person_id' => $deaconess->public_id,
+            'role_type' => 'leader',
+            'title' => 'Deaconess',
+        ])->assertCreated()->assertJsonPath('data.title', 'Deaconess');
+    }
+
     public function test_leader_appointment_rejects_invalid_title_and_leader_cap(): void
     {
         [$church, $headers] = $this->churchContext();
@@ -92,7 +152,7 @@ class AdminChurchLeadershipApiTest extends TestCase
                 'church_id' => $church->getKey(),
                 'person_id' => Person::factory()->withProfile()->create()->getKey(),
                 'role_type' => 'leader',
-                'title' => ChurchLeadershipCatalog::TITLES[$index],
+                'title' => 'Elder',
                 'status' => 'active',
                 'started_at' => now()->utc(),
             ]);

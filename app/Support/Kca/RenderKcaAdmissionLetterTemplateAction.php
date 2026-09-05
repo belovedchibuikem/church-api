@@ -19,7 +19,7 @@ final class RenderKcaAdmissionLetterTemplateAction
         ?KcaAdmissionLetter $letter = null,
         ?KcaGovernanceConfiguration $governance = null,
     ): string {
-        $application->loadMissing(['person.profile', 'enrollment.cohort:id,name,public_id']);
+        $application->loadMissing(['person.profile', 'enrollment.cohort:id,name,public_id', 'enrollment:id,kca_application_id,registration_number']);
         $governance ??= $this->resolver->governanceDefaults()
             ->loadMissing(['admissionLetterheadFile', 'admissionSignatureFile']);
 
@@ -63,9 +63,13 @@ final class RenderKcaAdmissionLetterTemplateAction
         $applicantName = PersonDisplayName::of($person) ?: 'Applicant';
         $issuedAt = $letter?->issued_at ?? now()->utc();
         $batch = $letter?->batch_label ?: $this->resolver->batchLabel($application);
+        $registrationNumber = $this->registrationNumber($application, $letter);
 
         return [
-            'reference_code' => (string) ($letter?->reference_code ?? 'Pending'),
+            'registration_number' => $registrationNumber,
+            'reference_code' => $registrationNumber !== 'Pending'
+                ? $registrationNumber
+                : (string) ($letter?->reference_code ?? 'Pending'),
             'date' => $issuedAt->format('d/m/Y'),
             'issued_date' => $issuedAt->format('d/m/Y'),
             'applicant_name' => $applicantName,
@@ -150,5 +154,20 @@ final class RenderKcaAdmissionLetterTemplateAction
         $fallback = trim((string) ($fallback ?? ''));
 
         return $fallback !== '' ? $fallback : 'To be announced';
+    }
+
+    private function registrationNumber(KcaApplication $application, ?KcaAdmissionLetter $letter): string
+    {
+        $fromEnrollment = trim((string) ($application->enrollment?->registration_number ?? ''));
+        if ($fromEnrollment !== '') {
+            return $fromEnrollment;
+        }
+
+        $fromLetter = trim((string) ($letter?->registration_number ?? ''));
+        if ($fromLetter !== '') {
+            return $fromLetter;
+        }
+
+        return 'Pending';
     }
 }

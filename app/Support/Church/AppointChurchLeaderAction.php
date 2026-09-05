@@ -3,6 +3,7 @@
 namespace App\Support\Church;
 
 use App\Models\Church;
+use App\Models\ChurchMembership;
 use App\Models\ChurchRoleAssignment;
 use App\Models\Person;
 use App\Models\User;
@@ -67,12 +68,20 @@ class AppointChurchLeaderAction
                 throw new InvalidArgumentException('This person already has an active leadership assignment at this church.');
             }
 
-            $this->startMembership->handle(
-                $lockedPerson,
-                $lockedChurch,
-                actor: $actor,
-                confirmTransfer: true,
-            );
+            $alreadyMember = ChurchMembership::query()
+                ->where('church_id', $lockedChurch->getKey())
+                ->where('person_id', $lockedPerson->getKey())
+                ->where('active_marker', 1)
+                ->exists();
+
+            if (! $alreadyMember) {
+                $this->startMembership->handle(
+                    $lockedPerson,
+                    $lockedChurch,
+                    actor: $actor,
+                    confirmTransfer: true,
+                );
+            }
 
             $assignment = ChurchRoleAssignment::query()->create([
                 'church_id' => $lockedChurch->getKey(),

@@ -188,6 +188,63 @@ class UserKcaMeAndPacingTest extends TestCase
         );
     }
 
+    public function test_dashboard_module_progress_is_lessons_completed_over_lessons_in_the_module(): void
+    {
+        $user = User::factory()->withPerson()->create();
+        $person = $user->person;
+        $this->assertNotNull($person);
+        $this->authenticate($user);
+
+        $application = KcaApplication::factory()->accepted()->for($person)->create();
+        $year = KcaYear::factory()->create();
+        $cohort = KcaCohort::factory()->for($year, 'year')->create(['timezone' => 'UTC']);
+        KcaEnrollment::factory()
+            ->for($application, 'application')
+            ->for($person)
+            ->for($year, 'year')
+            ->for($cohort, 'cohort')
+            ->create(['starts_on' => now()->toDateString()]);
+
+        $module = KcaModule::factory()->create(['duration_days' => 12, 'sequence' => 1]);
+        for ($i = 1; $i <= 12; $i++) {
+            KcaLesson::factory()->create([
+                'kca_module_id' => $module->getKey(),
+                'code' => 'PROG-L'.$i,
+                'sequence' => $i,
+            ]);
+        }
+
+        $actor = User::factory()->create();
+        $this->app->make(MapKcaModuleDaysAction::class)->handle($module, null, $actor);
+        $this->app->make(PublishKcaModuleAction::class)->handle($module->fresh(), $actor);
+
+        $firstLesson = KcaLesson::query()
+            ->where('kca_module_id', $module->getKey())
+            ->orderBy('sequence')
+            ->first();
+        $this->assertNotNull($firstLesson);
+
+        $this->postJson("/api/v1/user/kca/lessons/{$firstLesson->public_id}/complete", [
+            'acknowledged' => true,
+            'idempotency_key' => 'progress-lesson-1-'.$firstLesson->public_id,
+        ])->assertOk();
+
+        $this->getJson('/api/v1/user/kca/dashboard')
+            ->assertOk()
+            ->assertJsonPath('data.enrolled', true)
+            ->assertJsonPath('data.lessons_completed', 1)
+            ->assertJsonPath('data.lessons_total', 12)
+            ->assertJsonPath('data.curriculum_percent', 8)
+            ->assertJsonPath('data.modules_completed', 0)
+            ->assertJsonPath('data.modules_with_progress', 0);
+
+        $this->getJson('/api/v1/user/kca/modules')
+            ->assertOk()
+            ->assertJsonPath('data.0.lessons_completed', 1)
+            ->assertJsonPath('data.0.lessons_total', 12)
+            ->assertJsonPath('data.0.percent', 8);
+    }
+
     private function authenticate(User $user): void
     {
         $session = SecuritySession::factory()->for($user)->create();

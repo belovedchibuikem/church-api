@@ -19,6 +19,7 @@ class IssueKcaAdmissionLetterAction
         private readonly RenderKcaAdmissionLetterTemplateAction $renderTemplate,
         private readonly RecordAuditEventAction $recordAuditEvent,
         private readonly GenerateKcaAdmissionReferenceCodeAction $referenceCodes,
+        private readonly GenerateKcaRegistrationNumberAction $registrationNumbers,
     ) {}
 
     public function handle(
@@ -46,7 +47,7 @@ class IssueKcaAdmissionLetterAction
             $signatureFile,
         ): KcaAdmissionLetter {
             $lockedApplication = KcaApplication::query()
-                ->with(['person.profile', 'enrollment.cohort:id,name,public_id'])
+                ->with(['person.profile', 'enrollment.year', 'enrollment.cohort:id,name,public_id'])
                 ->lockForUpdate()
                 ->findOrFail($application->getKey());
 
@@ -67,9 +68,14 @@ class IssueKcaAdmissionLetterAction
                 ->loadMissing(['admissionLetterheadFile', 'admissionSignatureFile']);
             $resolvedBatch = $batchLabel ?: $this->resolver->batchLabel($lockedApplication);
             $referenceCode = $this->referenceCodes->handle($governance);
+            $registrationNumber = trim((string) ($lockedApplication->enrollment?->registration_number ?? ''));
+            if ($registrationNumber === '') {
+                $registrationNumber = $this->registrationNumbers->handle($lockedApplication->enrollment?->year);
+            }
 
             $draftLetter = (new KcaAdmissionLetter)->forceFill([
                 'reference_code' => $referenceCode,
+                'registration_number' => $registrationNumber,
                 'batch_label' => $resolvedBatch,
                 'signer_name' => $signerName ?: $governance->admission_signer_name ?: $governance->certificate_signer_name,
                 'signer_title' => $signerTitle ?: $governance->admission_signer_title ?: $governance->certificate_signer_title,
@@ -80,6 +86,7 @@ class IssueKcaAdmissionLetterAction
             $letter = (new KcaAdmissionLetter)->forceFill([
                 'kca_application_id' => $lockedApplication->getKey(),
                 'reference_code' => $referenceCode,
+                'registration_number' => $registrationNumber,
                 'batch_label' => $resolvedBatch,
                 'letter_body' => $letterBody ?: $this->renderTemplate->forApplication($lockedApplication, $draftLetter, $governance),
                 'signer_name' => $draftLetter->signer_name,
@@ -99,6 +106,7 @@ class IssueKcaAdmissionLetterAction
                 metadata: [
                     'application_id' => $lockedApplication->public_id,
                     'reference_code' => $letter->reference_code,
+                    'registration_number' => $letter->registration_number,
                     'applicant_name' => PersonDisplayName::of($lockedApplication->person) ?: 'Applicant',
                 ],
             ));

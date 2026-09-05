@@ -72,7 +72,7 @@ class TransitionKcaApplicationAction
                 ], static fn (mixed $value): bool => $value !== null),
             ));
 
-            if ($to === KcaApplicationState::Accepted) {
+            if ($to->permitsEnrollment()) {
                 $this->issueAdmissionLetter->handle($lockedApplication->fresh(), $actor);
             }
 

@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['kca_module_id', 'kca_cohort_id', 'lecturer_person_id', 'assigned_by_user_id', 'starts_at', 'ends_at'])]
+#[Fillable(['kca_module_id', 'kca_lesson_id', 'kca_cohort_id', 'lecturer_person_id', 'assigned_by_user_id', 'starts_at', 'ends_at'])]
 class KcaLecturerAssignment extends Model
 {
     /** @use HasFactory<KcaLecturerAssignmentFactory> */
@@ -28,6 +28,11 @@ class KcaLecturerAssignment extends Model
     public function module(): BelongsTo
     {
         return $this->belongsTo(KcaModule::class, 'kca_module_id');
+    }
+
+    public function lesson(): BelongsTo
+    {
+        return $this->belongsTo(KcaLesson::class, 'kca_lesson_id');
     }
 
     public function cohort(): BelongsTo

@@ -44,9 +44,11 @@ class EnrollKcaStudentAction
             $lockedApplication = KcaApplication::query()->lockForUpdate()->findOrFail($application->getKey());
             $lockedCohort = KcaCohort::query()->lockForUpdate()->findOrFail($cohort->getKey());
             $lockedYear = KcaYear::query()->lockForUpdate()->findOrFail($lockedCohort->kca_year_id);
+            $lockedApplication->loadMissing(['admissionLetter:id,kca_application_id,registration_number,letter_body']);
             $registrationNumber = $requestedRegistrationNumber;
             if ($registrationNumber === '') {
-                $registrationNumber = $this->registrationNumbers->handle($lockedYear);
+                $reserved = trim((string) ($lockedApplication->admissionLetter?->registration_number ?? ''));
+                $registrationNumber = $reserved !== '' ? $reserved : $this->registrationNumbers->handle($lockedYear);
             }
 
             if ($registrationNumber === '' || Str::length($registrationNumber) > 100) {
@@ -97,6 +99,21 @@ class EnrollKcaStudentAction
                 'created_by_user_id' => $actor->getKey(),
             ]);
             $enrollment->save();
+
+            $letter = $lockedApplication->admissionLetter;
+            if ($letter !== null) {
+                $letterUpdates = [];
+                if (trim((string) ($letter->registration_number ?? '')) === '') {
+                    $letterUpdates['registration_number'] = $registrationNumber;
+                }
+                $body = trim((string) ($letter->letter_body ?? ''));
+                if ($body !== '') {
+                    $letterUpdates['letter_body'] = SyncKcaAdmissionLetterReference::inBody($body, $registrationNumber);
+                }
+                if ($letterUpdates !== []) {
+                    $letter->forceFill($letterUpdates)->save();
+                }
+            }
 
             $this->recordAuditEvent->handle(new AuditEventData(
                 action: 'kca.enrollment.created',

@@ -6,8 +6,11 @@ use App\Files\FileAssetStatus;
 use App\Kca\KcaApplicationState;
 use App\Models\Church;
 use App\Models\FileAsset;
+use App\Models\KcaAdmissionLetter;
 use App\Models\KcaApplication;
+use App\Models\KcaCohort;
 use App\Models\KcaGovernanceConfiguration;
+use App\Models\KcaYear;
 use App\Models\Permission;
 use App\Models\Person;
 use App\Models\Role;
@@ -19,6 +22,7 @@ use App\Support\Authorization\GrantPermissionToRoleAction;
 use App\Support\Authorization\ScopeReference;
 use App\Support\Identity\PersonDisplayName;
 use App\Support\Kca\GenerateKcaAdmissionReferenceCodeAction;
+use App\Support\Kca\TransitionKcaApplicationAction;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Tests\TestCase;
 
@@ -120,6 +124,30 @@ class KcaAdmissionLetterApiTest extends TestCase
             ->postJson("/api/v1/admin/kca/applications/{$application->public_id}/admission-letter/issue")
             ->assertCreated()
             ->assertJsonPath('data.status', 'issued');
+    }
+
+    public function test_transition_to_provisionally_accepted_auto_issues_admission_letter(): void
+    {
+        $person = Person::factory()->create();
+        $application = KcaApplication::factory()->create([
+            'person_id' => $person->getKey(),
+            'status' => KcaApplicationState::Reviewed,
+        ]);
+        KcaGovernanceConfiguration::factory()->create([
+            'admission_signer_name' => 'Provost Jane',
+            'admission_signer_title' => 'Provost, KCA',
+        ]);
+        $actor = User::factory()->create();
+
+        app(TransitionKcaApplicationAction::class)->handle(
+            $application,
+            KcaApplicationState::ProvisionallyAccepted,
+            $actor,
+        );
+
+        $this->assertDatabaseHas('kca_admission_letters', [
+            'kca_application_id' => $application->getKey(),
+        ]);
     }
 
     public function test_admin_can_download_issued_admission_letter_pdf(): void
@@ -274,6 +302,46 @@ class KcaAdmissionLetterApiTest extends TestCase
             ->assertJsonPath('data.permitted_actions', fn (mixed $value): bool => is_array($value) && in_array('complete_orientation', $value, true));
     }
 
+    public function test_kca_access_moves_to_dashboard_after_orientation_completion(): void
+    {
+        $person = Person::factory()->create();
+        $user = User::factory()->create(['person_id' => $person->getKey()]);
+        $application = KcaApplication::factory()->create([
+            'person_id' => $person->getKey(),
+            'status' => KcaApplicationState::Accepted,
+        ]);
+        KcaGovernanceConfiguration::factory()->create([
+            'admission_signer_name' => 'Provost Jane',
+            'admission_signer_title' => 'Provost, KCA',
+        ]);
+
+        $scope = new ScopeReference('global', 'platform');
+        $actor = $this->actorWithPermissions(['kca.applications.transition'], $scope);
+        $this->authenticate($actor);
+        $this->withHeaders($this->headers($scope))
+            ->postJson("/api/v1/admin/kca/applications/{$application->public_id}/admission-letter/issue")
+            ->assertCreated();
+
+        $this->authenticate($user);
+        $this->postJson('/api/v1/user/kca/admission-letter/accept', [
+            'applicant_signature_name' => 'Accepted Applicant',
+        ])->assertOk();
+
+        foreach (['overview', 'rules', 'path', 'mentors'] as $stage) {
+            $this->postJson("/api/v1/user/kca/orientation/stages/{$stage}/complete")->assertOk();
+        }
+
+        $this->postJson('/api/v1/user/kca/orientation/complete')
+            ->assertOk()
+            ->assertJsonPath('data.status', 'accepted')
+            ->assertJsonPath('data.destination', 'student_dashboard');
+
+        $this->getJson('/api/v1/user/kca/me')
+            ->assertOk()
+            ->assertJsonPath('data.destination', 'student_dashboard')
+            ->assertJsonPath('data.permitted_actions', fn (mixed $value): bool => is_array($value) && in_array('open_dashboard', $value, true));
+    }
+
     public function test_applications_catalog_resolves_church_name_from_church_id(): void
     {
         $church = Church::factory()->create(['name' => 'Living Word Assembly']);
@@ -302,6 +370,59 @@ class KcaAdmissionLetterApiTest extends TestCase
 
         $this->assertSame('KCA/ADM/2026/00001', $code);
         $this->assertStringNotContainsString('/2026/2026/', $code);
+    }
+
+    public function test_admission_letter_uses_the_same_registration_number_as_enrollment(): void
+    {
+        $person = Person::factory()->withProfile()->create();
+        $application = KcaApplication::factory()->reviewed()->for($person)->create();
+        $year = KcaYear::factory()->create(['code' => 'KCA-2026', 'name' => '2026 KCA Year']);
+        $cohort = KcaCohort::factory()->for($year, 'year')->create();
+        KcaGovernanceConfiguration::factory()->create([
+            'admission_signer_name' => 'Provost Jane',
+            'admission_signer_title' => 'Provost, KCA',
+        ]);
+
+        $scope = new ScopeReference('global', 'platform');
+        $actor = $this->actorWithPermissions([
+            'kca.applications.transition',
+            'kca.applications.view',
+            'kca.enrollments.manage',
+        ], $scope);
+        $this->authenticate($actor);
+
+        app(TransitionKcaApplicationAction::class)->handle(
+            $application,
+            KcaApplicationState::Accepted,
+            $actor,
+        );
+
+        $letter = KcaAdmissionLetter::query()->where('kca_application_id', $application->getKey())->first();
+        $this->assertNotNull($letter);
+        $this->assertSame('KCA-2026-00001', $letter->registration_number);
+        $this->assertStringStartsWith('KCA/ADM/', (string) $letter->reference_code);
+        $this->assertStringContainsString('KCA-2026-00001', (string) $letter->letter_body);
+        $this->assertStringNotContainsString((string) $letter->reference_code, (string) $letter->letter_body);
+
+        $this->withHeaders($this->headers($scope))
+            ->postJson("/api/v1/admin/kca/applications/{$application->public_id}/enrollments", [
+                'cohort_id' => $cohort->public_id,
+                'starts_on' => now()->toDateString(),
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.registration_number', 'KCA-2026-00001');
+
+        $this->assertDatabaseHas('kca_enrollments', [
+            'kca_application_id' => $application->getKey(),
+            'registration_number' => 'KCA-2026-00001',
+        ]);
+
+        $this->withHeaders($this->headers($scope))
+            ->getJson("/api/v1/admin/kca/applications/{$application->public_id}/admission-letter")
+            ->assertOk()
+            ->assertJsonPath('data.registration_number', 'KCA-2026-00001')
+            ->assertJsonPath('data.reference_code', $letter->reference_code)
+            ->assertJsonPath('data.letter_body', fn (mixed $value): bool => is_string($value) && str_contains($value, 'KCA-2026-00001'));
     }
 
     /** @param array<int, string> $permissionCodes */

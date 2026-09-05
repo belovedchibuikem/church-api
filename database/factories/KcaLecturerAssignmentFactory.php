@@ -24,6 +24,7 @@ class KcaLecturerAssignmentFactory extends Factory
         return [
             'kca_module_id' => KcaModule::factory(),
             'kca_cohort_id' => KcaCohort::factory(),
+            'kca_lesson_id' => null,
             'lecturer_person_id' => Person::factory(),
             'assigned_by_user_id' => User::factory(),
             'starts_at' => now()->subDay(),

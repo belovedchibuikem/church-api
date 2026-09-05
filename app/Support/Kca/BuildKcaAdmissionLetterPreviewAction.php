@@ -13,6 +13,7 @@ final class BuildKcaAdmissionLetterPreviewAction
         private readonly ResolveKcaApplicationChurchName $resolver,
         private readonly RenderKcaAdmissionLetterTemplateAction $renderTemplate,
         private readonly GenerateKcaAdmissionReferenceCodeAction $referenceCodes,
+        private readonly GenerateKcaRegistrationNumberAction $registrationNumbers,
     ) {}
 
     /** @return array<string, mixed> */
@@ -22,13 +23,18 @@ final class BuildKcaAdmissionLetterPreviewAction
             throw new NotFoundHttpException('Admission letter preview is not available for this application.');
         }
 
-        $application->loadMissing(['person.profile', 'enrollment.cohort:id,name,public_id']);
+        $application->loadMissing(['person.profile', 'enrollment.year', 'enrollment.cohort:id,name,public_id']);
         $governance = $this->resolver->governanceDefaults()
             ->loadMissing(['admissionLetterheadFile', 'admissionSignatureFile']);
         $previewReference = $this->referenceCodes->handle($governance);
+        $previewRegistration = trim((string) ($application->enrollment?->registration_number ?? ''));
+        if ($previewRegistration === '') {
+            $previewRegistration = $this->registrationNumbers->handle($application->enrollment?->year);
+        }
 
         $draftLetter = (new KcaAdmissionLetter)->forceFill([
             'reference_code' => $previewReference,
+            'registration_number' => $previewRegistration,
             'signer_name' => $governance->admission_signer_name ?: $governance->certificate_signer_name,
             'signer_title' => $governance->admission_signer_title ?: $governance->certificate_signer_title,
             'batch_label' => $this->resolver->batchLabel($application),
@@ -40,6 +46,7 @@ final class BuildKcaAdmissionLetterPreviewAction
             'id' => null,
             'application_id' => $application->public_id,
             'reference_code' => $previewReference,
+            'registration_number' => $previewRegistration,
             'applicant_name' => PersonDisplayName::of($application->person) ?: 'Applicant',
             'church_name' => $this->resolver->fromApplicationData($application->application_data),
             'batch_label' => $draftLetter->batch_label,

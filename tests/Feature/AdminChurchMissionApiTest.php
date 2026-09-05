@@ -82,6 +82,8 @@ class AdminChurchMissionApiTest extends TestCase
             ->getJson("/api/v1/admin/church/home-church-applications/{$application->public_id}")
             ->assertOk()
             ->assertJsonPath('data.status', 'submitted')
+            ->assertJsonPath('data.contact_phone', $application->contact_phone)
+            ->assertJsonPath('data.contact_email', $application->contact_email)
             ->assertJsonPath('data.allowed_actions.0.status', 'under_review');
 
         $this->withHeaders($headers)->postJson("/api/v1/admin/church/home-church-applications/{$application->public_id}/transitions", [

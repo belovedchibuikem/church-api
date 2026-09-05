@@ -20,6 +20,8 @@ final class AuthorizationBundleCatalog
 
     public const DOMAIN_OPERATIONS_ADMINISTRATOR_ROLE = 'domain_operations_administrator';
 
+    public const KCA_LECTURER_ROLE = 'kca_lecturer';
+
     /** Single role carrying every permission code — assign at global/platform scope for full admin access. */
     public const SUPER_ADMINISTRATOR_ROLE = 'super_administrator';
 
@@ -160,6 +162,8 @@ final class AuthorizationBundleCatalog
                 'kca.assignments.transition',
                 'kca.evidence.submit',
                 'kca.evidence.review',
+                'kca.assessments.view',
+                'kca.assessments.record',
                 'kca.certificates.issue',
                 'kca.certificates.revoke',
                 'kca.governance.manage',
@@ -198,6 +202,19 @@ final class AuthorizationBundleCatalog
                 'privacy.data_exports.expire',
                 'safeguarding.incidents.report',
                 'safeguarding.guardians.register',
+            ],
+        ],
+        self::KCA_LECTURER_ROLE => [
+            'name' => 'KCA lecturer',
+            'permissions' => [
+                'kca.enrollments.view',
+                'kca.applications.view',
+                'kca.attendance.record',
+                'kca.evidence.view',
+                'kca.evidence.review',
+                'kca.assessments.view',
+                'kca.assessments.record',
+                'kca.assignments.transition',
             ],
         ],
     ];

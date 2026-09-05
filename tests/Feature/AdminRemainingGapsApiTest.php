@@ -11,6 +11,8 @@ use App\Models\FileAsset;
 use App\Models\KcaApplication;
 use App\Models\KcaCohort;
 use App\Models\KcaEnrollment;
+use App\Models\KcaLesson;
+use App\Models\KcaModule;
 use App\Models\KcaYear;
 use App\Models\MinistryEvent;
 use App\Models\Permission;
@@ -116,8 +118,8 @@ class AdminRemainingGapsApiTest extends TestCase
         $scope = new ScopeReference('global', 'platform');
         $actor = $this->actorWithPermissions(['kca.lessons.manage'], $scope);
         $this->authenticate($actor);
-        $module = \App\Models\KcaModule::factory()->create(['title' => 'Identity in Christ']);
-        $lesson = \App\Models\KcaLesson::factory()->for($module, 'module')->create([
+        $module = KcaModule::factory()->create(['title' => 'Identity in Christ']);
+        $lesson = KcaLesson::factory()->for($module, 'module')->create([
             'code' => 'L01',
             'title' => 'Who Am I?',
             'sequence' => 1,
@@ -143,11 +145,11 @@ class AdminRemainingGapsApiTest extends TestCase
         $scope = new ScopeReference('global', 'platform');
         $actor = $this->actorWithPermissions(['kca.lessons.manage'], $scope);
         $this->authenticate($actor);
-        $module = \App\Models\KcaModule::factory()->create([
+        $module = KcaModule::factory()->create([
             'title' => 'Identity in Christ',
             'published_at' => now(),
         ]);
-        $lesson = \App\Models\KcaLesson::factory()->for($module, 'module')->create([
+        $lesson = KcaLesson::factory()->for($module, 'module')->create([
             'code' => 'L01',
             'title' => 'Who Am I?',
             'sequence' => 1,
@@ -174,24 +176,24 @@ class AdminRemainingGapsApiTest extends TestCase
         $scope = new ScopeReference('global', 'platform');
         $actor = $this->actorWithPermissions(['kca.modules.manage'], $scope);
         $this->authenticate($actor);
-        $module = \App\Models\KcaModule::factory()->create([
+        $module = KcaModule::factory()->create([
             'title' => 'Identity in Christ',
             'duration_days' => 7,
             'published_at' => now(),
         ]);
-        \App\Models\KcaLesson::factory()->for($module, 'module')->create([
+        KcaLesson::factory()->for($module, 'module')->create([
             'code' => 'L01',
             'title' => 'Lesson one',
             'sequence' => 1,
             'day_index' => 1,
         ]);
-        \App\Models\KcaLesson::factory()->for($module, 'module')->create([
+        KcaLesson::factory()->for($module, 'module')->create([
             'code' => 'L02',
             'title' => 'Lesson two',
             'sequence' => 2,
             'day_index' => 1,
         ]);
-        \App\Models\KcaLesson::factory()->for($module, 'module')->create([
+        KcaLesson::factory()->for($module, 'module')->create([
             'code' => 'L03',
             'title' => 'Lesson three',
             'sequence' => 3,
@@ -202,7 +204,7 @@ class AdminRemainingGapsApiTest extends TestCase
             ->postJson("/api/v1/admin/kca/modules/{$module->public_id}/day-map", [])
             ->assertOk();
 
-        $dayIndexes = \App\Models\KcaLesson::query()
+        $dayIndexes = KcaLesson::query()
             ->where('kca_module_id', $module->getKey())
             ->orderBy('sequence')
             ->pluck('day_index')
@@ -217,7 +219,7 @@ class AdminRemainingGapsApiTest extends TestCase
         $scope = new ScopeReference('global', 'platform');
         $actor = $this->actorWithPermissions(['kca.lessons.manage'], $scope);
         $this->authenticate($actor);
-        $module = \App\Models\KcaModule::factory()->create(['title' => 'Identity in Christ']);
+        $module = KcaModule::factory()->create(['title' => 'Identity in Christ']);
 
         $this->withHeaders($this->headers($scope))
             ->postJson("/api/v1/admin/kca/modules/{$module->public_id}/lessons", [
@@ -247,7 +249,7 @@ class AdminRemainingGapsApiTest extends TestCase
         $scope = new ScopeReference('global', 'platform');
         $actor = $this->actorWithPermissions(['kca.lessons.manage'], $scope);
         $this->authenticate($actor);
-        $module = \App\Models\KcaModule::factory()->create([
+        $module = KcaModule::factory()->create([
             'title' => 'Identity in Christ',
             'published_at' => now(),
         ]);
@@ -271,8 +273,8 @@ class AdminRemainingGapsApiTest extends TestCase
         $scope = new ScopeReference('global', 'platform');
         $actor = $this->actorWithPermissions(['kca.lessons.manage'], $scope);
         $this->authenticate($actor);
-        $module = \App\Models\KcaModule::factory()->create(['title' => 'Identity in Christ']);
-        \App\Models\KcaLesson::factory()->for($module, 'module')->create([
+        $module = KcaModule::factory()->create(['title' => 'Identity in Christ']);
+        KcaLesson::factory()->for($module, 'module')->create([
             'code' => 'L01',
             'title' => 'Lesson one',
             'sequence' => 1,
@@ -405,7 +407,7 @@ class AdminRemainingGapsApiTest extends TestCase
     public function test_kca_operator_can_record_an_assessment_for_one_student(): void
     {
         $scope = new ScopeReference('global', 'platform');
-        $actor = $this->actorWithPermissions(['kca.enrollments.manage'], $scope);
+        $actor = $this->actorWithPermissions(['kca.assessments.record'], $scope);
         $this->authenticate($actor);
         $enrollment = KcaEnrollment::factory()->create();
 

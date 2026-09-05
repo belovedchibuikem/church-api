@@ -10,7 +10,6 @@ use App\Models\ChurchDepartment;
 use App\Models\ChurchGroup;
 use App\Models\ChurchMembership;
 use App\Models\ChurchRoleAssignment;
-use App\Support\Church\PersonChurchAdminAccessQuery;
 use App\Models\Convert;
 use App\Models\CounsellingCase;
 use App\Models\Crusade;
@@ -30,6 +29,7 @@ use App\Models\Person;
 use App\Models\PrayerRequest;
 use App\Models\SafeguardingIncident;
 use App\Models\Testimony;
+use App\Support\Church\PersonChurchAdminAccessQuery;
 use App\Support\Identity\PersonDisplayName;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -134,6 +134,9 @@ class ProtectedDomainRecordResource extends JsonResource
             'home_church_id' => $this->homeChurch?->public_id,
             'applicant_person_id' => $applicant?->public_id ?? $this->applicant()->value('public_id'),
             'applicant_name' => PersonDisplayName::of($applicant),
+            'contact_email' => $this->contact_email,
+            'contact_phone' => $this->contact_phone,
+            'person_phone' => $this->contact_phone ?: PersonDisplayName::phone($applicant),
             'proposed_name' => $this->proposed_name,
             'residence_family_name' => $this->residence_family_name,
             'expected_participants' => $this->expected_participants,
