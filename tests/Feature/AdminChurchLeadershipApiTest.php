@@ -250,6 +250,28 @@ class AdminChurchLeadershipApiTest extends TestCase
             ->assertJsonPath('data.roles.0.scopes.0.key', $church->public_id);
     }
 
+    public function test_capabilities_attaches_church_scope_from_membership_for_unscoped_church_operator(): void
+    {
+        $this->app->make(ProvisionAuthorizationBundlesAction::class)->handle();
+        $church = Church::factory()->create();
+        $person = Person::factory()->withProfile()->create();
+        $actor = User::factory()->for($person, 'person')->create();
+        ChurchMembership::factory()->create([
+            'person_id' => $person->getKey(),
+            'church_id' => $church->getKey(),
+            'status' => 'active',
+        ]);
+        $role = Role::query()->where('code', AuthorizationBundleCatalog::CHURCH_OPERATIONS_ADMINISTRATOR_ROLE)->firstOrFail();
+        $this->app->make(AssignRoleToUserAction::class)->handle($actor, $role);
+        $this->authenticate($actor);
+
+        $this->getJson('/api/v1/user/capabilities')
+            ->assertOk()
+            ->assertJsonPath('data.roles.0.code', AuthorizationBundleCatalog::CHURCH_OPERATIONS_ADMINISTRATOR_ROLE)
+            ->assertJsonPath('data.roles.0.scopes.0.type', 'church')
+            ->assertJsonPath('data.roles.0.scopes.0.key', $church->public_id);
+    }
+
     /** @return array{0: Church, 1: array<string, string>} */
     private function churchContext(): array
     {

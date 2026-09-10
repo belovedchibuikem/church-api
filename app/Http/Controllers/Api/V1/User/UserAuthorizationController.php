@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Queries\User\ListUserCapabilitiesQuery;
 use App\Support\Api\ApiResponse;
 use App\Support\Authorization\AuthorizationDecisionService;
+use App\Support\Authorization\ReconcileChurchOperatorScopesAction;
 use App\Support\Authorization\MobilePermissionAliasCatalog;
 use App\Support\Authorization\ScopeReference;
 use Illuminate\Http\JsonResponse;
@@ -16,12 +17,16 @@ use InvalidArgumentException;
 
 class UserAuthorizationController extends Controller
 {
-    public function capabilities(Request $request, ListUserCapabilitiesQuery $query): JsonResponse
-    {
+    public function capabilities(
+        Request $request,
+        ListUserCapabilitiesQuery $query,
+        ReconcileChurchOperatorScopesAction $reconcileChurchScopes,
+    ): JsonResponse {
         $user = $request->user();
         abort_unless($user instanceof User, 401);
+        $reconcileChurchScopes->handle($user);
 
-        return ApiResponse::success($request, $query->handle($user));
+        return ApiResponse::success($request, $query->handle($user->fresh() ?? $user));
     }
 
     public function check(

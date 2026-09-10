@@ -20,31 +20,60 @@ use App\Support\Authorization\AssignRoleToUserAction;
 use App\Support\Authorization\AssignScopeToRoleAssignmentAction;
 use App\Support\Authorization\AuthorizationBundleCatalog;
 use App\Support\Authorization\GrantPermissionToRoleAction;
+use App\Support\Authorization\ReconcileChurchOperatorScopesAction;
 use App\Support\Authorization\RevokeRoleFromUserAction;
 use App\Support\Authorization\ScopeReference;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use InvalidArgumentException;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
 class AccessAdministrationController extends Controller
 {
     use ExecutesDomainMutations;
 
-    public function assignRole(AssignRoleToUserRequest $request, string $user, AssignRoleToUserAction $action, ProtectedAdminContext $context): JsonResponse
-    {
+    public function assignRole(
+        AssignRoleToUserRequest $request,
+        string $user,
+        AssignRoleToUserAction $action,
+        AssignScopeToRoleAssignmentAction $assignScope,
+        ReconcileChurchOperatorScopesAction $reconcileChurchScopes,
+        ProtectedAdminContext $context,
+    ): JsonResponse {
         $context->ensureGlobal($request);
         $target = User::query()->where('public_id', $user)->firstOrFail();
         $role = Role::query()->where('public_id', $request->validated('role_id'))->firstOrFail();
         if ($role->code === AuthorizationBundleCatalog::SUPER_ADMINISTRATOR_ROLE) {
             $this->assertActorHoldsSuperAdministrator($context->actor($request));
         }
-        $assignment = $this->execute(fn (): RoleAssignment => $action->handle(
-            $target,
-            $role,
-            $context->actor($request),
-            $request->validated('expires_at') === null ? null : CarbonImmutable::parse((string) $request->validated('expires_at')),
-        ));
+        $assignment = $this->execute(function () use ($request, $target, $role, $action, $assignScope, $reconcileChurchScopes, $context): RoleAssignment {
+            $created = $action->handle(
+                $target,
+                $role,
+                $context->actor($request),
+                $request->validated('expires_at') === null ? null : CarbonImmutable::parse((string) $request->validated('expires_at')),
+            );
+            $scopeType = $request->validated('scope_type');
+            $scopeKey = $request->validated('scope_key');
+            if (is_string($scopeType) && is_string($scopeKey) && $scopeType !== '' && $scopeKey !== '') {
+                $assignScope->handle($created, new ScopeReference($scopeType, $scopeKey), $context->actor($request));
+            } elseif ($role->code === AuthorizationBundleCatalog::CHURCH_OPERATIONS_ADMINISTRATOR_ROLE) {
+                $reconcileChurchScopes->handle($target);
+                $created->refresh();
+                $created->load('scopeAssignments');
+                $hasChurchScope = $created->scopeAssignments->contains(
+                    fn ($scope): bool => $scope->scope_type === 'church',
+                );
+                if (! $hasChurchScope) {
+                    throw new InvalidArgumentException(
+                        'Church operations administrator requires a church scope. Select the church this person administers.',
+                    );
+                }
+            }
+
+            return $created;
+        });
         $assignment->load(['role:id,public_id,code', 'user:id,public_id']);
 
         return ApiResponse::success($request, [

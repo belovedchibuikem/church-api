@@ -20,6 +20,8 @@ class AssignRoleToUserRequest extends FormRequest
         return [
             'role_id' => ['required', 'ulid', 'exists:roles,public_id'],
             'expires_at' => ['nullable', 'date'],
+            'scope_type' => ['nullable', 'string', 'in:church,home_church,country,administrative_unit,global'],
+            'scope_key' => ['nullable', 'required_with:scope_type', 'string', 'max:191'],
         ];
     }
 }
