@@ -1,4 +1,4 @@
-// Generated from openapi/protected-v1.openapi.json (SHA-256: 94cfd9861b2768fd273ca83036bfa0a564f8055441ea2342663cdd463663223e).
+// Generated from openapi/protected-v1.openapi.json (SHA-256: 659f9decf2ce90b9d4b9bc436e714a49a96ddff9b3ac2ea2d99b27dd1554068a).
 // Do not edit directly. Run: php scripts/generate-protected-api.php
 
 typedef JsonMap = Map<String, Object?>;
@@ -504,6 +504,9 @@ final class FamilyHouseProtectedApiClient {
 
   Future<JsonMap> assignAdminUserRole({required String user, JsonMap body = const {}, ProtectedRequestOptions options = const ProtectedRequestOptions()}) =>
       _request('POST', '/api/v1/admin/users/${Uri.encodeComponent(user)}/role-assignments', options, body: body);
+
+  Future<JsonMap> revokeAdminUserRole({required String user, required String roleAssignment, ProtectedRequestOptions options = const ProtectedRequestOptions()}) =>
+      _request('DELETE', '/api/v1/admin/users/${Uri.encodeComponent(user)}/role-assignments/${Uri.encodeComponent(roleAssignment)}', options);
 
   Future<JsonMap> assignAdminRoleAssignmentScope({required String roleAssignment, JsonMap body = const {}, ProtectedRequestOptions options = const ProtectedRequestOptions()}) =>
       _request('POST', '/api/v1/admin/access/role-assignments/${Uri.encodeComponent(roleAssignment)}/scopes', options, body: body);

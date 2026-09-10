@@ -64,7 +64,7 @@ class ListScopedUsersQuery
             ->select(['id', 'public_id', 'person_id', 'name', 'email', 'email_verified_at', 'account_status', 'suspension_reason', 'suspended_at', 'reactivated_at', 'created_at'])
             ->with([
                 'person:id,public_id',
-                'person.profile:id,person_id,given_name,middle_name,family_name,preferred_name',
+                'person.profile:id,person_id,given_name,middle_name,family_name,preferred_name,phone,country,region,locality',
                 'roleAssignments' => function (HasMany $roleQuery) use ($now): void {
                     $roleQuery
                         ->select(['id', 'public_id', 'user_id', 'role_id', 'assigned_at', 'expires_at'])

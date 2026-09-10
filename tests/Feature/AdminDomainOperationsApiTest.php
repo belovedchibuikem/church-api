@@ -16,7 +16,9 @@ use App\Models\SecuritySession;
 use App\Models\User;
 use App\Support\Authorization\AssignRoleToUserAction;
 use App\Support\Authorization\AssignScopeToRoleAssignmentAction;
+use App\Support\Authorization\AuthorizationBundleCatalog;
 use App\Support\Authorization\GrantPermissionToRoleAction;
+use App\Support\Authorization\RevokeRoleFromUserAction;
 use App\Support\Authorization\ScopeReference;
 use App\Support\Church\StartChurchMembershipAction;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
@@ -78,6 +80,77 @@ class AdminDomainOperationsApiTest extends TestCase
             ->assertCreated()
             ->assertJsonPath('data.user_id', $target->public_id)
             ->assertJsonPath('data.role_id', $role->public_id);
+    }
+
+    public function test_platform_admin_can_revoke_role_from_user(): void
+    {
+        $scope = new ScopeReference('global', 'platform');
+        $actor = $this->actorWithPermissions(['identity.roles.assign'], $scope);
+        $this->authenticate($actor);
+        $target = User::factory()->create();
+        $role = Role::factory()->create();
+        $assignment = $this->app->make(AssignRoleToUserAction::class)->handle($target, $role, $actor);
+
+        $this->withHeaders($this->headers($scope))
+            ->deleteJson("/api/v1/admin/users/{$target->public_id}/role-assignments/{$assignment->public_id}")
+            ->assertOk()
+            ->assertJsonPath('data.id', $assignment->public_id)
+            ->assertJsonPath('data.role_code', $role->code);
+
+        $this->assertNotNull($assignment->fresh()->revoked_at);
+        $this->assertTrue(\App\Models\AuditEvent::query()->where('action', 'identity.role.revoked')->exists());
+    }
+
+    public function test_super_administrator_can_assign_super_administrator_role(): void
+    {
+        $scope = new ScopeReference('global', 'platform');
+        $actor = $this->actorWithPermissions(['identity.roles.assign'], $scope);
+        $superRole = Role::query()->firstOrCreate(
+            ['code' => AuthorizationBundleCatalog::SUPER_ADMINISTRATOR_ROLE],
+            ['name' => 'Super administrator'],
+        );
+        $this->app->make(AssignRoleToUserAction::class)->handle($actor, $superRole, $actor);
+        $this->authenticate($actor);
+        $target = User::factory()->create();
+
+        $this->withHeaders($this->headers($scope))
+            ->postJson("/api/v1/admin/users/{$target->public_id}/role-assignments", [
+                'role_id' => $superRole->public_id,
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.role_code', AuthorizationBundleCatalog::SUPER_ADMINISTRATOR_ROLE);
+    }
+
+    public function test_non_super_administrator_cannot_assign_super_administrator_role(): void
+    {
+        $scope = new ScopeReference('global', 'platform');
+        $actor = $this->actorWithPermissions(['identity.roles.assign'], $scope);
+        $this->authenticate($actor);
+        $target = User::factory()->create();
+        $superRole = Role::query()->firstOrCreate(
+            ['code' => AuthorizationBundleCatalog::SUPER_ADMINISTRATOR_ROLE],
+            ['name' => 'Super administrator'],
+        );
+
+        $this->withHeaders($this->headers($scope))
+            ->postJson("/api/v1/admin/users/{$target->public_id}/role-assignments", [
+                'role_id' => $superRole->public_id,
+            ])
+            ->assertForbidden();
+    }
+
+    public function test_cannot_revoke_the_last_super_administrator_assignment(): void
+    {
+        $actor = User::factory()->create();
+        $superRole = Role::query()->firstOrCreate(
+            ['code' => AuthorizationBundleCatalog::SUPER_ADMINISTRATOR_ROLE],
+            ['name' => 'Super administrator'],
+        );
+        $assignment = $this->app->make(AssignRoleToUserAction::class)->handle($actor, $superRole, $actor);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Cannot revoke the last super-administrator assignment.');
+        $this->app->make(RevokeRoleFromUserAction::class)->handle($actor, $actor, $assignment);
     }
 
     public function test_church_operator_can_start_membership(): void
@@ -153,7 +226,7 @@ class AdminDomainOperationsApiTest extends TestCase
         $role = Role::factory()->create();
 
         foreach ($permissionCodes as $permissionCode) {
-            $permission = Permission::factory()->create(['code' => $permissionCode]);
+            $permission = Permission::query()->firstOrCreate(['code' => $permissionCode]);
             $this->app->make(GrantPermissionToRoleAction::class)->handle($role, $permission);
         }
 

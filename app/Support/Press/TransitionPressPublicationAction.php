@@ -40,23 +40,27 @@ class TransitionPressPublicationAction
             }
 
             if (! $from->canTransitionTo($to)) {
-                throw new DomainException("Publication cannot transition from {$from->value} to {$to->value}.");
+                throw new DomainException(
+                    'This publication cannot move from '.str_replace('_', ' ', $from->value)
+                    .' to '.str_replace('_', ' ', $to->value)
+                    .'. Use Publish to make it live, or choose one of the actions shown on this page.',
+                );
             }
 
             if ($to === PressPublicationStatus::PublicationApproval
                 && $from === PressPublicationStatus::Design
                 && $lockedPublication->requiresIsbnToPublish()
                 && $lockedPublication->isbn === null) {
-                throw new DomainException('Books must receive an ISBN before publication approval.');
+                throw new DomainException('This book needs an ISBN before approval. Assign an ISBN, then continue.');
             }
 
             if ($to === PressPublicationStatus::Published) {
                 if ($lockedPublication->requiresIsbnToPublish() && $lockedPublication->isbn === null) {
-                    throw new DomainException('A publication must have a valid ISBN before publication.');
+                    throw new DomainException('This book needs an ISBN before it can be published. Assign an ISBN on the publication, then click Publish. PDFs, sermons, devotionals, and study manuals do not need an ISBN if you chose that publication type.');
                 }
 
                 if ($lockedPublication->hasUnreadyRequiredAssets()) {
-                    throw new DomainException('Required digital assets must be ready before publication.');
+                    throw new DomainException('A required document is still processing. Wait until the file shows as ready, then click Publish.');
                 }
             }
 

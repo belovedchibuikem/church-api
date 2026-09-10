@@ -27,4 +27,16 @@ class CreatePressPublicationRequest extends FormRequest
             ...PressPublicationPayloadRules::rules(),
         ];
     }
+
+    /** @return array<string, string> */
+    public function attributes(): array
+    {
+        return PressPublicationPayloadRules::attributes();
+    }
+
+    /** @return array<string, string> */
+    public function messages(): array
+    {
+        return PressPublicationPayloadRules::messages();
+    }
 }

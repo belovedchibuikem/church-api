@@ -33,6 +33,7 @@ use App\Support\People\CreatePersonAction;
 use App\Support\People\MatchPeopleQuery;
 use App\Support\People\MergePeopleAction;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Password;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Http\JsonResponse;
@@ -544,17 +545,39 @@ class ChurchMinistryOperationsController extends Controller
             'started_at' => ['nullable', 'date'],
             'grant_admin_access' => ['sometimes', 'boolean'],
             'admin_email' => ['nullable', 'email', 'max:191'],
+            'admin_password' => ['nullable', 'string'],
+            'admin_password_confirmation' => ['nullable', 'string'],
         ]);
         $church = Church::query()->where('public_id', $data['church_id'])->firstOrFail();
         $context->ensureContains($request, $church->scopeReference());
-        $person = Person::query()->where('public_id', $data['person_id'])->firstOrFail();
+        $person = Person::query()->with('user')->where('public_id', $data['person_id'])->firstOrFail();
 
         if ($data['role_type'] === 'leader') {
-            $request->validate([
+            $leaderRules = [
                 'title' => ['required', 'string', Rule::in(ChurchLeadershipCatalog::TITLES)],
                 'grant_admin_access' => ['sometimes', 'boolean'],
                 'admin_email' => ['nullable', 'email', 'max:191'],
-            ]);
+                'admin_password' => ['nullable', 'string'],
+                'admin_password_confirmation' => ['nullable', 'string'],
+            ];
+            if ($request->boolean('grant_admin_access')) {
+                $creatingLogin = $person->user()->doesntExist();
+                $leaderRules['admin_email'] = $creatingLogin
+                    ? ['required', 'email', 'max:191']
+                    : ['nullable', 'email', 'max:191'];
+                $leaderRules['admin_password'] = $creatingLogin
+                    ? [
+                        'required',
+                        'string',
+                        'confirmed',
+                        Password::min(12)->mixedCase()->letters()->numbers()->symbols(),
+                    ]
+                    : ['nullable', 'string'];
+                $leaderRules['admin_password_confirmation'] = $creatingLogin
+                    ? ['required', 'string']
+                    : ['nullable', 'string'];
+            }
+            $request->validate($leaderRules);
             $assignment = $this->execute(fn (): ChurchRoleAssignment => $appointLeader->handle(
                 $person,
                 $church,
@@ -563,6 +586,7 @@ class ChurchMinistryOperationsController extends Controller
                     'started_at' => isset($data['started_at']) ? CarbonImmutable::parse($data['started_at']) : null,
                     'grant_admin_access' => $request->boolean('grant_admin_access'),
                     'admin_email' => $data['admin_email'] ?? null,
+                    'admin_password' => $request->input('admin_password'),
                 ],
                 $context->actor($request),
             ));

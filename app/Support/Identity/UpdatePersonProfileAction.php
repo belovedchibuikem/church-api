@@ -17,7 +17,7 @@ class UpdatePersonProfileAction
     public function __construct(private RecordAuditEventAction $recordAuditEvent) {}
 
     /**
-     * @param  array{given_name: string, middle_name?: string|null, family_name: string, preferred_name?: string|null, avatar_file_asset_id?: string|null}  $attributes
+     * @param  array{given_name: string, middle_name?: string|null, family_name: string, preferred_name?: string|null, phone?: string|null, country?: string|null, region?: string|null, locality?: string|null, avatar_file_asset_id?: string|null}  $attributes
      */
     public function handle(Person $person, array $attributes, ?User $actor = null): PersonProfile
     {
@@ -31,9 +31,13 @@ class UpdatePersonProfileAction
 
             $profile->fill([
                 'given_name' => $attributes['given_name'],
-                'middle_name' => $attributes['middle_name'] ?? null,
+                'middle_name' => array_key_exists('middle_name', $attributes) ? $attributes['middle_name'] : $profile->middle_name,
                 'family_name' => $attributes['family_name'],
-                'preferred_name' => $attributes['preferred_name'] ?? null,
+                'preferred_name' => array_key_exists('preferred_name', $attributes) ? $attributes['preferred_name'] : $profile->preferred_name,
+                'phone' => array_key_exists('phone', $attributes) ? $attributes['phone'] : $profile->phone,
+                'country' => array_key_exists('country', $attributes) ? $attributes['country'] : $profile->country,
+                'region' => array_key_exists('region', $attributes) ? $attributes['region'] : $profile->region,
+                'locality' => array_key_exists('locality', $attributes) ? $attributes['locality'] : $profile->locality,
                 'avatar_file_asset_id' => $avatarId,
             ]);
 

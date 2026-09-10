@@ -19,4 +19,16 @@ class UpdatePressPublicationRequest extends FormRequest
     {
         return PressPublicationPayloadRules::rules(creating: false);
     }
+
+    /** @return array<string, string> */
+    public function attributes(): array
+    {
+        return PressPublicationPayloadRules::attributes();
+    }
+
+    /** @return array<string, string> */
+    public function messages(): array
+    {
+        return PressPublicationPayloadRules::messages();
+    }
 }

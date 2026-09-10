@@ -35,11 +35,22 @@ class ApiExceptionRenderer
         }
 
         if ($exception instanceof ValidationException) {
+            $fieldErrors = $exception->errors();
+            $firstMessage = '';
+            foreach ($fieldErrors as $messages) {
+                foreach ($messages as $message) {
+                    if (is_string($message) && trim($message) !== '') {
+                        $firstMessage = $message;
+                        break 2;
+                    }
+                }
+            }
+
             return ApiResponse::error(
                 $request,
                 'VALIDATION_FAILED',
-                'The request data is invalid.',
-                ['fields' => $exception->errors()],
+                $firstMessage !== '' ? $firstMessage : 'Please check the required fields and try again.',
+                ['fields' => $fieldErrors],
                 422,
             );
         }

@@ -16,8 +16,6 @@ use App\Support\Identity\LinkUserToPersonAction;
 use App\Support\Identity\PersonDisplayName;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Password;
-use Illuminate\Support\Str;
 use InvalidArgumentException;
 
 class ProvisionPersonAdminAccessAction
@@ -34,8 +32,9 @@ class ProvisionPersonAdminAccessAction
         Church $church,
         ?User $actor = null,
         ?string $email = null,
+        ?string $password = null,
     ): User {
-        return DB::transaction(function () use ($person, $church, $actor, $email): User {
+        return DB::transaction(function () use ($person, $church, $actor, $email, $password): User {
             $lockedPerson = Person::query()
                 ->with(['profile', 'user'])
                 ->lockForUpdate()
@@ -45,6 +44,7 @@ class ProvisionPersonAdminAccessAction
 
             if ($user === null) {
                 $resolvedEmail = $this->resolveEmail($email);
+                $chosenPassword = $this->resolvePassword($password);
                 $normalizedEmail = mb_strtolower(trim($resolvedEmail));
                 if (User::query()->where('email', $normalizedEmail)->exists()) {
                     throw new InvalidArgumentException('A user with this email already exists.');
@@ -53,7 +53,7 @@ class ProvisionPersonAdminAccessAction
                     $user = User::query()->create([
                         'name' => PersonDisplayName::of($lockedPerson),
                         'email' => $normalizedEmail,
-                        'password' => Str::password(20),
+                        'password' => $chosenPassword,
                     ]);
                 } catch (QueryException $exception) {
                     if (($exception->errorInfo[1] ?? null) === 1062) {
@@ -62,8 +62,8 @@ class ProvisionPersonAdminAccessAction
 
                     throw $exception;
                 }
+                $user->forceFill(['email_verified_at' => now()])->save();
                 $user = $this->linkUser->handle($user, $lockedPerson, $actor);
-                Password::sendResetLink(['email' => $user->email]);
             }
 
             $role = Role::query()
@@ -95,6 +95,16 @@ class ProvisionPersonAdminAccessAction
         $resolved = trim((string) $email);
         if ($resolved === '' || ! filter_var($resolved, FILTER_VALIDATE_EMAIL)) {
             throw new InvalidArgumentException('A valid email is required to grant church admin access.');
+        }
+
+        return $resolved;
+    }
+
+    private function resolvePassword(?string $password): string
+    {
+        $resolved = (string) $password;
+        if ($resolved === '') {
+            throw new InvalidArgumentException('A login password is required to create church admin access.');
         }
 
         return $resolved;

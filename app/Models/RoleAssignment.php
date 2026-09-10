@@ -19,6 +19,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'assigned_by_user_id',
     'assigned_at',
     'expires_at',
+    'revoked_at',
 ])]
 class RoleAssignment extends Model
 {

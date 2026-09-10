@@ -109,11 +109,54 @@ class UserAdministrationControllerTest extends TestCase
         $this->assertFalse(AuditEvent::query()->where('action', 'identity.user.suspended')->exists());
     }
 
+    public function test_updates_user_contact_and_profile_fields(): void
+    {
+        $scope = new ScopeReference('global', 'platform');
+        $actor = $this->actorWithPermissionAtScope('identity.users.manage', $scope);
+        $target = User::factory()->withPerson()->create([
+            'name' => 'Old Name',
+            'email' => 'old.user@example.test',
+            'email_verified_at' => now(),
+        ]);
+        $this->authenticate($actor);
+
+        $this->withHeaders($this->globalScopeHeaders())
+            ->patchJson("/api/v1/admin/users/{$target->public_id}", [
+                'name' => 'Ada Lovelace',
+                'email' => 'ada@example.test',
+                'profile' => [
+                    'given_name' => 'Ada',
+                    'middle_name' => 'King',
+                    'family_name' => 'Lovelace',
+                    'preferred_name' => 'Ada',
+                    'phone' => '+2348010000000',
+                    'country' => 'ng',
+                    'region' => 'Lagos',
+                    'locality' => 'Ikeja',
+                ],
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.name', 'Ada Lovelace')
+            ->assertJsonPath('data.email', 'ada@example.test')
+            ->assertJsonPath('data.email_verified_at', null)
+            ->assertJsonPath('data.profile.given_name', 'Ada')
+            ->assertJsonPath('data.profile.middle_name', 'King')
+            ->assertJsonPath('data.profile.family_name', 'Lovelace')
+            ->assertJsonPath('data.profile.preferred_name', 'Ada')
+            ->assertJsonPath('data.profile.phone', '+2348010000000')
+            ->assertJsonPath('data.profile.country', 'NG')
+            ->assertJsonPath('data.profile.region', 'Lagos')
+            ->assertJsonPath('data.profile.locality', 'Ikeja');
+
+        $this->assertTrue(AuditEvent::query()->where('action', 'identity.user.updated')->exists());
+        $this->assertTrue(AuditEvent::query()->where('action', 'identity.profile.updated')->exists());
+    }
+
     private function actorWithPermissionAtScope(string $permissionCode, ScopeReference $scope): User
     {
         $actor = User::factory()->create();
         $role = Role::factory()->create();
-        $permission = Permission::factory()->create(['code' => $permissionCode]);
+        $permission = Permission::query()->firstOrCreate(['code' => $permissionCode]);
         $this->app->make(GrantPermissionToRoleAction::class)->handle($role, $permission);
         $assignment = $this->app->make(AssignRoleToUserAction::class)->handle($actor, $role);
         $this->app->make(AssignScopeToRoleAssignmentAction::class)->handle($assignment, $scope);

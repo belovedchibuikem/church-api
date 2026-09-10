@@ -2,6 +2,8 @@
 
 namespace App\Press;
 
+use Illuminate\Validation\ValidationException;
+
 enum PressPublicationType: string
 {
     case DocumentPdf = 'document_pdf';
@@ -41,17 +43,20 @@ enum PressPublicationType: string
             self::Sermon => $this->requireAny(
                 $metadata,
                 ['speaker', 'preacher', 'speaker_name'],
-                'Sermons require a speaker or preacher name.',
+                'speaker',
+                'Enter the speaker or preacher name for this sermon.',
             ),
             self::Devotional => $this->requireAny(
                 $metadata,
                 ['body', 'reflection', 'content'],
-                'Devotionals require a reflection or body.',
+                'reflection',
+                'Enter the reflection or body for this devotional.',
             ),
             self::BibleStudy => $this->requireAny(
                 $metadata,
                 ['passage', 'scripture', 'session_passage'],
-                'Study manuals require a scripture passage.',
+                'passage',
+                'Enter the scripture passage this study manual covers, for example Romans 8:1-39.',
             ),
             self::DocumentPdf, self::Book => null,
         };
@@ -61,7 +66,7 @@ enum PressPublicationType: string
      * @param  array<string, mixed>  $metadata
      * @param  list<string>  $keys
      */
-    private function requireAny(array $metadata, array $keys, string $message): void
+    private function requireAny(array $metadata, array $keys, string $field, string $message): void
     {
         foreach ($keys as $key) {
             $value = $metadata[$key] ?? null;
@@ -70,6 +75,8 @@ enum PressPublicationType: string
             }
         }
 
-        throw new \InvalidArgumentException($message);
+        throw ValidationException::withMessages([
+            $field => [$message],
+        ]);
     }
 }

@@ -24,6 +24,7 @@ class AppointChurchLeaderAction
      *     started_at?: CarbonInterface|null,
      *     grant_admin_access?: bool,
      *     admin_email?: string|null,
+     *     admin_password?: string|null,
      * }  $options
      */
     public function handle(
@@ -98,6 +99,7 @@ class AppointChurchLeaderAction
                     $lockedChurch,
                     $actor,
                     $options['admin_email'] ?? null,
+                    $options['admin_password'] ?? null,
                 );
             }
 

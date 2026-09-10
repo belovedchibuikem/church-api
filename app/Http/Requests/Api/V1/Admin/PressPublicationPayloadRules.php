@@ -55,4 +55,39 @@ final class PressPublicationPayloadRules
             'type_metadata.isbn' => ['prohibited'],
         ];
     }
+
+    /** @return array<string, string> */
+    public static function attributes(): array
+    {
+        return [
+            'title' => 'title',
+            'publisher_name' => 'publisher',
+            'language_code' => 'language',
+            'format' => 'format',
+            'publication_type' => 'publication type',
+            'content_file_asset_id' => 'document file',
+            'content_source_url' => 'document URL',
+            'idempotency_key' => 'save request',
+            'type_metadata.speaker' => 'speaker',
+            'type_metadata.passage' => 'scripture passage',
+            'type_metadata.reflection' => 'reflection',
+        ];
+    }
+
+    /** @return array<string, string> */
+    public static function messages(): array
+    {
+        return [
+            'title.required' => 'Enter a publication title.',
+            'publisher_name.required' => 'Enter a publisher name.',
+            'language_code.required' => 'Enter a language code, for example en.',
+            'format.required' => 'Choose a format such as PDF, print, or audio.',
+            'format.enum' => 'Choose a valid format such as PDF, print, audio, epub, or video.',
+            'format.Illuminate\Validation\Rules\Enum' => 'Choose a valid format such as PDF, print, audio, epub, or video.',
+            'publication_type.enum' => 'Choose a valid publication type.',
+            'publication_type.Illuminate\Validation\Rules\Enum' => 'Choose a valid publication type.',
+            'idempotency_key.required' => 'Please try again. The publication could not be saved.',
+            'content_source_url.url' => 'Enter a valid document URL starting with http:// or https://.',
+        ];
+    }
 }

@@ -112,6 +112,49 @@ class PressPublicationTypesApiTest extends TestCase
             ->assertJsonPath('data.0.id', $created->json('data.id'));
     }
 
+    public function test_study_manual_can_publish_now_from_edit(): void
+    {
+        $scope = new ScopeReference('global', 'platform');
+        $actor = $this->actorWithPermissions([
+            'press.publications.manage',
+            'press.publications.transition',
+            'press.publications.view',
+        ], $scope);
+        $this->authenticate($actor);
+
+        $created = $this->withHeaders([...$this->headers($scope), 'Idempotency-Key' => 'press-study-edit-create-0001'])
+            ->postJson('/api/v1/admin/press/publications', [
+                'title' => '2026 Studying at His Feet Manual',
+                'publisher_name' => 'Family House Press',
+                'language_code' => 'en',
+                'format' => 'pdf',
+                'publication_type' => 'bible_study',
+                'category' => 'Spiritual Growth Study Manual',
+                'type_metadata' => ['passage' => 'Luke 10:38-42'],
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.status', 'manuscript');
+
+        $id = $created->json('data.id');
+
+        $this->withHeaders($this->headers($scope))
+            ->putJson('/api/v1/admin/press/publications/'.$id, [
+                'title' => '2026 Studying at His Feet Manual',
+                'publisher_name' => 'Family House Press',
+                'language_code' => 'en',
+                'format' => 'pdf',
+                'publish_now' => true,
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.status', 'published')
+            ->assertJsonPath('data.publication_type', 'bible_study')
+            ->assertJsonPath('data.availability', 'available');
+
+        $this->getJson('/api/v1/press/publications?filter[publication_type]=bible_study')
+            ->assertOk()
+            ->assertJsonPath('data.0.id', $id);
+    }
+
     public function test_sermon_create_without_speaker_is_rejected(): void
     {
         $scope = new ScopeReference('global', 'platform');
@@ -127,7 +170,8 @@ class PressPublicationTypesApiTest extends TestCase
                 'publication_type' => 'sermon',
             ])
             ->assertStatus(422)
-            ->assertJsonPath('error.message', 'Sermons require a speaker or preacher name.');
+            ->assertJsonPath('error.message', 'Enter the speaker or preacher name for this sermon.')
+            ->assertJsonPath('error.details.fields.speaker.0', 'Enter the speaker or preacher name for this sermon.');
     }
 
     public function test_bible_study_create_without_passage_is_rejected(): void
@@ -145,7 +189,8 @@ class PressPublicationTypesApiTest extends TestCase
                 'publication_type' => 'bible_study',
             ])
             ->assertStatus(422)
-            ->assertJsonPath('error.message', 'Study manuals require a scripture passage.');
+            ->assertJsonPath('error.message', 'Enter the scripture passage this study manual covers, for example Romans 8:1-39.')
+            ->assertJsonPath('error.details.fields.passage.0', 'Enter the scripture passage this study manual covers, for example Romans 8:1-39.');
     }
 
     public function test_bible_study_create_accepts_scripture_alias(): void

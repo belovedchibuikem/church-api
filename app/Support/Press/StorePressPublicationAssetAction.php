@@ -32,7 +32,7 @@ class StorePressPublicationAssetAction
             $lockedAsset = FileAsset::query()->lockForUpdate()->findOrFail($fileAsset->getKey());
 
             if ($lockedAsset->status !== FileAssetStatus::Available || $lockedAsset->deleted_at !== null) {
-                throw new DomainException('Press assets must be available and not deleted.');
+                throw new DomainException('The uploaded document is not ready yet. Wait until processing finishes, then try again.');
             }
 
             $current = PressPublicationAsset::query()

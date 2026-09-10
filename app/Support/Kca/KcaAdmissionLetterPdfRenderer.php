@@ -22,7 +22,7 @@ class KcaAdmissionLetterPdfRenderer
     private const CONTENT_WIDTH = 490;
 
     /** Clear the branded zone on the full-page letterhead template. */
-    private const CONTENT_TOP_Y = 450;
+    private const CONTENT_TOP_Y = 600;
 
     private const CONTENT_BOTTOM_Y = 58;
 

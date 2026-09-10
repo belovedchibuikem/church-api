@@ -56,6 +56,7 @@ class ApiErrorResponseTest extends TestCase
         $response
             ->assertUnprocessable()
             ->assertJsonPath('error.code', 'VALIDATION_FAILED')
+            ->assertJsonPath('error.message', 'The email field is required.')
             ->assertJsonPath('error.details.fields.email.0', 'The email field is required.')
             ->assertJsonMissingPath('data');
     }

@@ -9444,6 +9444,77 @@
                 }
             }
         },
+        "/api/v1/admin/users/{user}/role-assignments/{roleAssignment}": {
+            "delete": {
+                "operationId": "revokeAdminUserRole",
+                "tags": [
+                    "Admin"
+                ],
+                "parameters": [
+                    {
+                        "name": "X-Correlation-ID",
+                        "in": "header",
+                        "required": false,
+                        "schema": {
+                            "$ref": "#/components/schemas/CorrelationId"
+                        }
+                    },
+                    {
+                        "name": "user",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "roleAssignment",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "$ref": "#/components/parameters/ScopeType"
+                    },
+                    {
+                        "$ref": "#/components/parameters/ScopeId"
+                    }
+                ],
+                "security": [
+                    {
+                        "cookieSession": [],
+                        "csrfToken": []
+                    },
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SuccessEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "default": {
+                        "description": "Normalized API error.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/admin/access/role-assignments/{roleAssignment}/scopes": {
             "post": {
                 "operationId": "assignAdminRoleAssignmentScope",

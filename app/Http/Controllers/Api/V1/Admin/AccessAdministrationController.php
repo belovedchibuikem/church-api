@@ -20,9 +20,11 @@ use App\Support\Authorization\AssignRoleToUserAction;
 use App\Support\Authorization\AssignScopeToRoleAssignmentAction;
 use App\Support\Authorization\AuthorizationBundleCatalog;
 use App\Support\Authorization\GrantPermissionToRoleAction;
+use App\Support\Authorization\RevokeRoleFromUserAction;
 use App\Support\Authorization\ScopeReference;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
 class AccessAdministrationController extends Controller
@@ -53,6 +55,34 @@ class AccessAdministrationController extends Controller
             'assigned_at' => $assignment->assigned_at?->utc()->toIso8601String(),
             'expires_at' => $assignment->expires_at?->utc()->toIso8601String(),
         ], status: 201);
+    }
+
+    public function revokeRole(Request $request, string $user, string $roleAssignment, RevokeRoleFromUserAction $action, ProtectedAdminContext $context): JsonResponse
+    {
+        $context->ensureGlobal($request);
+        $target = User::query()->where('public_id', $user)->firstOrFail();
+        $assignment = RoleAssignment::query()
+            ->with('role:id,public_id,code,name')
+            ->where('public_id', $roleAssignment)
+            ->where('user_id', $target->getKey())
+            ->firstOrFail();
+        if ($assignment->role?->code === AuthorizationBundleCatalog::SUPER_ADMINISTRATOR_ROLE) {
+            $this->assertActorHoldsSuperAdministrator($context->actor($request));
+        }
+        $revoked = $this->execute(fn (): RoleAssignment => $action->handle(
+            $context->actor($request),
+            $target,
+            $assignment,
+        ));
+        $revoked->load(['role:id,public_id,code', 'user:id,public_id']);
+
+        return ApiResponse::success($request, [
+            'id' => $revoked->public_id,
+            'user_id' => $revoked->user?->public_id,
+            'role_id' => $revoked->role?->public_id,
+            'role_code' => $revoked->role?->code,
+            'revoked_at' => $revoked->revoked_at?->utc()->toIso8601String(),
+        ]);
     }
 
     public function assignScope(AssignScopeToRoleAssignmentRequest $request, string $roleAssignment, AssignScopeToRoleAssignmentAction $action, ProtectedAdminContext $context): JsonResponse

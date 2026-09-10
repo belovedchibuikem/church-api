@@ -1,4 +1,4 @@
-// Generated from openapi/protected-v1.openapi.json (SHA-256: 94cfd9861b2768fd273ca83036bfa0a564f8055441ea2342663cdd463663223e).
+// Generated from openapi/protected-v1.openapi.json (SHA-256: 659f9decf2ce90b9d4b9bc436e714a49a96ddff9b3ac2ea2d99b27dd1554068a).
 // Do not edit directly. Run: php scripts/generate-protected-api.php
 
 export type JsonPrimitive = string | number | boolean | null;
@@ -862,6 +862,10 @@ export class FamilyHouseProtectedApiClient {
 
   public assignAdminUserRole(user: string, body: AssignAdminUserRoleInput, options: ProtectedRequestOptions = {}): Promise<SuccessEnvelope<ProtectedDomainRecord>> {
     return this.request<ProtectedDomainRecord>('POST', `/api/v1/admin/users/${encodeURIComponent(user)}/role-assignments`, options, body as unknown as JsonObject);
+  }
+
+  public revokeAdminUserRole(user: string, roleAssignment: string, options: ProtectedRequestOptions = {}): Promise<SuccessEnvelope<JsonValue>> {
+    return this.request<JsonValue>('DELETE', `/api/v1/admin/users/${encodeURIComponent(user)}/role-assignments/${encodeURIComponent(roleAssignment)}`, options);
   }
 
   public assignAdminRoleAssignmentScope(roleAssignment: string, body: AssignAdminRoleAssignmentScopeInput, options: ProtectedRequestOptions = {}): Promise<SuccessEnvelope<ProtectedDomainRecord>> {

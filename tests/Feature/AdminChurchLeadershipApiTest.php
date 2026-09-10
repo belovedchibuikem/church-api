@@ -14,7 +14,6 @@ use App\Models\Role;
 use App\Models\RoleAssignment;
 use App\Models\SecuritySession;
 use App\Models\User;
-use App\Notifications\QueuedResetPassword;
 use App\Support\Authorization\AssignRoleToUserAction;
 use App\Support\Authorization\AssignScopeToRoleAssignmentAction;
 use App\Support\Authorization\AuthorizationBundleCatalog;
@@ -23,6 +22,7 @@ use App\Support\Authorization\ProvisionAuthorizationBundlesAction;
 use App\Support\Authorization\ScopeReference;
 use App\Support\Church\ChurchLeadershipCatalog;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
 
@@ -45,6 +45,8 @@ class AdminChurchLeadershipApiTest extends TestCase
             'title' => 'Senior Pastor',
             'grant_admin_access' => true,
             'admin_email' => 'pastor@example.test',
+            'admin_password' => 'PastorPass!2026',
+            'admin_password_confirmation' => 'PastorPass!2026',
         ])
             ->assertCreated()
             ->assertJsonPath('data.title', 'Senior Pastor')
@@ -58,6 +60,8 @@ class AdminChurchLeadershipApiTest extends TestCase
 
         $user = User::query()->where('email', 'pastor@example.test')->firstOrFail();
         $this->assertSame($person->getKey(), $user->person_id);
+        $this->assertNotNull($user->email_verified_at);
+        $this->assertTrue(Hash::check('PastorPass!2026', $user->password));
         $this->assertTrue(
             RoleAssignment::query()
                 ->where('user_id', $user->getKey())
@@ -71,8 +75,27 @@ class AdminChurchLeadershipApiTest extends TestCase
                     ->where('scope_key', $church->public_id))
                 ->exists(),
         );
-        Notification::assertSentTo($user, QueuedResetPassword::class);
+        Notification::assertNothingSent();
         $this->assertTrue(AuditEvent::query()->where('action', 'church.leadership.admin_access_granted')->exists());
+    }
+
+    public function test_granting_admin_access_to_a_new_person_requires_a_chosen_password(): void
+    {
+        $this->app->make(ProvisionAuthorizationBundlesAction::class)->handle();
+        [$church, $headers] = $this->churchContext();
+        $person = Person::factory()->withProfile()->create();
+
+        $this->withHeaders($headers)->postJson('/api/v1/admin/church/role-assignments', [
+            'church_id' => $church->public_id,
+            'person_id' => $person->public_id,
+            'role_type' => 'leader',
+            'title' => 'Resident Pastor',
+            'grant_admin_access' => true,
+            'admin_email' => 'resident@example.test',
+        ])
+            ->assertStatus(422)
+            ->assertJsonPath('error.code', 'VALIDATION_FAILED')
+            ->assertJsonPath('error.details.fields.admin_password.0', 'The admin password field is required.');
     }
 
     public function test_appointing_an_existing_member_as_associate_pastor_succeeds(): void
@@ -179,6 +202,8 @@ class AdminChurchLeadershipApiTest extends TestCase
             'title' => 'Elder',
             'grant_admin_access' => true,
             'admin_email' => 'elder@example.test',
+            'admin_password' => 'ElderPass!2026',
+            'admin_password_confirmation' => 'ElderPass!2026',
         ])->assertCreated()->json('data.id');
 
         $user = User::query()->where('email', 'elder@example.test')->firstOrFail();

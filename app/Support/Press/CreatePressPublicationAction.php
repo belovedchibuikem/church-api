@@ -101,7 +101,7 @@ class CreatePressPublicationAction
     private function resolveRetry(PressPublication $publication, string $fingerprint): PressPublication
     {
         if (! hash_equals($publication->request_fingerprint, $fingerprint)) {
-            throw new DomainException('The idempotency key was already used with different publication data.');
+            throw new DomainException('This save request was already used with different publication details. Refresh the page and try again.');
         }
 
         return $publication;
@@ -116,7 +116,7 @@ class CreatePressPublicationAction
         $lockedAsset = FileAsset::query()->lockForUpdate()->findOrFail($asset->getKey());
 
         if ($lockedAsset->status !== FileAssetStatus::Available || $lockedAsset->deleted_at !== null) {
-            throw new DomainException('Press assets must be available and not deleted.');
+            throw new DomainException('The uploaded document is not ready yet. Wait until processing finishes, then try again.');
         }
     }
 }

@@ -72,16 +72,7 @@ class PressOperationsController extends Controller
                 (string) $request->validated('idempotency_key'),
             );
 
-            if ($request->boolean('publish_now') && ! $request->boolean('as_draft')) {
-                return $transition->handle(
-                    $created,
-                    PressPublicationStatus::Published,
-                    $context->actor($request),
-                    'publication.approved',
-                );
-            }
-
-            return $created;
+            return $this->publishNowIfRequested($request, $created, $transition, $context);
         });
 
         return ApiResponse::success($request, (new ProtectedCatalogRecordResource($publication))->resolve($request), status: 201);
@@ -103,15 +94,24 @@ class PressOperationsController extends Controller
         return ApiResponse::success($request, (new PressPublicationAdminResource($target))->resolve($request));
     }
 
-    public function updatePublication(UpdatePressPublicationRequest $request, string $publication, UpdatePressPublicationAction $action, ProtectedAdminContext $context): JsonResponse
-    {
+    public function updatePublication(
+        UpdatePressPublicationRequest $request,
+        string $publication,
+        UpdatePressPublicationAction $action,
+        TransitionPressPublicationAction $transition,
+        ProtectedAdminContext $context,
+    ): JsonResponse {
         $context->ensureGlobal($request);
         $target = $this->publication($publication);
-        $updated = $this->execute(fn (): PressPublication => $action->handle(
-            $target,
-            $this->publicationData($request),
-            $context->actor($request),
-        ));
+        $updated = $this->execute(function () use ($request, $action, $transition, $context, $target): PressPublication {
+            $saved = $action->handle(
+                $target,
+                $this->publicationData($request, $target),
+                $context->actor($request),
+            );
+
+            return $this->publishNowIfRequested($request, $saved, $transition, $context);
+        });
 
         return ApiResponse::success($request, (new ProtectedCatalogRecordResource($updated))->resolve($request));
     }
@@ -301,10 +301,18 @@ class PressOperationsController extends Controller
         return PressPublication::query()->where('public_id', $publicId)->firstOrFail();
     }
 
-    private function publicationData(CreatePressPublicationRequest|UpdatePressPublicationRequest $request): PressPublicationData
-    {
+    private function publicationData(
+        CreatePressPublicationRequest|UpdatePressPublicationRequest $request,
+        ?PressPublication $existing = null,
+    ): PressPublicationData {
         $cover = $request->validated('cover_file_asset_id') === null ? null : FileAsset::query()->where('public_id', $request->validated('cover_file_asset_id'))->firstOrFail();
         $content = $request->validated('content_file_asset_id') === null ? null : FileAsset::query()->where('public_id', $request->validated('content_file_asset_id'))->firstOrFail();
+        $typeValue = $request->validated('publication_type')
+            ?? $existing?->publicationType()->value
+            ?? PressPublicationType::Book->value;
+        $metadata = $request->has('type_metadata')
+            ? ($request->validated('type_metadata') ?? [])
+            : ($existing?->type_metadata ?? []);
 
         return new PressPublicationData(
             title: (string) $request->validated('title'),
@@ -323,13 +331,31 @@ class PressOperationsController extends Controller
             contentSourceUrl: $request->validated('content_source_url'),
             priceMinor: $request->validated('price_minor') === null ? null : (int) $request->validated('price_minor'),
             currencyCode: $request->validated('currency_code'),
-            publicationType: PressPublicationType::from((string) $request->validated('publication_type', PressPublicationType::Book->value)),
-            visibility: PressPublicationVisibility::from((string) $request->validated('visibility', PressPublicationVisibility::Public->value)),
+            publicationType: PressPublicationType::from((string) $typeValue),
+            visibility: PressPublicationVisibility::from((string) $request->validated('visibility', $existing?->visibilityEnum()->value ?? PressPublicationVisibility::Public->value)),
             asDraft: (bool) $request->validated('as_draft', false),
             featured: (bool) $request->validated('featured', false),
             slug: $request->validated('slug'),
             summary: $request->validated('summary'),
-            typeMetadata: $request->validated('type_metadata', []),
+            typeMetadata: is_array($metadata) ? $metadata : [],
+        );
+    }
+
+    private function publishNowIfRequested(
+        CreatePressPublicationRequest|UpdatePressPublicationRequest $request,
+        PressPublication $publication,
+        TransitionPressPublicationAction $transition,
+        ProtectedAdminContext $context,
+    ): PressPublication {
+        if (! $request->boolean('publish_now') || $request->boolean('as_draft')) {
+            return $publication;
+        }
+
+        return $transition->handle(
+            $publication,
+            PressPublicationStatus::Published,
+            $context->actor($request),
+            'publication.approved',
         );
     }
 }

@@ -130,6 +130,11 @@ Route::post('/users/{user}/role-assignments', [AccessAdministrationController::c
     ->whereUlid('user')
     ->middleware(RequirePermissionAndScope::class.':identity.roles.assign')
     ->name('users.role_assignments.store');
+Route::delete('/users/{user}/role-assignments/{roleAssignment}', [AccessAdministrationController::class, 'revokeRole'])
+    ->whereUlid('user')
+    ->whereUlid('roleAssignment')
+    ->middleware(RequirePermissionAndScope::class.':identity.roles.assign')
+    ->name('users.role_assignments.destroy');
 
 Route::prefix('administration/work-items')->name('work_items.')->controller(AdminWorkItemController::class)->group(function (): void {
     Route::get('/', 'index')->middleware(RequirePermissionAndScope::class.':administration.work_items.view')->name('index');

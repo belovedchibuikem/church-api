@@ -35,6 +35,10 @@ class UserResource extends JsonResource
                 'middle_name' => $this->person->profile->middle_name,
                 'family_name' => $this->person->profile->family_name,
                 'preferred_name' => $this->person->profile->preferred_name,
+                'phone' => $this->person->profile->phone,
+                'country' => $this->person->profile->country,
+                'region' => $this->person->profile->region,
+                'locality' => $this->person->profile->locality,
             ]),
             'roles' => $this->whenLoaded('roleAssignments', fn (): array => $this->roleAssignments
                 ->map(fn (RoleAssignment $assignment): array => [

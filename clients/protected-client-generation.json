@@ -609,6 +609,10 @@
             "method": "POST",
             "path": "/api/v1/admin/users/{user}/role-assignments"
         },
+        "revokeAdminUserRole": {
+            "method": "DELETE",
+            "path": "/api/v1/admin/users/{user}/role-assignments/{roleAssignment}"
+        },
         "assignAdminRoleAssignmentScope": {
             "method": "POST",
             "path": "/api/v1/admin/access/role-assignments/{roleAssignment}/scopes"
