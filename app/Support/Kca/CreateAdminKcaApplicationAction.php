@@ -94,7 +94,7 @@ class CreateAdminKcaApplicationAction
                 $applicant->profile?->forceFill(['phone' => $resolvedPhone])->save();
             }
 
-            $application->application_data = $this->applicantSafeData($applicationData);
+            $application->application_data = KcaRegistrationProfile::normalizeIncoming($this->applicantSafeData($applicationData));
             $application->status = $finalize ? KcaApplicationState::Received : KcaApplicationState::Draft;
             if ($finalize && $application->received_at === null) {
                 $application->received_at = now()->utc();
@@ -161,7 +161,7 @@ class CreateAdminKcaApplicationAction
     {
         $email = isset($incoming['recommender_email']) ? trim((string) $incoming['recommender_email']) : '';
         $name = isset($incoming['recommender_name']) ? trim((string) $incoming['recommender_name']) : '';
-        if ($email === '' || $name === '') {
+        if ($email === '') {
             return;
         }
 

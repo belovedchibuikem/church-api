@@ -107,12 +107,13 @@ class ProtectedCatalogRecordResource extends JsonResource
                 'cohort_id' => $this->cohort?->public_id,
                 'kca_cohort_id' => $this->cohort?->public_id,
                 'cohort_name' => $this->cohort?->name,
-                'mentor_name' => PersonDisplayName::of($this->mentorAssignments->first()?->mentor),
                 'status' => 'Active',
                 'starts_on' => $this->starts_on?->toDateString(),
                 'application_data' => $this->application?->application_data,
                 'registration_sections' => KcaRegistrationProfile::sections($this->application, $this->person),
-            ], KcaRegistrationProfile::flattened($this->application, $this->person)),
+            ], KcaRegistrationProfile::flattened($this->application, $this->person), [
+                'mentor_name' => $this->activeMentorName(),
+            ]),
             $this->resource instanceof KcaAssignment => [
                 'id' => $this->public_id,
                 'enrollment_id' => $this->enrollment?->public_id,
@@ -695,6 +696,21 @@ class ProtectedCatalogRecordResource extends JsonResource
             ],
             default => throw new LogicException('Unsupported protected catalog resource.'),
         };
+    }
+
+    private function activeMentorName(): ?string
+    {
+        if (! $this->resource instanceof KcaEnrollment || ! $this->relationLoaded('mentorAssignments')) {
+            return null;
+        }
+
+        $assignment = $this->mentorAssignments
+            ->filter(fn ($row): bool => $row->ends_at === null || $row->ends_at->isFuture())
+            ->sortByDesc(fn ($row): int => $row->starts_at?->getTimestamp() ?? 0)
+            ->first();
+        $name = PersonDisplayName::of($assignment?->mentor);
+
+        return $name !== '' ? $name : null;
     }
 
     private function formatMoneyMinor(int $amountMinor, string $currency): string

@@ -56,7 +56,19 @@ class AccessAdministrationController extends Controller
             );
             $scopeType = $request->validated('scope_type');
             $scopeKey = $request->validated('scope_key');
-            if (is_string($scopeType) && is_string($scopeKey) && $scopeType !== '' && $scopeKey !== '') {
+            if ($role->code === AuthorizationBundleCatalog::KCA_LECTURER_ROLE) {
+                $created->load('scopeAssignments');
+                $hasGlobal = $created->scopeAssignments->contains(
+                    fn ($scope): bool => $scope->scope_type === 'global' && $scope->scope_key === 'platform',
+                );
+                if (! $hasGlobal) {
+                    $assignScope->handle(
+                        $created,
+                        new ScopeReference('global', 'platform'),
+                        $context->actor($request),
+                    );
+                }
+            } elseif (is_string($scopeType) && is_string($scopeKey) && $scopeType !== '' && $scopeKey !== '') {
                 $assignScope->handle($created, new ScopeReference($scopeType, $scopeKey), $context->actor($request));
             } elseif ($role->code === AuthorizationBundleCatalog::CHURCH_OPERATIONS_ADMINISTRATOR_ROLE) {
                 $reconcileChurchScopes->handle($target);
@@ -68,6 +80,15 @@ class AccessAdministrationController extends Controller
                 if (! $hasChurchScope) {
                     throw new InvalidArgumentException(
                         'Church operations administrator requires a church scope. Select the church this person administers.',
+                    );
+                }
+            } elseif ($role->code !== AuthorizationBundleCatalog::MEMBER_SECURITY_ROLE) {
+                $created->load('scopeAssignments');
+                if ($created->scopeAssignments->isEmpty()) {
+                    $assignScope->handle(
+                        $created,
+                        new ScopeReference('global', 'platform'),
+                        $context->actor($request),
                     );
                 }
             }

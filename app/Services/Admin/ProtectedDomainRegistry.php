@@ -103,7 +103,7 @@ class ProtectedDomainRegistry
                 'path' => 'kca/evidence-submissions',
                 'operation_id' => 'listAdminCatalogKcaEvidenceSubmissions',
                 'model' => KcaEvidenceSubmission::class,
-                'with' => ['enrollment:id,public_id', 'fileAsset:id,public_id', ...PersonDisplayName::eager('submittedBy')],
+                'with' => ['enrollment:id,public_id,person_id', 'fileAsset:id,public_id', ...PersonDisplayName::eager('submittedBy')],
                 'order_column' => 'submitted_at',
             ],
             'kca.assessments' => [
@@ -112,7 +112,7 @@ class ProtectedDomainRegistry
                 'operation_id' => 'listAdminCatalogKcaAssessmentResults',
                 'model' => KcaAssessmentResult::class,
                 'with' => [
-                    'enrollment:id,public_id,registration_number',
+                    'enrollment:id,public_id,registration_number,person_id',
                     ...PersonDisplayName::eager('enrollment.person'),
                     'module:id,public_id,title,code',
                 ],
@@ -124,7 +124,7 @@ class ProtectedDomainRegistry
                 'operation_id' => 'listAdminCatalogKcaAttendance',
                 'model' => KcaAttendance::class,
                 'with' => [
-                    'enrollment:id,public_id,registration_number',
+                    'enrollment:id,public_id,registration_number,person_id',
                     ...PersonDisplayName::eager('enrollment.person'),
                     'lesson:id,public_id,title,code',
                 ],
@@ -136,7 +136,7 @@ class ProtectedDomainRegistry
                 'path' => 'kca/certificates',
                 'operation_id' => 'listAdminCatalogKcaCertificates',
                 'model' => KcaCertificate::class,
-                'with' => [...PersonDisplayName::eager(), 'enrollment:id,public_id'],
+                'with' => [...PersonDisplayName::eager(), 'enrollment:id,public_id,person_id'],
                 'order_column' => 'issued_at',
             ],
             'kca.years' => [
@@ -234,7 +234,7 @@ class ProtectedDomainRegistry
                 'operation_id' => 'listAdminCatalogKcaMentorAssignments',
                 'model' => KcaMentorAssignment::class,
                 'with' => [
-                    'enrollment:id,public_id',
+                    'enrollment:id,public_id,person_id',
                     ...PersonDisplayName::eager('mentor'),
                     ...PersonDisplayName::eager('enrollment.person'),
                 ],
@@ -625,6 +625,11 @@ class ProtectedDomainRegistry
                 $definition['purpose_column'],
                 $filters['purpose'],
             );
+        }
+
+        $moduleId = $filters['module_id'] ?? $filters['kca_module_id'] ?? null;
+        if ($key === 'kca.lessons' && is_string($moduleId) && trim($moduleId) !== '') {
+            $query->whereHas('module', fn (Builder $module) => $module->where('public_id', trim($moduleId)));
         }
 
         $direction = $definition['order_direction'] ?? 'desc';

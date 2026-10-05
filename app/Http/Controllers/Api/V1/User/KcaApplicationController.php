@@ -9,6 +9,7 @@ use App\Kca\KcaApplicationState;
 use App\Models\KcaApplication;
 use App\Models\User;
 use App\Support\Api\ApiResponse;
+use App\Support\Kca\KcaRegistrationProfile;
 use App\Support\Kca\RequestKcaLeadershipRecommendationAction;
 use App\Support\Kca\ResolveKcaAccessQuery;
 use Illuminate\Http\JsonResponse;
@@ -140,7 +141,7 @@ class KcaApplicationController extends Controller
             unset($incoming[$denied]);
         }
 
-        return $incoming;
+        return KcaRegistrationProfile::normalizeIncoming($incoming);
     }
 
     /** @param  array<string, mixed>  $incoming */
@@ -148,7 +149,7 @@ class KcaApplicationController extends Controller
     {
         $email = isset($incoming['recommender_email']) ? trim((string) $incoming['recommender_email']) : '';
         $name = isset($incoming['recommender_name']) ? trim((string) $incoming['recommender_name']) : '';
-        if ($email === '' || $name === '') {
+        if ($email === '') {
             return;
         }
         try {

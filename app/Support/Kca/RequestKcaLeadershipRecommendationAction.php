@@ -7,7 +7,10 @@ use App\Models\KcaLeadershipRecommendation;
 use App\Models\User;
 use App\Support\Audit\AuditEventData;
 use App\Support\Audit\RecordAuditEventAction;
+use App\Support\Identity\PersonDisplayName;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 
@@ -27,9 +30,12 @@ class RequestKcaLeadershipRecommendationAction
         ?User $actor = null,
     ): array {
         $normalizedName = Str::squish($name);
+        if ($normalizedName === '') {
+            $normalizedName = 'Church leader';
+        }
         $normalizedEmail = Str::lower(Str::squish($email));
-        if ($normalizedName === '' || $normalizedEmail === '' || ! filter_var($normalizedEmail, FILTER_VALIDATE_EMAIL)) {
-            throw new InvalidArgumentException('A recommender name and valid email are required.');
+        if ($normalizedEmail === '' || ! filter_var($normalizedEmail, FILTER_VALIDATE_EMAIL)) {
+            throw new InvalidArgumentException('A valid church leader email is required.');
         }
 
         return DB::transaction(function () use ($application, $normalizedName, $normalizedEmail, $role, $phone, $actor): array {
@@ -71,7 +77,39 @@ class RequestKcaLeadershipRecommendationAction
                 ],
             ));
 
+            if ($plain !== null) {
+                $this->sendLeaderEmail($application, $row, $plain);
+            }
+
             return ['recommendation' => $row, 'token' => $plain];
         }, attempts: 3);
+    }
+
+    private function sendLeaderEmail(KcaApplication $application, KcaLeadershipRecommendation $row, string $token): void
+    {
+        $application->loadMissing('person.profile', 'person.user');
+        $applicant = PersonDisplayName::of($application->person) ?: 'a KCA applicant';
+        $frontend = rtrim((string) env('FRONTEND_URL', config('app.url')), '/');
+        $link = $frontend.'/kca/recommend/'.$token;
+        $body = <<<TEXT
+Kingdom Change Agents (KCA) is asking you to recommend {$applicant}.
+
+{$applicant} gave this email address so their church leader can complete the recommendation. The student does not write this recommendation. Please open the link, add your name and role, and send a short note about the applicant.
+
+{$link}
+
+This message is from KCA at Family House Connect.
+TEXT;
+
+        try {
+            Mail::raw($body, function ($message) use ($row, $applicant): void {
+                $message->to($row->recommender_email)->subject('KCA leadership recommendation for '.$applicant);
+            });
+        } catch (\Throwable $exception) {
+            Log::warning('KCA leadership recommendation email could not be sent.', [
+                'recommendation_id' => $row->public_id,
+                'error' => $exception->getMessage(),
+            ]);
+        }
     }
 }

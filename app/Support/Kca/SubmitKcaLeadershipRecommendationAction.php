@@ -11,7 +11,13 @@ use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 class SubmitKcaLeadershipRecommendationAction
 {
-    public function handle(string $token, string $statement): KcaLeadershipRecommendation
+    public function handle(
+        string $token,
+        string $statement,
+        ?string $name = null,
+        ?string $role = null,
+        ?string $phone = null,
+    ): KcaLeadershipRecommendation
     {
         $normalizedToken = strtolower(trim($token));
         $statement = Str::squish($statement);
@@ -22,7 +28,7 @@ class SubmitKcaLeadershipRecommendationAction
             throw new InvalidArgumentException('A recommendation statement of 1 to 5000 characters is required.');
         }
 
-        return DB::transaction(function () use ($normalizedToken, $statement): KcaLeadershipRecommendation {
+        return DB::transaction(function () use ($normalizedToken, $statement, $name, $role, $phone): KcaLeadershipRecommendation {
             $row = KcaLeadershipRecommendation::query()
                 ->where('token_hash', hash('sha256', $normalizedToken))
                 ->lockForUpdate()
@@ -37,11 +43,24 @@ class SubmitKcaLeadershipRecommendationAction
                 return $row;
             }
 
-            $row->forceFill([
+            $updates = [
                 'statement' => $statement,
                 'status' => 'submitted',
                 'submitted_at' => now()->utc(),
-            ])->save();
+            ];
+            $leaderName = Str::squish((string) $name);
+            if ($leaderName !== '') {
+                $updates['recommender_name'] = $leaderName;
+            }
+            $leaderRole = Str::squish((string) $role);
+            if ($leaderRole !== '') {
+                $updates['recommender_role'] = $leaderRole;
+            }
+            $leaderPhone = Str::squish((string) $phone);
+            if ($leaderPhone !== '') {
+                $updates['recommender_phone'] = $leaderPhone;
+            }
+            $row->forceFill($updates)->save();
 
             return $row;
         }, attempts: 3);

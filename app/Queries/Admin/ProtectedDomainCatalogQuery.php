@@ -435,18 +435,54 @@ class ProtectedDomainCatalogQuery
                 $inner->whereHas('memberships', fn (Builder $m) => $m->whereIn('church_id', $churchIds))
                     ->orWhereHas('firstTimers', fn (Builder $f) => $f->whereIn('church_id', $churchIds))
                     ->orWhereHas('converts', fn (Builder $c) => $c->whereIn('church_id', $churchIds))
-                    ->orWhereHas('roleAssignments', fn (Builder $r) => $r->whereIn('church_id', $churchIds));
+                    ->orWhereHas('roleAssignments', fn (Builder $r) => $r->whereIn('church_id', $churchIds))
+                    ->orWhereIn('id', function ($leaders) use ($churchIds): void {
+                        $leaders->select('leader_person_id')
+                            ->from('home_churches')
+                            ->whereIn('church_id', $churchIds)
+                            ->whereNotNull('leader_person_id');
+                    })
+                    ->orWhereIn('id', function ($leaders) use ($churchIds): void {
+                        $leaders->select('leader_person_id')
+                            ->from('church_departments')
+                            ->whereIn('church_id', $churchIds)
+                            ->whereNotNull('leader_person_id');
+                    })
+                    ->orWhereIn('id', function ($leaders) use ($churchIds): void {
+                        $leaders->select('leader_person_id')
+                            ->from('church_groups')
+                            ->whereIn('church_id', $churchIds)
+                            ->whereNotNull('leader_person_id');
+                    });
             });
         }
         if (isset($filters['search'])) {
-            $search = '%'.trim((string) $filters['search']).'%';
-            $query->where(function (Builder $inner) use ($search): void {
-                $inner->where('public_id', 'like', $search)
-                    ->orWhereHas('profile', function (Builder $profile) use ($search): void {
-                        $profile->where('given_name', 'like', $search)
-                            ->orWhere('family_name', 'like', $search)
-                            ->orWhere('preferred_name', 'like', $search);
-                    })->orWhereHas('user', fn (Builder $user) => $user->where('email', 'like', $search)->orWhere('name', 'like', $search));
+            $raw = trim((string) $filters['search']);
+            $words = preg_split('/\s+/', $raw, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+            $query->where(function (Builder $inner) use ($raw, $words): void {
+                $inner->where('public_id', 'like', '%'.$raw.'%')
+                    ->orWhereHas('profile', function (Builder $profile) use ($raw, $words): void {
+                        $profile->where(function (Builder $name) use ($raw, $words): void {
+                            $name->whereRaw("concat_ws(' ', given_name, family_name) like ?", ['%'.$raw.'%'])
+                                ->orWhereRaw("concat_ws(' ', family_name, given_name) like ?", ['%'.$raw.'%'])
+                                ->orWhere('preferred_name', 'like', '%'.$raw.'%');
+                            foreach ($words as $word) {
+                                $like = '%'.$word.'%';
+                                $name->orWhere(function (Builder $part) use ($like): void {
+                                    $part->where('given_name', 'like', $like)
+                                        ->orWhere('family_name', 'like', $like)
+                                        ->orWhere('preferred_name', 'like', $like);
+                                });
+                            }
+                        });
+                    })
+                    ->orWhereHas('user', function (Builder $user) use ($raw, $words): void {
+                        $user->where('email', 'like', '%'.$raw.'%')
+                            ->orWhere('name', 'like', '%'.$raw.'%');
+                        foreach ($words as $word) {
+                            $user->orWhere('name', 'like', '%'.$word.'%');
+                        }
+                    });
             });
         }
 

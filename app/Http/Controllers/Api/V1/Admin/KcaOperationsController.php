@@ -71,6 +71,7 @@ use App\Support\Kca\CreateKcaMentorAssignmentAction;
 use App\Support\Kca\CreateKcaModuleAction;
 use App\Support\Kca\CreateKcaYearAction;
 use App\Support\Kca\DeleteKcaAssignmentAction;
+use App\Support\Kca\DeleteKcaAttendanceAction;
 use App\Support\Kca\DeleteKcaEnrollmentAction;
 use App\Support\Kca\EnrollKcaStudentAction;
 use App\Support\Kca\ExportKcaStudentsAction;
@@ -402,7 +403,7 @@ class KcaOperationsController extends Controller
             (string) $request->validated('idempotency_key'),
             $context->actor($request),
         ));
-        $evidence->load(['enrollment:id,public_id', 'fileAsset:id,public_id', 'submittedBy:id,public_id']);
+        $evidence->load(['enrollment:id,public_id,person_id', 'fileAsset:id,public_id', 'submittedBy:id,public_id']);
 
         return ApiResponse::success($request, (new ProtectedCatalogRecordResource($evidence))->resolve($request), status: 201);
     }
@@ -435,7 +436,7 @@ class KcaOperationsController extends Controller
             (string) $request->validated('idempotency_key'),
             $context->actor($request),
         ));
-        $certificate->load(['enrollment:id,public_id', 'person:id,public_id']);
+        $certificate->load(['enrollment:id,public_id,person_id', 'person:id,public_id']);
 
         return ApiResponse::success($request, (new ProtectedCatalogRecordResource($certificate))->resolve($request), status: 201);
     }
@@ -789,9 +790,35 @@ class KcaOperationsController extends Controller
             CarbonImmutable::parse((string) $request->validated('session_on')),
             $context->actor($request),
         ));
-        $attendance->load(['enrollment:id,public_id,registration_number', 'lesson:id,public_id,title,code', ...PersonDisplayName::eager('enrollment.person')]);
+        $attendance->load(['enrollment:id,public_id,registration_number,person_id', 'lesson:id,public_id,title,code', ...PersonDisplayName::eager('enrollment.person')]);
 
         return ApiResponse::success($request, (new ProtectedCatalogRecordResource($attendance))->resolve($request), status: 201);
+    }
+
+    public function destroyAttendance(Request $request, string $attendance, DeleteKcaAttendanceAction $action, ProtectedAdminContext $context): JsonResponse
+    {
+        $context->ensureGlobal($request);
+        $target = KcaAttendance::query()->where('public_id', $attendance)->firstOrFail();
+        $this->execute(function () use ($action, $target, $context, $request): void {
+            $action->handle($target, $context->actor($request));
+        });
+
+        return ApiResponse::success($request, ['id' => $attendance, 'deleted' => true]);
+    }
+
+    public function publishDraftAssignments(Request $request, TransitionKcaAssignmentAction $action, ProtectedAdminContext $context): JsonResponse
+    {
+        $context->ensureGlobal($request);
+        $published = $this->execute(function () use ($action, $context, $request): int {
+            $drafts = KcaAssignment::query()->where('state', KcaAssignmentState::Draft->value)->get();
+            foreach ($drafts as $draft) {
+                $action->handle($draft, KcaAssignmentState::Assigned, $context->actor($request));
+            }
+
+            return $drafts->count();
+        });
+
+        return ApiResponse::success($request, ['published' => $published]);
     }
 
     public function attendanceRoster(Request $request, RecordKcaMassAttendanceAction $action, ProtectedAdminContext $context): JsonResponse
@@ -956,7 +983,7 @@ class KcaOperationsController extends Controller
             $context->actor($request),
         ));
         $assignment->load([
-            'enrollment:id,public_id',
+            'enrollment:id,public_id,person_id',
             ...PersonDisplayName::eager('mentor'),
             ...PersonDisplayName::eager('enrollment.person'),
         ]);
@@ -979,7 +1006,7 @@ class KcaOperationsController extends Controller
             ])->save();
         });
         $target->load([
-            'enrollment:id,public_id',
+            'enrollment:id,public_id,person_id',
             ...PersonDisplayName::eager('mentor'),
             ...PersonDisplayName::eager('enrollment.person'),
         ]);

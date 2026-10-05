@@ -567,6 +567,7 @@ Route::prefix('kca')->name('kca.')->controller(KcaOperationsController::class)->
     Route::patch('/lessons/{lesson}', 'updateLesson')->whereUlid('lesson')->middleware(RequirePermissionAndScope::class.':kca.lessons.manage')->name('lessons.update');
     Route::post('/lessons/{lesson}/chapters', 'storeChapter')->whereUlid('lesson')->middleware(RequirePermissionAndScope::class.':kca.lessons.manage')->name('lessons.chapters.store');
     Route::post('/assignments', 'storeAssignment')->middleware(RequirePermissionAndScope::class.':kca.assignments.transition')->name('assignments.store');
+    Route::post('/assignments/publish-drafts', 'publishDraftAssignments')->middleware(RequirePermissionAndScope::class.':kca.assignments.transition')->name('assignments.publish_drafts');
     Route::get('/assignments/{assignment}', 'showAssignment')->whereUlid('assignment')->middleware(RequirePermissionAndScope::class.':kca.enrollments.view')->name('assignments.show');
     Route::patch('/assignments/{assignment}', 'updateAssignment')->whereUlid('assignment')->middleware(RequirePermissionAndScope::class.':kca.assignments.transition')->name('assignments.update');
     Route::delete('/assignments/{assignment}', 'destroyAssignment')->whereUlid('assignment')->middleware(RequirePermissionAndScope::class.':kca.assignments.transition')->name('assignments.destroy');
@@ -584,6 +585,7 @@ Route::prefix('kca')->name('kca.')->controller(KcaOperationsController::class)->
     Route::post('/enrollments/{enrollment}/attendance', 'recordAttendance')->whereUlid('enrollment')->middleware(RequirePermissionAndScope::class.':kca.attendance.record')->name('enrollments.attendance.store');
     Route::get('/attendance/roster', 'attendanceRoster')->middleware(RequirePermissionAndScope::class.':kca.attendance.record')->name('attendance.roster');
     Route::post('/attendance/mass', 'recordMassAttendance')->middleware(RequirePermissionAndScope::class.':kca.attendance.record')->name('attendance.mass');
+    Route::delete('/attendance/{attendance}', 'destroyAttendance')->whereUlid('attendance')->middleware(RequirePermissionAndScope::class.':kca.attendance.record')->name('attendance.destroy');
     Route::get('/enrollments/registration-number-preview', 'previewRegistrationNumber')->middleware(RequirePermissionAndScope::class.':kca.enrollments.manage')->name('enrollments.registration_number.preview');
     Route::get('/students/import-template', 'downloadStudentImportTemplate')->middleware(RequirePermissionAndScope::class.':kca.enrollments.manage')->name('students.import_template');
     Route::get('/students/export', 'exportStudents')->middleware(RequirePermissionAndScope::class.':kca.enrollments.manage')->name('students.export');

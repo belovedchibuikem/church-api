@@ -55,7 +55,7 @@ class RecordKcaMassAttendanceAction
             }
 
             $attendance->load([
-                'enrollment:id,public_id,registration_number',
+                'enrollment:id,public_id,registration_number,person_id',
                 ...PersonDisplayName::eager('enrollment.person'),
                 'lesson:id,public_id,title,code',
             ]);

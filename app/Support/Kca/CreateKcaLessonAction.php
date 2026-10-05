@@ -40,14 +40,16 @@ class CreateKcaLessonAction
 
             $duplicate = KcaLesson::query()
                 ->whereBelongsTo($lockedModule, 'module')
-                ->where(function ($query) use ($normalizedCode, $sequence): void {
-                    $query->where('code', $normalizedCode)->orWhere('sequence', $sequence);
+                ->where(function ($query) use ($normalizedCode, $normalizedTitle, $sequence): void {
+                    $query->where('code', $normalizedCode)
+                        ->orWhere('sequence', $sequence)
+                        ->orWhereRaw('lower(title) = ?', [strtolower($normalizedTitle)]);
                 })
                 ->lockForUpdate()
                 ->exists();
 
             if ($duplicate) {
-                throw new InvalidArgumentException('A KCA lesson with this code or sequence already exists for the module.');
+                throw new InvalidArgumentException('A lesson with this title, code, or sequence already exists in the module.');
             }
 
             $lesson = KcaLesson::query()->create([
